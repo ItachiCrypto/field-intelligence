@@ -7,12 +7,16 @@ import { NAV_BY_ROLE, ROLE_LABELS, ROLE_COLORS } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import {
   LayoutDashboard, Radar, BarChart3, Activity, Settings,
-  Briefcase, Bell, Users, Map, LogOut, BookOpen, Zap
+  Briefcase, Bell, Users, Map, LogOut, BookOpen, Zap,
+  DollarSign, TrendingUp, Target, Package, MapPin, Megaphone,
+  GitCompare, PieChart, TrendingDown, Brain,
 } from 'lucide-react';
 
 const ICON_MAP: Record<string, React.ElementType> = {
   LayoutDashboard, Radar, BarChart3, Activity, Settings,
   Briefcase, Bell, Users, Map, BookOpen,
+  DollarSign, TrendingUp, Target, Package, MapPin, Megaphone,
+  GitCompare, PieChart, TrendingDown, Brain,
 };
 
 export function Sidebar() {
