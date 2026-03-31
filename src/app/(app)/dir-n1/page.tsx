@@ -1,53 +1,110 @@
 'use client';
 
-import { useMemo } from 'react';
-import { EVOLUTION_CLIENTS } from '@/lib/seed-data-v2';
-import { KpiCard } from '@/components/shared/kpi-card';
-import { formatDate } from '@/lib/utils';
+import { useMemo, useState } from 'react';
 import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell,
+  SENTIMENT_PERIODES,
+  SENTIMENT_PERIODE_ACTUELLE,
+  SENTIMENT_PERIODE_PRECEDENTE,
+  SENTIMENT_REGIONS,
+} from '@/lib/seed-data-v2';
+import type { SentimentRegion } from '@/lib/types-v2';
+import { cn } from '@/lib/utils';
+import { REGIONS } from '@/lib/constants';
+import { KpiCard } from '@/components/shared/kpi-card';
+import {
+  BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip,
+  ResponsiveContainer, Legend, Cell,
 } from 'recharts';
-import { TrendingUp, TrendingDown, ShieldAlert } from 'lucide-react';
+import { Smile, Frown, UserCheck, FileText } from 'lucide-react';
+
+const PERIOD_OPTIONS = ['Mois', 'Trimestre', 'Semestre'] as const;
+
+function pct(n: number, total: number) {
+  return total > 0 ? Math.round((n / total) * 100) : 0;
+}
+
+function changePct(current: number, previous: number) {
+  if (previous === 0) return current > 0 ? 100 : 0;
+  return Math.round(((current - previous) / previous) * 100);
+}
 
 export default function DirN1Page() {
-  const stats = useMemo(() => {
-    const progression = EVOLUTION_CLIENTS.filter((c) => c.delta > 0).length;
-    const regression = EVOLUTION_CLIENTS.filter((c) => c.delta < 0).length;
-    const nouveauxConcurrents = EVOLUTION_CLIENTS.filter(
-      (c) => c.presence_concurrent_actuel && !c.presence_concurrent_precedent
-    ).length;
-    return { progression, regression, nouveauxConcurrents };
-  }, []);
+  const [regionFilter, setRegionFilter] = useState<string>('Toutes');
+  const [periodFilter, setPeriodFilter] = useState<string>('Mois');
 
-  const sorted = useMemo(
-    () => [...EVOLUTION_CLIENTS].sort((a, b) => a.delta - b.delta),
-    []
-  );
+  const cur = SENTIMENT_PERIODE_ACTUELLE;
+  const prev = SENTIMENT_PERIODE_PRECEDENTE;
 
-  const chartData = useMemo(
-    () =>
-      sorted.map((c) => ({
-        name: c.client_name,
-        delta: c.delta,
-      })),
-    [sorted]
-  );
+  // --- KPIs ---
+  const kpis = useMemo(() => ({
+    positif: {
+      count: cur.positif,
+      pct: pct(cur.positif, cur.total),
+      change: changePct(cur.positif, prev.positif),
+    },
+    negatif: {
+      count: cur.negatif,
+      pct: pct(cur.negatif, cur.total),
+      change: changePct(cur.negatif, prev.negatif),
+    },
+    interesse: {
+      count: cur.interesse,
+      change: changePct(cur.interesse, prev.interesse),
+    },
+    total: {
+      count: cur.total,
+      change: changePct(cur.total, prev.total),
+    },
+  }), [cur, prev]);
 
-  function sentimentBadge(sentiment: string) {
-    const config: Record<string, string> = {
-      positif: 'bg-emerald-50 text-emerald-700',
-      neutre: 'bg-slate-50 text-slate-600',
-      negatif: 'bg-rose-50 text-rose-700',
-    };
-    const labels: Record<string, string> = {
-      positif: 'Positif',
-      neutre: 'Neutre',
-      negatif: 'Negatif',
-    };
+  // --- Grouped bar chart data ---
+  const compareData = useMemo(() => [
+    { category: 'Positif', actuel: cur.positif, precedent: prev.positif },
+    { category: 'Negatif', actuel: cur.negatif, precedent: prev.negatif },
+    { category: 'Neutre', actuel: cur.neutre, precedent: prev.neutre },
+    { category: 'Interesse', actuel: cur.interesse, precedent: prev.interesse },
+  ], [cur, prev]);
+
+  // --- Line chart: positif % per week ---
+  const tendanceData = useMemo(() =>
+    SENTIMENT_PERIODES.map((p) => ({
+      semaine: p.periode,
+      ratio: pct(p.positif, p.total),
+    })),
+  []);
+
+  // --- Regions sorted by negatif/total desc ---
+  const regionsSorted = useMemo(() => {
+    let regions = [...SENTIMENT_REGIONS];
+    if (regionFilter !== 'Toutes') {
+      regions = regions.filter((r) => r.region === regionFilter);
+    }
+    return regions.sort((a, b) => {
+      const ratioA = a.total > 0 ? a.negatif / a.total : 0;
+      const ratioB = b.total > 0 ? b.negatif / b.total : 0;
+      return ratioB - ratioA;
+    });
+  }, [regionFilter]);
+
+  function stackedBar(r: SentimentRegion) {
+    const total = r.total || 1;
+    const segments = [
+      { key: 'positif', value: r.positif, color: 'bg-emerald-500', label: 'Positif' },
+      { key: 'negatif', value: r.negatif, color: 'bg-rose-500', label: 'Negatif' },
+      { key: 'neutre', value: r.neutre, color: 'bg-slate-400', label: 'Neutre' },
+      { key: 'interesse', value: r.interesse, color: 'bg-amber-500', label: 'Interesse' },
+    ];
     return (
-      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${config[sentiment] || ''}`}>
-        {labels[sentiment] || sentiment}
-      </span>
+      <div className="flex h-2.5 rounded-full overflow-hidden bg-slate-100">
+        {segments.map((s) => (
+          <div
+            key={s.key}
+            className={s.color}
+            style={{ width: `${(s.value / total) * 100}%` }}
+            title={`${s.label}: ${s.value}`}
+          />
+        ))}
+      </div>
     );
   }
 
@@ -55,116 +112,175 @@ export default function DirN1Page() {
     <div className="space-y-8">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-slate-900">Evolution Clients — Retours N-1</h1>
-        <p className="text-sm text-slate-500 mt-1">Comparaison des scores clients entre deux periodes</p>
+        <h1 className="text-2xl font-bold text-slate-900">Pilotage Sentiment Client</h1>
+        <p className="text-sm text-slate-500 mt-1">
+          Evolution globale du sentiment detecte dans les CR
+        </p>
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <KpiCard
-          label="Clients en progression"
-          value={stats.progression}
-          icon={<TrendingUp className="w-5 h-5" />}
+          label="Sentiment positif"
+          value={`${kpis.positif.count}`}
+          suffix={`(${kpis.positif.pct}%)`}
+          change={kpis.positif.change}
+          icon={<Smile className="w-5 h-5" />}
           iconColor="text-emerald-600 bg-emerald-50"
         />
         <KpiCard
-          label="En regression"
-          value={stats.regression}
-          icon={<TrendingDown className="w-5 h-5" />}
+          label="Sentiment negatif"
+          value={`${kpis.negatif.count}`}
+          suffix={`(${kpis.negatif.pct}%)`}
+          change={kpis.negatif.change}
+          icon={<Frown className="w-5 h-5" />}
           iconColor="text-rose-600 bg-rose-50"
         />
         <KpiCard
-          label="Nouveaux concurrents detectes"
-          value={stats.nouveauxConcurrents}
-          icon={<ShieldAlert className="w-5 h-5" />}
+          label="Clients interesses"
+          value={kpis.interesse.count}
+          change={kpis.interesse.change}
+          icon={<UserCheck className="w-5 h-5" />}
           iconColor="text-amber-600 bg-amber-50"
+        />
+        <KpiCard
+          label="Total CR analyses"
+          value={kpis.total.count}
+          change={kpis.total.change}
+          icon={<FileText className="w-5 h-5" />}
+          iconColor="text-indigo-600 bg-indigo-50"
         />
       </div>
 
-      {/* Table */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-100">
-          <h2 className="text-base font-semibold text-slate-900">Detail par client</h2>
+      {/* Filter pills */}
+      <div className="flex flex-wrap items-center gap-6">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider mr-1">Region</span>
+          {['Toutes', ...REGIONS].map((r) => (
+            <button
+              key={r}
+              onClick={() => setRegionFilter(r)}
+              className={cn(
+                'px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
+                regionFilter === r
+                  ? 'bg-slate-900 text-white'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              )}
+            >
+              {r}
+            </button>
+          ))}
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-slate-50/60">
-                <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Client</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Commercial</th>
-                <th className="text-center px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Score actuel</th>
-                <th className="text-center px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Score precedent</th>
-                <th className="text-center px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Delta</th>
-                <th className="text-center px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Concurrent</th>
-                <th className="text-center px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Sentiment</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Date actuel</th>
-                <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Date precedent</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sorted.map((c) => (
-                <tr key={c.client_id} className="border-b border-slate-100 hover:bg-slate-50/40 transition-colors">
-                  <td className="px-6 py-3 font-medium text-slate-900">{c.client_name}</td>
-                  <td className="px-4 py-3 text-slate-700">{c.commercial_name}</td>
-                  <td className="px-4 py-3 text-center tabular-nums font-semibold text-slate-900">{c.score_actuel}</td>
-                  <td className="px-4 py-3 text-center tabular-nums text-slate-500">{c.score_precedent}</td>
-                  <td className="px-4 py-3 text-center">
-                    <span
-                      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums ${
-                        c.delta > 0
-                          ? 'bg-emerald-50 text-emerald-700'
-                          : c.delta < 0
-                            ? 'bg-rose-50 text-rose-700'
-                            : 'bg-slate-50 text-slate-600'
-                      }`}
-                    >
-                      {c.delta > 0 ? '+' : ''}{c.delta}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    {c.presence_concurrent_actuel ? (
-                      <span className="inline-block w-2.5 h-2.5 rounded-full bg-rose-500" title="Concurrent present" />
-                    ) : (
-                      <span className="inline-block w-2.5 h-2.5 rounded-full bg-slate-200" title="Aucun concurrent" />
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-center">{sentimentBadge(c.sentiment)}</td>
-                  <td className="px-4 py-3 text-slate-500 tabular-nums">{formatDate(c.date_actuel)}</td>
-                  <td className="px-6 py-3 text-slate-500 tabular-nums">{formatDate(c.date_precedent)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider mr-1">Periode</span>
+          {PERIOD_OPTIONS.map((p) => (
+            <button
+              key={p}
+              onClick={() => setPeriodFilter(p)}
+              className={cn(
+                'px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
+                periodFilter === p
+                  ? 'bg-slate-900 text-white'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              )}
+            >
+              {p}
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* Delta chart */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
-        <h2 className="text-base font-semibold text-slate-900 mb-4">Delta par client</h2>
-        <div className="h-72">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-              <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#64748b' }} angle={-20} textAnchor="end" height={60} />
-              <YAxis tick={{ fontSize: 12, fill: '#64748b' }} />
-              <Tooltip
-                formatter={(value) => [`${Number(value) > 0 ? '+' : ''}${value}`, 'Delta']}
-                contentStyle={{
-                  borderRadius: 12,
-                  border: '1px solid #e2e8f0',
-                  boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-                }}
-              />
-              <Bar dataKey="delta" radius={[4, 4, 0, 0]}>
-                {chartData.map((entry, idx) => (
-                  <Cell
-                    key={idx}
-                    fill={entry.delta >= 0 ? '#10b981' : '#f43f5e'}
-                  />
+      {/* Charts row */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Grouped bar chart */}
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+          <h2 className="text-base font-semibold text-slate-900 mb-4">
+            Comparaison mois actuel vs precedent
+          </h2>
+          <div className="h-72">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={compareData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+                <XAxis dataKey="category" tick={{ fontSize: 12, fill: '#64748b' }} />
+                <YAxis tick={{ fontSize: 12, fill: '#64748b' }} />
+                <Tooltip
+                  contentStyle={{
+                    borderRadius: 12,
+                    border: '1px solid #e2e8f0',
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                  }}
+                />
+                <Legend
+                  wrapperStyle={{ fontSize: 12, color: '#64748b' }}
+                />
+                <Bar dataKey="actuel" name="Mois actuel" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="precedent" name="Mois precedent" fill="#cbd5e1" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Line chart: tendance positif % */}
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+          <h2 className="text-base font-semibold text-slate-900 mb-4">
+            Tendance sentiment positif (4 semaines)
+          </h2>
+          <div className="h-72">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={tendanceData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+                <XAxis dataKey="semaine" tick={{ fontSize: 12, fill: '#64748b' }} />
+                <YAxis
+                  tick={{ fontSize: 12, fill: '#64748b' }}
+                  domain={[0, 100]}
+                  tickFormatter={(v) => `${v}%`}
+                />
+                <Tooltip
+                  formatter={((value: any) => [`${value}%`, 'Positif']) as any}
+                  contentStyle={{
+                    borderRadius: 12,
+                    border: '1px solid #e2e8f0',
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                  }}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="ratio"
+                  stroke="#6366f1"
+                  strokeWidth={2.5}
+                  dot={{ fill: '#6366f1', r: 4 }}
+                  activeDot={{ r: 6 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+
+      {/* Region breakdown */}
+      <div>
+        <h2 className="text-base font-semibold text-slate-900 mb-4">Repartition par region</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {regionsSorted.map((r) => (
+            <div
+              key={r.region}
+              className="bg-white rounded-xl border border-slate-200 shadow-sm p-5"
+            >
+              <h3 className="text-sm font-semibold text-slate-900 mb-3">{r.region}</h3>
+              {stackedBar(r)}
+              <div className="mt-3 grid grid-cols-4 gap-2 text-center">
+                {[
+                  { label: 'Positif', value: r.positif, color: 'text-emerald-700' },
+                  { label: 'Negatif', value: r.negatif, color: 'text-rose-700' },
+                  { label: 'Neutre', value: r.neutre, color: 'text-slate-600' },
+                  { label: 'Interesse', value: r.interesse, color: 'text-amber-700' },
+                ].map((s) => (
+                  <div key={s.label}>
+                    <p className={cn('text-base font-bold tabular-nums', s.color)}>{s.value}</p>
+                    <p className="text-[10px] text-slate-500">{s.label}</p>
+                  </div>
                 ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     </div>

@@ -1,104 +1,132 @@
 'use client';
 
 import { useMemo } from 'react';
-import { SEGMENT_STATS } from '@/lib/seed-data-v2';
-import { formatCurrency } from '@/lib/utils';
+import { SEGMENT_SENTIMENTS, SEGMENT_INSIGHTS } from '@/lib/seed-data-v2';
+import { ClientSegment } from '@/lib/types-v2';
+import { cn } from '@/lib/utils';
 import {
-  PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip,
-  ResponsiveContainer, CartesianGrid,
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
-import { Users, Briefcase, Star } from 'lucide-react';
+import { CheckCircle, XCircle, Brain, Users } from 'lucide-react';
 
-const SEGMENT_CONFIG: Record<string, { label: string; color: string; border: string; bg: string; icon: React.ReactNode }> = {
+const SEGMENT_CONFIG: Record<ClientSegment, { label: string; border: string; headerBg: string; color: string }> = {
   nouveau: {
-    label: 'Nouveau',
-    color: '#6366f1',
+    label: 'Nouveaux clients',
     border: 'border-l-indigo-500',
-    bg: 'bg-indigo-50',
-    icon: <Users className="w-5 h-5 text-indigo-600" />,
+    headerBg: 'bg-indigo-50',
+    color: '#6366f1',
   },
   etabli: {
-    label: 'Etabli',
-    color: '#0ea5e9',
-    border: 'border-l-sky-500',
-    bg: 'bg-sky-50',
-    icon: <Briefcase className="w-5 h-5 text-sky-600" />,
-  },
-  strategique: {
-    label: 'Strategique',
-    color: '#f59e0b',
-    border: 'border-l-amber-500',
-    bg: 'bg-amber-50',
-    icon: <Star className="w-5 h-5 text-amber-600" />,
+    label: 'Clients etablis',
+    border: 'border-l-teal-500',
+    headerBg: 'bg-teal-50',
+    color: '#14b8a6',
   },
 };
 
-export default function DirSegPage() {
-  const pieData = useMemo(
-    () =>
-      SEGMENT_STATS.map((s) => ({
-        name: SEGMENT_CONFIG[s.segment]?.label || s.segment,
-        value: s.count,
-        color: SEGMENT_CONFIG[s.segment]?.color || '#94a3b8',
-      })),
-    []
-  );
+const SENTIMENT_COLORS = {
+  positif: '#10b981',
+  negatif: '#f43f5e',
+  neutre: '#64748b',
+  interesse: '#f59e0b',
+};
 
-  const barData = useMemo(
-    () =>
-      SEGMENT_STATS.map((s) => ({
-        name: SEGMENT_CONFIG[s.segment]?.label || s.segment,
-        ca: s.ca_total,
-        color: SEGMENT_CONFIG[s.segment]?.color || '#94a3b8',
-      })),
-    []
-  );
+const SENTIMENT_LABELS: Record<string, string> = {
+  positif: 'Positif',
+  negatif: 'Negatif',
+  neutre: 'Neutre',
+  interesse: 'Interesse',
+};
+
+export default function DirSegPage() {
+  const nouveau = SEGMENT_SENTIMENTS.find(s => s.segment === 'nouveau')!;
+  const etabli = SEGMENT_SENTIMENTS.find(s => s.segment === 'etabli')!;
+
+  // Bar chart: grouped bars comparing sentiment % by segment
+  const chartData = useMemo(() => {
+    const keys = ['positif', 'negatif', 'neutre', 'interesse'] as const;
+    return keys.map(k => ({
+      sentiment: SENTIMENT_LABELS[k],
+      Nouveau: nouveau[`pct_${k}`],
+      Etabli: etabli[`pct_${k}`],
+    }));
+  }, [nouveau, etabli]);
 
   return (
     <div className="space-y-8">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-slate-900">Segmentation Nouveaux vs Etablis</h1>
-        <p className="text-sm text-slate-500 mt-1">Repartition et performance par segment client</p>
+        <h1 className="text-2xl font-bold text-slate-900">Segmentation Clients</h1>
+        <p className="text-sm text-slate-500 mt-1">Comparaison sentiment et retours entre nouveaux et etablis</p>
       </div>
 
-      {/* Segment cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {SEGMENT_STATS.map((seg) => {
-          const config = SEGMENT_CONFIG[seg.segment];
+      {/* Segment cards side by side */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {([nouveau, etabli] as const).map(seg => {
+          const cfg = SEGMENT_CONFIG[seg.segment];
           return (
             <div
               key={seg.segment}
-              className={`bg-white rounded-xl border border-slate-200 shadow-sm p-5 border-l-4 ${config?.border || ''}`}
+              className={cn('bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden border-l-4', cfg.border)}
             >
-              <div className="flex items-center gap-3 mb-4">
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${config?.bg || 'bg-slate-50'}`}>
-                  {config?.icon}
-                </div>
-                <h3 className="text-base font-semibold text-slate-900">{config?.label || seg.segment}</h3>
+              {/* Card header */}
+              <div className={cn('px-6 py-4 flex items-center gap-3', cfg.headerBg)}>
+                <Users className="w-5 h-5" style={{ color: cfg.color }} />
+                <h2 className="text-base font-semibold text-slate-800">{cfg.label}</h2>
               </div>
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-slate-500">Nombre de clients</span>
-                  <span className="text-sm font-semibold text-slate-900 tabular-nums">{seg.count}</span>
+
+              <div className="px-6 py-5 space-y-5">
+                {/* Stats grid */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-xs text-slate-500 mb-0.5">Nombre de CR</p>
+                    <p className="text-xl font-bold text-slate-900 tabular-nums">{seg.nb_cr}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-500 mb-0.5">Positif</p>
+                    <p className="text-xl font-bold text-emerald-600 tabular-nums">{seg.pct_positif}%</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-500 mb-0.5">Negatif</p>
+                    <p className="text-xl font-bold text-rose-600 tabular-nums">{seg.pct_negatif}%</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-500 mb-0.5">Neutre</p>
+                    <p className="text-xl font-bold text-slate-600 tabular-nums">{seg.pct_neutre}%</p>
+                  </div>
+                  <div className="col-span-2">
+                    <p className="text-xs text-slate-500 mb-0.5">Interesse</p>
+                    <p className="text-xl font-bold text-amber-600 tabular-nums">{seg.pct_interesse}%</p>
+                  </div>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-slate-500">CA total</span>
-                  <span className="text-sm font-semibold text-slate-900 tabular-nums">{formatCurrency(seg.ca_total)}</span>
+
+                {/* Divider */}
+                <div className="border-t border-slate-100" />
+
+                {/* Top insatisfactions */}
+                <div>
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">Top insatisfactions</h3>
+                  <ul className="space-y-1.5">
+                    {seg.top_insatisfactions.map((item, i) => (
+                      <li key={i} className="flex items-start gap-2 text-sm text-slate-700">
+                        <XCircle className="w-4 h-4 text-rose-400 mt-0.5 shrink-0" />
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-slate-500">Signaux moy.</span>
-                  <span className="text-sm font-semibold text-slate-900 tabular-nums">{seg.signaux_avg}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-slate-500">Risque moy.</span>
-                  <span className="text-sm font-semibold text-slate-900 tabular-nums">{seg.risk_avg}%</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-slate-500">Taux de churn</span>
-                  <span className={`text-sm font-semibold tabular-nums ${seg.churn_rate >= 10 ? 'text-rose-600' : 'text-slate-900'}`}>
-                    {seg.churn_rate}%
-                  </span>
+
+                {/* Points positifs */}
+                <div>
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">Points positifs</h3>
+                  <ul className="space-y-1.5">
+                    {seg.top_points_positifs.map((item, i) => (
+                      <li key={i} className="flex items-start gap-2 text-sm text-slate-700">
+                        <CheckCircle className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               </div>
             </div>
@@ -106,70 +134,46 @@ export default function DirSegPage() {
         })}
       </div>
 
-      {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Pie chart */}
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
-          <h2 className="text-base font-semibold text-slate-900 mb-4">Repartition par segment</h2>
-          <div className="h-64 flex items-center justify-center">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={pieData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={50}
-                  outerRadius={90}
-                  dataKey="value"
-                  stroke="#fff"
-                  strokeWidth={2}
-                  label={({ name, value }) => `${name}: ${value}`}
-                >
-                  {pieData.map((entry, idx) => (
-                    <Cell key={idx} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip
-                  contentStyle={{
-                    borderRadius: 12,
-                    border: '1px solid #e2e8f0',
-                    boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-                  }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
+      {/* Bar chart compare */}
+      <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+        <h2 className="text-sm font-semibold text-slate-700 mb-4">Comparaison sentiment par segment</h2>
+        <ResponsiveContainer width="100%" height={320}>
+          <BarChart data={chartData} margin={{ left: 10, right: 10 }}>
+            <XAxis dataKey="sentiment" tick={{ fill: '#334155', fontSize: 13 }} />
+            <YAxis tickFormatter={v => `${v}%`} tick={{ fill: '#64748b', fontSize: 12 }} />
+            <Tooltip
+              formatter={((value: any) => [`${value}%`]) as any}
+              contentStyle={{ borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13 }}
+            />
+            <Legend
+              iconType="circle"
+              iconSize={8}
+              wrapperStyle={{ fontSize: 13, color: '#64748b' }}
+            />
+            <Bar dataKey="Nouveau" fill="#6366f1" radius={[4, 4, 0, 0]} maxBarSize={40} />
+            <Bar dataKey="Etabli" fill="#14b8a6" radius={[4, 4, 0, 0]} maxBarSize={40} />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
 
-        {/* Bar chart */}
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
-          <h2 className="text-base font-semibold text-slate-900 mb-4">CA par segment</h2>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={barData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#64748b' }} />
-                <YAxis
-                  tick={{ fontSize: 12, fill: '#64748b' }}
-                  tickFormatter={(v) => formatCurrency(v as number)}
-                />
-                <Tooltip
-                  formatter={(value) => [formatCurrency(value as number), 'CA total']}
-                  contentStyle={{
-                    borderRadius: 12,
-                    border: '1px solid #e2e8f0',
-                    boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-                  }}
-                />
-                <Bar dataKey="ca" radius={[4, 4, 0, 0]}>
-                  {barData.map((entry, idx) => (
-                    <Cell key={idx} fill={entry.color} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+      {/* Insights IA */}
+      <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+        <div className="flex items-center gap-2 mb-4">
+          <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-slate-100">
+            <Brain className="w-4.5 h-4.5 text-slate-600" />
           </div>
+          <h2 className="text-sm font-semibold text-slate-700">Insights IA</h2>
         </div>
+        <ul className="space-y-3">
+          {SEGMENT_INSIGHTS.map((insight, i) => (
+            <li key={i} className="flex items-start gap-3 text-sm text-slate-700">
+              <span className="flex items-center justify-center w-5 h-5 rounded-full bg-slate-100 text-slate-500 text-xs font-semibold shrink-0 mt-0.5">
+                {i + 1}
+              </span>
+              {insight}
+            </li>
+          ))}
+        </ul>
       </div>
     </div>
   );

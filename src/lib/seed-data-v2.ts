@@ -1,8 +1,8 @@
 import {
-  PrixSignal, TendancePrixConcurrent, DealAnalyse, OffreConcurrente,
-  CommConcurrente, PositionnementData, GeoSectorCell,
-  ClosingCommercial, FunnelEtape, EvolutionClient, SegmentStats,
-  DealPerdu, TerritoireSynthese, GeoPoint, RecommandationIA,
+  PrixSignal, TendancePrixConcurrent, DealAnalyse, DealTendanceSemaine,
+  OffreConcurrente, CommConcurrente, PositionnementData, GeoSectorCell,
+  CRObjectif, SentimentPeriode, SentimentRegion, SegmentSentiment,
+  TerritoireSynthese, GeoPoint, RecommandationIA,
 } from './types-v2';
 
 // === MKT-PRIX ===
@@ -36,20 +36,29 @@ export const TENDANCE_PRIX: TendancePrixConcurrent[] = [
   { concurrent_nom: 'Proxio', semaine: 'S14', mentions: 4, ecart_moyen: -5, deals_perdus: 1, deals_gagnes: 1 },
 ];
 
-// === MKT-DEAL ===
+// === MKT-DEAL + DIR-LOST — Deals (sans euros) ===
 export const DEALS_ANALYSE: DealAnalyse[] = [
-  { id: 'd-1', motif_principal: 'prix', resultat: 'perdu', valeur_eur: 45000, concurrent_nom: 'Acme', commercial_name: 'Thomas D.', client_name: 'Dupont Industries', secteur: 'Industrie', region: 'Nord', date: '2026-03-28' },
-  { id: 'd-2', motif_principal: 'relation', resultat: 'gagne', valeur_eur: 82000, commercial_name: 'Emma V.', client_name: 'BioSante Plus', secteur: 'Sante', region: 'IDF', date: '2026-03-27' },
-  { id: 'd-3', motif_principal: 'produit', resultat: 'perdu', valeur_eur: 35000, concurrent_nom: 'Bexor', commercial_name: 'Antoine G.', client_name: 'SudFrance Logistique', secteur: 'Logistique', region: 'Sud-Ouest', date: '2026-03-25' },
-  { id: 'd-4', motif_principal: 'prix', resultat: 'perdu', valeur_eur: 120000, concurrent_nom: 'Acme', commercial_name: 'Lucas M.', client_name: 'Horizon Distribution', secteur: 'Distribution', region: 'Est', date: '2026-03-22' },
-  { id: 'd-5', motif_principal: 'timing', resultat: 'perdu', valeur_eur: 28000, commercial_name: 'Hugo T.', client_name: 'NovaTech', secteur: 'Tech', region: 'Sud-Ouest', date: '2026-03-20' },
-  { id: 'd-6', motif_principal: 'relation', resultat: 'gagne', valeur_eur: 56000, commercial_name: 'Clara S.', client_name: 'Transco Group', secteur: 'Transport', region: 'IDF', date: '2026-03-19' },
-  { id: 'd-7', motif_principal: 'concurrent', resultat: 'perdu', valeur_eur: 67000, concurrent_nom: 'Bexor', commercial_name: 'Camille P.', client_name: 'Atelier Central', secteur: 'Industrie', region: 'Nord-Est', date: '2026-03-18' },
-  { id: 'd-8', motif_principal: 'prix', resultat: 'gagne', valeur_eur: 95000, commercial_name: 'Sarah R.', client_name: 'Groupe Mercier', secteur: 'Distribution', region: 'Nord', date: '2026-03-15' },
-  { id: 'd-9', motif_principal: 'budget', resultat: 'perdu', valeur_eur: 42000, commercial_name: 'Marc D.', client_name: 'EcoVert Services', secteur: 'Services', region: 'Ouest', date: '2026-03-12' },
-  { id: 'd-10', motif_principal: 'produit', resultat: 'gagne', valeur_eur: 73000, commercial_name: 'Lea F.', client_name: 'LogiPro SAS', secteur: 'Logistique', region: 'Est', date: '2026-03-10' },
-  { id: 'd-11', motif_principal: 'prix', resultat: 'perdu', valeur_eur: 38000, concurrent_nom: 'Proxio', commercial_name: 'Nathan B.', client_name: 'MecanoParts', secteur: 'Industrie', region: 'Sud', date: '2026-03-08' },
-  { id: 'd-12', motif_principal: 'offre', resultat: 'perdu', valeur_eur: 55000, concurrent_nom: 'Bexor', commercial_name: 'Ines D.', client_name: 'AlphaLogistics', secteur: 'Logistique', region: 'Sud-Ouest', date: '2026-03-05' },
+  { id: 'd-1', motif_principal: 'prix', resultat: 'perdu', concurrent_nom: 'Acme', commercial_name: 'Thomas D.', client_name: 'Dupont Industries', region: 'Nord', date: '2026-03-28', verbatim: 'Client a choisi Acme car 12% moins cher sur la gamme standard' },
+  { id: 'd-2', motif_principal: 'relation', resultat: 'gagne', commercial_name: 'Emma V.', client_name: 'BioSante Plus', region: 'IDF', date: '2026-03-27', verbatim: 'Relation de confiance avec le DG — renouvellement sans appel d\'offres' },
+  { id: 'd-3', motif_principal: 'produit', resultat: 'perdu', concurrent_nom: 'Bexor', commercial_name: 'Antoine G.', client_name: 'SudFrance Logistique', region: 'Sud-Ouest', date: '2026-03-25', verbatim: 'Bexor propose un bundle produit+maintenance plus adapte a leur usage' },
+  { id: 'd-4', motif_principal: 'prix', resultat: 'perdu', concurrent_nom: 'Acme', commercial_name: 'Lucas M.', client_name: 'Horizon Distribution', region: 'Est', date: '2026-03-22', verbatim: 'Impossible de matcher le prix Acme, engagement 3 ans trop contraignant' },
+  { id: 'd-5', motif_principal: 'timing', resultat: 'perdu', commercial_name: 'Hugo T.', client_name: 'NovaTech', region: 'Sud-Ouest', date: '2026-03-20', verbatim: 'Projet reporte au Q3, budget gele par la direction' },
+  { id: 'd-6', motif_principal: 'relation', resultat: 'gagne', commercial_name: 'Clara S.', client_name: 'Transco Group', region: 'IDF', date: '2026-03-19', verbatim: 'Le client valorise notre reactivite et la qualite du suivi commercial' },
+  { id: 'd-7', motif_principal: 'concurrent', resultat: 'perdu', concurrent_nom: 'Bexor', commercial_name: 'Camille P.', client_name: 'Atelier Central', region: 'Nord-Est', date: '2026-03-18', verbatim: 'Bexor a offert l\'installation gratuite du nouveau site' },
+  { id: 'd-8', motif_principal: 'prix', resultat: 'gagne', commercial_name: 'Sarah R.', client_name: 'Groupe Mercier', region: 'Nord', date: '2026-03-15', verbatim: 'Notre offre prix alignee + SAV premium a fait la difference' },
+  { id: 'd-9', motif_principal: 'budget', resultat: 'perdu', commercial_name: 'Marc D.', client_name: 'EcoVert Services', region: 'Ouest', date: '2026-03-12', verbatim: 'Budget supprime par la direction generale — projet annule' },
+  { id: 'd-10', motif_principal: 'produit', resultat: 'gagne', commercial_name: 'Lea F.', client_name: 'LogiPro SAS', region: 'Est', date: '2026-03-10', verbatim: 'Notre gamme repond exactement au cahier des charges technique' },
+  { id: 'd-11', motif_principal: 'prix', resultat: 'perdu', concurrent_nom: 'Proxio', commercial_name: 'Nathan B.', client_name: 'MecanoParts', region: 'Sud', date: '2026-03-08', verbatim: 'Proxio 5% moins cher sur le catalogue standard' },
+  { id: 'd-12', motif_principal: 'offre', resultat: 'perdu', concurrent_nom: 'Bexor', commercial_name: 'Ines D.', client_name: 'AlphaLogistics', region: 'Sud-Ouest', date: '2026-03-05', verbatim: 'Offre Bexor tout inclus — maintenance + formation + installation' },
+  { id: 'd-13', motif_principal: 'relation', resultat: 'gagne', commercial_name: 'Alice M.', client_name: 'TechnoPlus', region: 'Nord-Est', date: '2026-03-04', verbatim: 'Confiance etablie depuis 2 ans, le client ne veut pas changer' },
+  { id: 'd-14', motif_principal: 'timing', resultat: 'perdu', commercial_name: 'Gabriel L.', client_name: 'OmegaCorp', region: 'Ouest', date: '2026-03-02', verbatim: 'Arrive trop tard, le concurrent avait deja signe la semaine derniere' },
+];
+
+export const DEAL_TENDANCE: DealTendanceSemaine[] = [
+  { semaine: 'S11', prix: 2, produit: 1, offre: 0, timing: 0, concurrent: 1, relation: 0, budget: 1, autre: 0 },
+  { semaine: 'S12', prix: 3, produit: 0, offre: 1, timing: 1, concurrent: 0, relation: 0, budget: 0, autre: 0 },
+  { semaine: 'S13', prix: 2, produit: 1, offre: 0, timing: 1, concurrent: 1, relation: 0, budget: 1, autre: 0 },
+  { semaine: 'S14', prix: 4, produit: 1, offre: 1, timing: 0, concurrent: 1, relation: 0, budget: 0, autre: 0 },
 ];
 
 // === MKT-OFFRE ===
@@ -106,65 +115,100 @@ export const GEO_SECTOR_DATA: GeoSectorCell[] = [
   { secteur: 'Distribution', region: 'Est', signaux_concurrence: 9, signaux_besoins: 11, signaux_opportunites: 7, score_intensite: 58 },
 ];
 
-// === DIR-CLOS ===
-export const CLOSING_DATA: ClosingCommercial[] = [
-  { commercial_id: 'com-1', commercial_name: 'Thomas D.', mois: '2026-03', nb_rdv: 48, nb_propositions: 18, nb_closings: 12, ca_signe_eur: 285000, objectif_mensuel_eur: 300000, taux_closing_pct: 67 },
-  { commercial_id: 'com-2', commercial_name: 'Sarah R.', mois: '2026-03', nb_rdv: 42, nb_propositions: 15, nb_closings: 10, ca_signe_eur: 220000, objectif_mensuel_eur: 250000, taux_closing_pct: 67 },
-  { commercial_id: 'com-7', commercial_name: 'Emma V.', mois: '2026-03', nb_rdv: 45, nb_propositions: 20, nb_closings: 14, ca_signe_eur: 340000, objectif_mensuel_eur: 280000, taux_closing_pct: 70 },
-  { commercial_id: 'com-13', commercial_name: 'Clara S.', mois: '2026-03', nb_rdv: 50, nb_propositions: 22, nb_closings: 15, ca_signe_eur: 380000, objectif_mensuel_eur: 350000, taux_closing_pct: 68 },
-  { commercial_id: 'com-6', commercial_name: 'Lucas M.', mois: '2026-03', nb_rdv: 38, nb_propositions: 12, nb_closings: 7, ca_signe_eur: 165000, objectif_mensuel_eur: 250000, taux_closing_pct: 58 },
-  { commercial_id: 'com-4', commercial_name: 'Marc D.', mois: '2026-03', nb_rdv: 35, nb_propositions: 14, nb_closings: 9, ca_signe_eur: 195000, objectif_mensuel_eur: 220000, taux_closing_pct: 64 },
-  { commercial_id: 'com-5', commercial_name: 'Pierre B.', mois: '2026-03', nb_rdv: 22, nb_propositions: 8, nb_closings: 3, ca_signe_eur: 78000, objectif_mensuel_eur: 200000, taux_closing_pct: 38 },
-  { commercial_id: 'com-8', commercial_name: 'Antoine G.', mois: '2026-03', nb_rdv: 30, nb_propositions: 10, nb_closings: 5, ca_signe_eur: 125000, objectif_mensuel_eur: 200000, taux_closing_pct: 50 },
+// === DIR-CLOS — Objectifs de visite (pas de CA) ===
+export const CR_OBJECTIFS: CRObjectif[] = [
+  { id: 'cr-1', commercial_id: 'com-1', commercial_name: 'Thomas D.', client_name: 'Dupont Industries', objectif_type: 'signature', resultat: 'atteint', date: '2026-03-29', region: 'Nord' },
+  { id: 'cr-2', commercial_id: 'com-1', commercial_name: 'Thomas D.', client_name: 'MetalPro', objectif_type: 'sell_in', resultat: 'atteint', date: '2026-03-28', region: 'Nord' },
+  { id: 'cr-3', commercial_id: 'com-1', commercial_name: 'Thomas D.', client_name: 'Groupe Mercier', objectif_type: 'fidelisation', resultat: 'non_atteint', date: '2026-03-27', region: 'Nord' },
+  { id: 'cr-4', commercial_id: 'com-7', commercial_name: 'Emma V.', client_name: 'BioSante Plus', objectif_type: 'signature', resultat: 'atteint', date: '2026-03-29', region: 'IDF' },
+  { id: 'cr-5', commercial_id: 'com-7', commercial_name: 'Emma V.', client_name: 'Transco Group', objectif_type: 'sell_out', resultat: 'atteint', date: '2026-03-28', region: 'IDF' },
+  { id: 'cr-6', commercial_id: 'com-7', commercial_name: 'Emma V.', client_name: 'NewCorp', objectif_type: 'decouverte', resultat: 'atteint', date: '2026-03-26', region: 'IDF' },
+  { id: 'cr-7', commercial_id: 'com-13', commercial_name: 'Clara S.', client_name: 'Transco Group', objectif_type: 'sell_out', resultat: 'atteint', date: '2026-03-28', region: 'IDF' },
+  { id: 'cr-8', commercial_id: 'com-13', commercial_name: 'Clara S.', client_name: 'BioSante Plus', objectif_type: 'formation', resultat: 'atteint', date: '2026-03-27', region: 'IDF' },
+  { id: 'cr-9', commercial_id: 'com-13', commercial_name: 'Clara S.', client_name: 'TechCom', objectif_type: 'signature', resultat: 'non_atteint', date: '2026-03-25', region: 'IDF' },
+  { id: 'cr-10', commercial_id: 'com-6', commercial_name: 'Lucas M.', client_name: 'Horizon Distribution', objectif_type: 'sell_in', resultat: 'non_atteint', date: '2026-03-28', region: 'Est' },
+  { id: 'cr-11', commercial_id: 'com-6', commercial_name: 'Lucas M.', client_name: 'LogiPro SAS', objectif_type: 'fidelisation', resultat: 'atteint', date: '2026-03-26', region: 'Est' },
+  { id: 'cr-12', commercial_id: 'com-6', commercial_name: 'Lucas M.', client_name: 'EstParts', objectif_type: 'decouverte', resultat: 'non_atteint', date: '2026-03-24', region: 'Est' },
+  { id: 'cr-13', commercial_id: 'com-5', commercial_name: 'Pierre B.', client_name: 'MecanoParts', objectif_type: 'sell_out', resultat: 'non_atteint', date: '2026-03-29', region: 'Sud' },
+  { id: 'cr-14', commercial_id: 'com-5', commercial_name: 'Pierre B.', client_name: 'SudTech', objectif_type: 'signature', resultat: 'non_atteint', date: '2026-03-27', region: 'Sud' },
+  { id: 'cr-15', commercial_id: 'com-5', commercial_name: 'Pierre B.', client_name: 'EcoVert Services', objectif_type: 'decouverte', resultat: 'non_atteint', date: '2026-03-25', region: 'Sud' },
+  { id: 'cr-16', commercial_id: 'com-8', commercial_name: 'Antoine G.', client_name: 'SudFrance Logistique', objectif_type: 'sell_in', resultat: 'atteint', date: '2026-03-28', region: 'Sud-Ouest' },
+  { id: 'cr-17', commercial_id: 'com-8', commercial_name: 'Antoine G.', client_name: 'NovaTech', objectif_type: 'formation', resultat: 'atteint', date: '2026-03-26', region: 'Sud-Ouest' },
+  { id: 'cr-18', commercial_id: 'com-8', commercial_name: 'Antoine G.', client_name: 'AlphaLogistics', objectif_type: 'signature', resultat: 'non_atteint', date: '2026-03-24', region: 'Sud-Ouest' },
+  { id: 'cr-19', commercial_id: 'com-4', commercial_name: 'Marc D.', client_name: 'Bertrand & Fils', objectif_type: 'fidelisation', resultat: 'atteint', date: '2026-03-29', region: 'Ouest' },
+  { id: 'cr-20', commercial_id: 'com-4', commercial_name: 'Marc D.', client_name: 'OmegaCorp', objectif_type: 'sell_out', resultat: 'atteint', date: '2026-03-27', region: 'Ouest' },
+  { id: 'cr-21', commercial_id: 'com-2', commercial_name: 'Sarah R.', client_name: 'Groupe Mercier', objectif_type: 'sell_in', resultat: 'atteint', date: '2026-03-28', region: 'Nord' },
+  { id: 'cr-22', commercial_id: 'com-2', commercial_name: 'Sarah R.', client_name: 'NordParts', objectif_type: 'decouverte', resultat: 'atteint', date: '2026-03-26', region: 'Nord' },
+  { id: 'cr-23', commercial_id: 'com-2', commercial_name: 'Sarah R.', client_name: 'MetalPro', objectif_type: 'signature', resultat: 'non_atteint', date: '2026-03-24', region: 'Nord' },
+  { id: 'cr-24', commercial_id: 'com-9', commercial_name: 'Camille P.', client_name: 'Atelier Central', objectif_type: 'sell_in', resultat: 'non_atteint', date: '2026-03-28', region: 'Nord-Est' },
+  { id: 'cr-25', commercial_id: 'com-9', commercial_name: 'Camille P.', client_name: 'NordEst Indus', objectif_type: 'formation', resultat: 'atteint', date: '2026-03-26', region: 'Nord-Est' },
 ];
 
-export const FUNNEL_DATA: FunnelEtape[] = [
-  { etape: 'RDV realises', count: 310, valeur_eur: 4800000 },
-  { etape: 'Propositions', count: 119, valeur_eur: 3200000 },
-  { etape: 'Negociation', count: 68, valeur_eur: 2100000 },
-  { etape: 'Closing', count: 75, valeur_eur: 1788000 },
+// === DIR-N1 — Sentiment global par periode ===
+export const SENTIMENT_PERIODES: SentimentPeriode[] = [
+  { periode: 'S11', positif: 28, negatif: 12, neutre: 18, interesse: 8, total: 66 },
+  { periode: 'S12', positif: 25, negatif: 15, neutre: 20, interesse: 10, total: 70 },
+  { periode: 'S13', positif: 30, negatif: 14, neutre: 16, interesse: 12, total: 72 },
+  { periode: 'S14', positif: 32, negatif: 18, neutre: 15, interesse: 9, total: 74 },
 ];
 
-// === DIR-N1 ===
-export const EVOLUTION_CLIENTS: EvolutionClient[] = [
-  { client_id: 'acc-1', client_name: 'Dupont Industries', commercial_name: 'Thomas D.', score_actuel: 35, score_precedent: 72, delta: -37, presence_concurrent_actuel: true, presence_concurrent_precedent: false, sentiment: 'negatif', date_actuel: '2026-03-29', date_precedent: '2025-09-15' },
-  { client_id: 'acc-2', client_name: 'Groupe Mercier', commercial_name: 'Sarah R.', score_actuel: 45, score_precedent: 68, delta: -23, presence_concurrent_actuel: true, presence_concurrent_precedent: false, sentiment: 'negatif', date_actuel: '2026-03-22', date_precedent: '2025-10-01' },
-  { client_id: 'acc-4', client_name: 'Bertrand & Fils', commercial_name: 'Marc D.', score_actuel: 88, score_precedent: 82, delta: 6, presence_concurrent_actuel: false, presence_concurrent_precedent: false, sentiment: 'positif', date_actuel: '2026-03-28', date_precedent: '2025-11-20' },
-  { client_id: 'acc-3', client_name: 'Horizon Distribution', commercial_name: 'Lucas M.', score_actuel: 55, score_precedent: 60, delta: -5, presence_concurrent_actuel: true, presence_concurrent_precedent: true, sentiment: 'neutre', date_actuel: '2026-03-15', date_precedent: '2025-09-28' },
-  { client_id: 'acc-6', client_name: 'Transco Group', commercial_name: 'Clara S.', score_actuel: 78, score_precedent: 65, delta: 13, presence_concurrent_actuel: false, presence_concurrent_precedent: true, sentiment: 'positif', date_actuel: '2026-03-24', date_precedent: '2025-12-10' },
-  { client_id: 'acc-7', client_name: 'NovaTech', commercial_name: 'Antoine G.', score_actuel: 82, score_precedent: 80, delta: 2, presence_concurrent_actuel: false, presence_concurrent_precedent: false, sentiment: 'positif', date_actuel: '2026-03-26', date_precedent: '2026-01-05' },
-  { client_id: 'acc-5', client_name: 'LogiPro SAS', commercial_name: 'Lea F.', score_actuel: 70, score_precedent: 55, delta: 15, presence_concurrent_actuel: false, presence_concurrent_precedent: true, sentiment: 'positif', date_actuel: '2026-03-19', date_precedent: '2025-10-22' },
-  { client_id: 'acc-8', client_name: 'Atelier Central', commercial_name: 'Camille P.', score_actuel: 50, score_precedent: 62, delta: -12, presence_concurrent_actuel: true, presence_concurrent_precedent: false, sentiment: 'negatif', date_actuel: '2026-03-21', date_precedent: '2025-11-15' },
+export const SENTIMENT_PERIODE_PRECEDENTE: SentimentPeriode = {
+  periode: 'Mois precedent', positif: 95, negatif: 38, neutre: 60, interesse: 30, total: 223,
+};
+export const SENTIMENT_PERIODE_ACTUELLE: SentimentPeriode = {
+  periode: 'Mois actuel', positif: 115, negatif: 59, neutre: 69, interesse: 39, total: 282,
+};
+
+export const SENTIMENT_REGIONS: SentimentRegion[] = [
+  { region: 'Nord', positif: 25, negatif: 18, neutre: 12, interesse: 8, total: 63 },
+  { region: 'IDF', positif: 30, negatif: 8, neutre: 15, interesse: 12, total: 65 },
+  { region: 'Est', positif: 18, negatif: 12, neutre: 10, interesse: 6, total: 46 },
+  { region: 'Sud-Ouest', positif: 12, negatif: 14, neutre: 8, interesse: 5, total: 39 },
+  { region: 'Nord-Est', positif: 10, negatif: 4, neutre: 8, interesse: 3, total: 25 },
+  { region: 'Ouest', positif: 12, negatif: 2, neutre: 10, interesse: 4, total: 28 },
+  { region: 'Sud', positif: 8, negatif: 1, neutre: 6, interesse: 1, total: 16 },
 ];
 
-// === DIR-SEG ===
-export const SEGMENT_STATS: SegmentStats[] = [
-  { segment: 'nouveau', count: 3, ca_total: 730000, signaux_avg: 1.2, risk_avg: 35, churn_rate: 12 },
-  { segment: 'etabli', count: 6, ca_total: 2870000, signaux_avg: 2.1, risk_avg: 42, churn_rate: 8 },
-  { segment: 'strategique', count: 3, ca_total: 2500000, signaux_avg: 3.5, risk_avg: 55, churn_rate: 5 },
+// === DIR-SEG — Sentiment par segment ===
+export const SEGMENT_SENTIMENTS: SegmentSentiment[] = [
+  {
+    segment: 'nouveau',
+    nb_cr: 85,
+    pct_positif: 35,
+    pct_negatif: 28,
+    pct_neutre: 22,
+    pct_interesse: 15,
+    top_insatisfactions: ['Prix trop eleve', 'Manque d\'information produit', 'Delai de reponse trop long'],
+    top_points_positifs: ['Qualite produit reconnue', 'Accueil commercial', 'Premiere impression positive'],
+  },
+  {
+    segment: 'etabli',
+    nb_cr: 197,
+    pct_positif: 52,
+    pct_negatif: 18,
+    pct_neutre: 20,
+    pct_interesse: 10,
+    top_insatisfactions: ['SAV peu reactif', 'Manque de visite terrain', 'Concurrents plus agressifs sur le prix'],
+    top_points_positifs: ['Relation de confiance', 'SAV quand il repond', 'Stabilite de la qualite'],
+  },
 ];
 
-// === DIR-LOST ===
-export const DEALS_PERDUS: DealPerdu[] = [
-  { id: 'dp-1', commercial_name: 'Thomas D.', client_name: 'Dupont Industries', valeur_eur: 45000, motif_principal: 'prix', concurrent_retenu: 'Acme', secteur: 'Industrie', region: 'Nord', date: '2026-03-28', verbatim: 'Trop cher de 12% face a Acme' },
-  { id: 'dp-2', commercial_name: 'Lucas M.', client_name: 'Horizon Distribution', valeur_eur: 120000, motif_principal: 'prix', concurrent_retenu: 'Acme', secteur: 'Distribution', region: 'Est', date: '2026-03-22', verbatim: 'Engagement prix 3 ans impossible a matcher' },
-  { id: 'dp-3', commercial_name: 'Antoine G.', client_name: 'SudFrance Logistique', valeur_eur: 35000, motif_principal: 'produit', concurrent_retenu: 'Bexor', secteur: 'Logistique', region: 'Sud-Ouest', date: '2026-03-25', verbatim: 'Bundle Bexor plus adapte a leur besoin specifique' },
-  { id: 'dp-4', commercial_name: 'Hugo T.', client_name: 'NovaTech', valeur_eur: 28000, motif_principal: 'timing', secteur: 'Tech', region: 'Sud-Ouest', date: '2026-03-20', verbatim: 'Projet reporte au Q3 — budget gele' },
-  { id: 'dp-5', commercial_name: 'Camille P.', client_name: 'Atelier Central', valeur_eur: 67000, motif_principal: 'concurrent', concurrent_retenu: 'Bexor', secteur: 'Industrie', region: 'Nord-Est', date: '2026-03-18', verbatim: 'Bexor a propose ouverture site gratuite' },
-  { id: 'dp-6', commercial_name: 'Nathan B.', client_name: 'MecanoParts', valeur_eur: 38000, motif_principal: 'prix', concurrent_retenu: 'Proxio', secteur: 'Industrie', region: 'Sud', date: '2026-03-08', verbatim: 'Proxio moins cher de 5% sur catalogue standard' },
-  { id: 'dp-7', commercial_name: 'Ines D.', client_name: 'AlphaLogistics', valeur_eur: 55000, motif_principal: 'offre', concurrent_retenu: 'Bexor', secteur: 'Logistique', region: 'Sud-Ouest', date: '2026-03-05', verbatim: 'Offre Bexor trop complete — maintenance incluse' },
-  { id: 'dp-8', commercial_name: 'Marc D.', client_name: 'EcoVert Services', valeur_eur: 42000, motif_principal: 'budget', secteur: 'Services', region: 'Ouest', date: '2026-03-12', verbatim: 'Budget coupe par la direction — projet annule' },
+export const SEGMENT_INSIGHTS: string[] = [
+  'Les nouveaux clients sont 2x plus sensibles au prix que les clients etablis',
+  'Le taux d\'interet est 50% plus eleve chez les nouveaux clients — levier de conversion fort',
+  'Les clients etablis mentionnent 3x plus souvent la concurrence — risque de churn a surveiller',
+  'Le SAV est le 1er motif d\'insatisfaction chez les etablis mais absent chez les nouveaux',
 ];
 
-// === DIR-TERR ===
+// === DIR-TERR — Territoires (sans pipeline, sans euros) ===
 export const TERRITOIRES: TerritoireSynthese[] = [
-  { territoire: 'Nord', commercial_names: ['Thomas D.', 'Sarah R.', 'Maxime R.', 'Manon A.'], nb_opportunites: 5, valeur_opportunites_eur: 380000, nb_clients_risque_rouge: 2, nb_clients_risque_orange: 3, nb_besoins_non_couverts: 8, nb_signaux_concurrent: 22, score_priorite: 92 },
-  { territoire: 'Sud-Ouest', commercial_names: ['Antoine G.', 'Ines D.', 'Theo N.'], nb_opportunites: 3, valeur_opportunites_eur: 210000, nb_clients_risque_rouge: 1, nb_clients_risque_orange: 2, nb_besoins_non_couverts: 5, nb_signaux_concurrent: 16, score_priorite: 78 },
-  { territoire: 'Est', commercial_names: ['Lucas M.', 'Lea F.', 'Jade W.', 'Raphael C.'], nb_opportunites: 4, valeur_opportunites_eur: 290000, nb_clients_risque_rouge: 1, nb_clients_risque_orange: 2, nb_besoins_non_couverts: 6, nb_signaux_concurrent: 14, score_priorite: 72 },
-  { territoire: 'IDF', commercial_names: ['Julie L.', 'Emma V.', 'Clara S.', 'Zoe H.'], nb_opportunites: 6, valeur_opportunites_eur: 520000, nb_clients_risque_rouge: 0, nb_clients_risque_orange: 1, nb_besoins_non_couverts: 4, nb_signaux_concurrent: 10, score_priorite: 65 },
-  { territoire: 'Nord-Est', commercial_names: ['Camille P.', 'Ethan K.', 'Alice M.'], nb_opportunites: 2, valeur_opportunites_eur: 150000, nb_clients_risque_rouge: 1, nb_clients_risque_orange: 1, nb_besoins_non_couverts: 3, nb_signaux_concurrent: 12, score_priorite: 58 },
-  { territoire: 'Ouest', commercial_names: ['Marc D.', 'Hugo T.', 'Gabriel L.'], nb_opportunites: 2, valeur_opportunites_eur: 120000, nb_clients_risque_rouge: 0, nb_clients_risque_orange: 1, nb_besoins_non_couverts: 4, nb_signaux_concurrent: 4, score_priorite: 35 },
-  { territoire: 'Sud', commercial_names: ['Pierre B.', 'Nathan B.', 'Louis J.'], nb_opportunites: 1, valeur_opportunites_eur: 85000, nb_clients_risque_rouge: 0, nb_clients_risque_orange: 2, nb_besoins_non_couverts: 3, nb_signaux_concurrent: 6, score_priorite: 42 },
+  { territoire: 'Nord', commercial_names: ['Thomas D.', 'Sarah R.', 'Maxime R.', 'Manon A.'], nb_cr: 85, sentiment_dominant: 'negatif', nb_mentions_concurrents: 22, nb_opportunites: 5, nb_risques_perte: 5, tendance_vs_mois_precedent: 'hausse', score_priorite: 92 },
+  { territoire: 'Sud-Ouest', commercial_names: ['Antoine G.', 'Ines D.', 'Theo N.'], nb_cr: 52, sentiment_dominant: 'negatif', nb_mentions_concurrents: 16, nb_opportunites: 3, nb_risques_perte: 3, tendance_vs_mois_precedent: 'hausse', score_priorite: 78 },
+  { territoire: 'Est', commercial_names: ['Lucas M.', 'Lea F.', 'Jade W.', 'Raphael C.'], nb_cr: 68, sentiment_dominant: 'neutre', nb_mentions_concurrents: 14, nb_opportunites: 4, nb_risques_perte: 3, tendance_vs_mois_precedent: 'stable', score_priorite: 72 },
+  { territoire: 'IDF', commercial_names: ['Julie L.', 'Emma V.', 'Clara S.', 'Zoe H.'], nb_cr: 78, sentiment_dominant: 'positif', nb_mentions_concurrents: 10, nb_opportunites: 6, nb_risques_perte: 1, tendance_vs_mois_precedent: 'baisse', score_priorite: 45 },
+  { territoire: 'Nord-Est', commercial_names: ['Camille P.', 'Ethan K.', 'Alice M.'], nb_cr: 42, sentiment_dominant: 'neutre', nb_mentions_concurrents: 12, nb_opportunites: 2, nb_risques_perte: 2, tendance_vs_mois_precedent: 'stable', score_priorite: 58 },
+  { territoire: 'Ouest', commercial_names: ['Marc D.', 'Hugo T.', 'Gabriel L.'], nb_cr: 38, sentiment_dominant: 'positif', nb_mentions_concurrents: 4, nb_opportunites: 2, nb_risques_perte: 1, tendance_vs_mois_precedent: 'baisse', score_priorite: 35 },
+  { territoire: 'Sud', commercial_names: ['Pierre B.', 'Nathan B.', 'Louis J.'], nb_cr: 28, sentiment_dominant: 'neutre', nb_mentions_concurrents: 6, nb_opportunites: 1, nb_risques_perte: 2, tendance_vs_mois_precedent: 'stable', score_priorite: 42 },
 ];
 
 // === DIR-GEO ===
@@ -181,9 +225,9 @@ export const GEO_POINTS: GeoPoint[] = [
 // === DIR-PRIOR ===
 export const RECOMMANDATIONS_IA: RecommandationIA[] = [
   { id: 'rec-1', type: 'risque', territoire: 'Nord', commercial_suggere: 'Thomas D.', priorite: 1, action_recommandee: 'RDV urgent Dupont Industries — Acme en test actif depuis 2 mois. Proposer offre de retention avec avantage SAV premium.', statut: 'nouvelle' },
-  { id: 'rec-2', type: 'opportunite', territoire: 'IDF', commercial_suggere: 'Emma V.', priorite: 2, action_recommandee: 'Relancer BioSante Plus — 520K EUR d\'opportunites actives en IDF. Proposer demo gamme Pro.', statut: 'nouvelle' },
+  { id: 'rec-2', type: 'opportunite', territoire: 'IDF', commercial_suggere: 'Emma V.', priorite: 2, action_recommandee: 'Relancer BioSante Plus — fort interet detecte dans les CR. Proposer demo gamme Pro.', statut: 'nouvelle' },
   { id: 'rec-3', type: 'territoire', territoire: 'Sud-Ouest', commercial_suggere: 'Antoine G.', priorite: 1, action_recommandee: 'Renforcer presence Sud-Ouest — Bexor en demarchage agressif. Planifier 5 visites clients strategiques cette semaine.', statut: 'vue' },
-  { id: 'rec-4', type: 'coaching', territoire: 'Sud', commercial_suggere: 'Pierre B.', priorite: 3, action_recommandee: 'Session coaching Pierre B. — taux closing 38% (equipe: 62%). Analyser pipeline et technique de closing.', statut: 'nouvelle' },
-  { id: 'rec-5', type: 'risque', territoire: 'Nord', commercial_suggere: 'Sarah R.', priorite: 2, action_recommandee: 'Groupe Mercier en regression — score satisfaction -23pts. Organiser revue de compte avec KAM.', statut: 'en_cours' },
-  { id: 'rec-6', type: 'opportunite', territoire: 'Nord-Est', commercial_suggere: 'Camille P.', priorite: 3, action_recommandee: 'Atelier Central ouvre nouveau site en mai — budget 80K EUR. Preparer proposition equipement complet.', statut: 'nouvelle' },
+  { id: 'rec-4', type: 'coaching', territoire: 'Sud', commercial_suggere: 'Pierre B.', priorite: 3, action_recommandee: 'Session coaching Pierre B. — taux reussite objectifs 0% ce mois. Analyser approche et technique.', statut: 'nouvelle' },
+  { id: 'rec-5', type: 'risque', territoire: 'Nord', commercial_suggere: 'Sarah R.', priorite: 2, action_recommandee: 'Groupe Mercier — sentiment negatif croissant dans les CR. Organiser revue de compte avec KAM.', statut: 'en_cours' },
+  { id: 'rec-6', type: 'opportunite', territoire: 'Nord-Est', commercial_suggere: 'Camille P.', priorite: 3, action_recommandee: 'Atelier Central ouvre nouveau site en mai. Preparer proposition equipement complet.', statut: 'nouvelle' },
 ];

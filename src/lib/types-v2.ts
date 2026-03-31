@@ -1,4 +1,5 @@
-// === V2 TYPES — Nouvelles fonctionnalites ===
+// === V2 TYPES — Toutes les donnees viennent des CR de visite (NLP) ===
+// PAS de CA, PAS de valeur en euros, PAS de pipeline CRM
 
 // MKT-PRIX — Radar Prix Concurrentiels
 export interface PrixSignal {
@@ -6,7 +7,6 @@ export interface PrixSignal {
   concurrent_nom: string;
   ecart_pct: number;
   ecart_type: 'inferieur' | 'superieur';
-  deal_id?: string;
   statut_deal: 'gagne' | 'perdu' | 'en_cours';
   commercial_name: string;
   client_name: string;
@@ -24,22 +24,32 @@ export interface TendancePrixConcurrent {
   deals_gagnes: number;
 }
 
-// MKT-DEAL — Deals Gagnes / Perdus
+// MKT-DEAL + DIR-LOST — Deals Gagnes/Perdus (sans euros, bases sur CR)
 export type DealMotif = 'prix' | 'produit' | 'offre' | 'timing' | 'concurrent' | 'relation' | 'budget' | 'autre';
 
 export interface DealAnalyse {
   id: string;
   motif_principal: DealMotif;
-  motif_secondaire?: DealMotif;
   resultat: 'gagne' | 'perdu';
-  valeur_eur: number;
   concurrent_nom?: string;
   commercial_name: string;
   client_name: string;
-  secteur: string;
   region: string;
   date: string;
-  verbatim?: string;
+  verbatim: string;
+}
+
+// Tendance deals par semaine
+export interface DealTendanceSemaine {
+  semaine: string;
+  prix: number;
+  produit: number;
+  offre: number;
+  timing: number;
+  concurrent: number;
+  relation: number;
+  budget: number;
+  autre: number;
 }
 
 // MKT-OFFRE — Offres Concurrentes
@@ -96,77 +106,69 @@ export interface GeoSectorCell {
   score_intensite: number;
 }
 
-// DIR-CLOS — Taux de Closing
-export interface ClosingCommercial {
+// DIR-CLOS — Taux de Closing (base sur objectifs de visite, PAS sur CA)
+export type ObjectifType = 'signature' | 'sell_out' | 'sell_in' | 'formation' | 'decouverte' | 'fidelisation';
+
+export interface CRObjectif {
+  id: string;
   commercial_id: string;
   commercial_name: string;
-  mois: string;
-  nb_rdv: number;
-  nb_propositions: number;
-  nb_closings: number;
-  ca_signe_eur: number;
-  objectif_mensuel_eur: number;
-  taux_closing_pct: number;
-}
-
-export interface FunnelEtape {
-  etape: string;
-  count: number;
-  valeur_eur: number;
-}
-
-// DIR-N1 — Evolution Clients
-export interface EvolutionClient {
-  client_id: string;
   client_name: string;
-  commercial_name: string;
-  score_actuel: number;
-  score_precedent: number;
-  delta: number;
-  presence_concurrent_actuel: boolean;
-  presence_concurrent_precedent: boolean;
-  sentiment: 'positif' | 'neutre' | 'negatif';
-  date_actuel: string;
-  date_precedent: string;
-}
-
-// DIR-SEG — Segmentation
-export type ClientSegment = 'nouveau' | 'etabli' | 'strategique';
-
-export interface SegmentStats {
-  segment: ClientSegment;
-  count: number;
-  ca_total: number;
-  signaux_avg: number;
-  risk_avg: number;
-  churn_rate: number;
-}
-
-// DIR-LOST — Deals Perdus
-export interface DealPerdu {
-  id: string;
-  commercial_name: string;
-  client_name: string;
-  valeur_eur: number;
-  motif_principal: DealMotif;
-  concurrent_retenu?: string;
-  secteur: string;
-  region: string;
+  objectif_type: ObjectifType;
+  resultat: 'atteint' | 'non_atteint';
   date: string;
-  verbatim?: string;
+  region: string;
 }
 
-// DIR-TERR — Carte Territoire
+// DIR-N1 — Vue de pilotage GLOBALE du sentiment client (pas individuel)
+export type SentimentType = 'positif' | 'negatif' | 'neutre' | 'interesse';
+
+export interface SentimentPeriode {
+  periode: string; // "S11", "S12", etc. ou "Mars 2026"
+  positif: number;
+  negatif: number;
+  neutre: number;
+  interesse: number;
+  total: number;
+}
+
+export interface SentimentRegion {
+  region: string;
+  positif: number;
+  negatif: number;
+  neutre: number;
+  interesse: number;
+  total: number;
+}
+
+// DIR-SEG — Segmentation Nouveaux vs Etablis (comparaison SENTIMENT, pas CA)
+export type ClientSegment = 'nouveau' | 'etabli';
+
+export interface SegmentSentiment {
+  segment: ClientSegment;
+  nb_cr: number;
+  pct_positif: number;
+  pct_negatif: number;
+  pct_neutre: number;
+  pct_interesse: number;
+  top_insatisfactions: string[];
+  top_points_positifs: string[];
+}
+
+// DIR-LOST — Deals Perdus (meme structure que DealAnalyse, filtre perdu)
+// Reutilise DealAnalyse avec resultat='perdu'
+
+// DIR-TERR — Carte Territoire (sans pipeline, sans euros)
 export interface TerritoireSynthese {
   territoire: string;
   commercial_names: string[];
+  nb_cr: number;
+  sentiment_dominant: SentimentType;
+  nb_mentions_concurrents: number;
   nb_opportunites: number;
-  valeur_opportunites_eur: number;
-  nb_clients_risque_rouge: number;
-  nb_clients_risque_orange: number;
-  nb_besoins_non_couverts: number;
-  nb_signaux_concurrent: number;
-  score_priorite: number;
+  nb_risques_perte: number;
+  tendance_vs_mois_precedent: 'hausse' | 'baisse' | 'stable';
+  score_priorite: number; // base sur risques + pression concurrentielle
 }
 
 // DIR-GEO — Heatmap Geo
@@ -190,3 +192,36 @@ export interface RecommandationIA {
   action_recommandee: string;
   statut: 'nouvelle' | 'vue' | 'en_cours' | 'done';
 }
+
+// Labels pour ObjectifType
+export const OBJECTIF_LABELS: Record<ObjectifType, string> = {
+  signature: 'Signature contrat',
+  sell_out: 'Sell Out',
+  sell_in: 'Sell In',
+  formation: 'Formation',
+  decouverte: 'Decouverte',
+  fidelisation: 'Fidelisation',
+};
+
+// Labels pour DealMotif
+export const MOTIF_LABELS: Record<DealMotif, string> = {
+  prix: 'Prix',
+  produit: 'Produit',
+  offre: 'Offre',
+  timing: 'Timing',
+  concurrent: 'Concurrent retenu',
+  relation: 'Relation',
+  budget: 'Budget coupe',
+  autre: 'Autre',
+};
+
+export const MOTIF_COLORS: Record<DealMotif, string> = {
+  prix: '#e11d48',
+  produit: '#0ea5e9',
+  offre: '#8b5cf6',
+  timing: '#f59e0b',
+  concurrent: '#ef4444',
+  relation: '#10b981',
+  budget: '#64748b',
+  autre: '#94a3b8',
+};
