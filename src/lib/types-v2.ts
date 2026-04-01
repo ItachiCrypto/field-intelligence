@@ -221,7 +221,20 @@ export interface TerritoireSynthese {
   nb_opportunites: number;
   nb_risques_perte: number;
   tendance_vs_mois_precedent: 'hausse' | 'baisse' | 'stable';
-  score_priorite: number; // base sur risques + pression concurrentielle
+  score_priorite: number;
+  motifs_opportunite: string[];
+  motifs_risque: string[];
+}
+
+// MKT-GEO — Profil par region (problematiques locales)
+export interface RegionProfile {
+  region: string;
+  top_besoins: string[];
+  concurrent_principal: string;
+  concurrent_mentions: number;
+  sentiment_dominant: SentimentType;
+  specificite_locale: string;
+  nb_signaux: number;
 }
 
 // DIR-GEO — Heatmap Geo

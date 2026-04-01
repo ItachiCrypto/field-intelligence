@@ -4,6 +4,7 @@ import {
   CRObjectif, SentimentPeriode, SentimentRegion, SegmentSentiment,
   TerritoireSynthese, GeoPoint, RecommandationIA,
   DealCommercial, DealCommercialTendance, MotifSentiment,
+  RegionProfile,
 } from './types-v2';
 
 // === MKT-PRIX ===
@@ -201,15 +202,26 @@ export const SEGMENT_INSIGHTS: string[] = [
   'Le SAV est le 1er motif d\'insatisfaction chez les etablis mais absent chez les nouveaux',
 ];
 
-// === DIR-TERR — Territoires (sans pipeline, sans euros) ===
+// === DIR-TERR — Territoires avec motifs strategiques ===
 export const TERRITOIRES: TerritoireSynthese[] = [
-  { territoire: 'Nord', commercial_names: ['Thomas D.', 'Sarah R.', 'Maxime R.', 'Manon A.'], nb_cr: 85, sentiment_dominant: 'negatif', nb_mentions_concurrents: 22, nb_opportunites: 5, nb_risques_perte: 5, tendance_vs_mois_precedent: 'hausse', score_priorite: 92 },
-  { territoire: 'Sud-Ouest', commercial_names: ['Antoine G.', 'Ines D.', 'Theo N.'], nb_cr: 52, sentiment_dominant: 'negatif', nb_mentions_concurrents: 16, nb_opportunites: 3, nb_risques_perte: 3, tendance_vs_mois_precedent: 'hausse', score_priorite: 78 },
-  { territoire: 'Est', commercial_names: ['Lucas M.', 'Lea F.', 'Jade W.', 'Raphael C.'], nb_cr: 68, sentiment_dominant: 'neutre', nb_mentions_concurrents: 14, nb_opportunites: 4, nb_risques_perte: 3, tendance_vs_mois_precedent: 'stable', score_priorite: 72 },
-  { territoire: 'IDF', commercial_names: ['Julie L.', 'Emma V.', 'Clara S.', 'Zoe H.'], nb_cr: 78, sentiment_dominant: 'positif', nb_mentions_concurrents: 10, nb_opportunites: 6, nb_risques_perte: 1, tendance_vs_mois_precedent: 'baisse', score_priorite: 45 },
-  { territoire: 'Nord-Est', commercial_names: ['Camille P.', 'Ethan K.', 'Alice M.'], nb_cr: 42, sentiment_dominant: 'neutre', nb_mentions_concurrents: 12, nb_opportunites: 2, nb_risques_perte: 2, tendance_vs_mois_precedent: 'stable', score_priorite: 58 },
-  { territoire: 'Ouest', commercial_names: ['Marc D.', 'Hugo T.', 'Gabriel L.'], nb_cr: 38, sentiment_dominant: 'positif', nb_mentions_concurrents: 4, nb_opportunites: 2, nb_risques_perte: 1, tendance_vs_mois_precedent: 'baisse', score_priorite: 35 },
-  { territoire: 'Sud', commercial_names: ['Pierre B.', 'Nathan B.', 'Louis J.'], nb_cr: 28, sentiment_dominant: 'neutre', nb_mentions_concurrents: 6, nb_opportunites: 1, nb_risques_perte: 2, tendance_vs_mois_precedent: 'stable', score_priorite: 42 },
+  { territoire: 'Nord', commercial_names: ['Thomas D.', 'Sarah R.', 'Maxime R.', 'Manon A.'], nb_cr: 85, sentiment_dominant: 'negatif', nb_mentions_concurrents: 22, nb_opportunites: 5, nb_risques_perte: 5, tendance_vs_mois_precedent: 'hausse', score_priorite: 92, motifs_opportunite: ['Client interesse par gamme Pro', 'Nouveau besoin formation technique', 'Demande de solution integree'], motifs_risque: ['Acme agressif sur le prix -12%', 'Client menace de changer de fournisseur', 'Insatisfaction delai livraison recurrente'] },
+  { territoire: 'Sud-Ouest', commercial_names: ['Antoine G.', 'Ines D.', 'Theo N.'], nb_cr: 52, sentiment_dominant: 'negatif', nb_mentions_concurrents: 16, nb_opportunites: 3, nb_risques_perte: 3, tendance_vs_mois_precedent: 'hausse', score_priorite: 78, motifs_opportunite: ['Ouverture nouveau site client en mai', 'Besoin equipement complet'], motifs_risque: ['Bexor en demarchage agressif avec bundle', 'Prix non competitif face aux offres locales', 'Manque de presence terrain'] },
+  { territoire: 'Est', commercial_names: ['Lucas M.', 'Lea F.', 'Jade W.', 'Raphael C.'], nb_cr: 68, sentiment_dominant: 'neutre', nb_mentions_concurrents: 14, nb_opportunites: 4, nb_risques_perte: 3, tendance_vs_mois_precedent: 'stable', score_priorite: 72, motifs_opportunite: ['Appel d\'offres 200K detecte', 'Client interesse par API ERP', 'Renouvellement contrats Q2'], motifs_risque: ['Concurrent TechPro en reconquete', 'Insatisfaction stock et disponibilite', 'Nouveau decideur non rencontre'] },
+  { territoire: 'IDF', commercial_names: ['Julie L.', 'Emma V.', 'Clara S.', 'Zoe H.'], nb_cr: 78, sentiment_dominant: 'positif', nb_mentions_concurrents: 10, nb_opportunites: 6, nb_risques_perte: 1, tendance_vs_mois_precedent: 'baisse', score_priorite: 45, motifs_opportunite: ['Fort interet pour demo gamme Pro', 'Besoin catalogue numerique', 'Upsell detecte sur 3 comptes', 'Client pret a recommander'], motifs_risque: ['Proxio detecte sur 2 comptes'] },
+  { territoire: 'Nord-Est', commercial_names: ['Camille P.', 'Ethan K.', 'Alice M.'], nb_cr: 42, sentiment_dominant: 'neutre', nb_mentions_concurrents: 12, nb_opportunites: 2, nb_risques_perte: 2, tendance_vs_mois_precedent: 'stable', score_priorite: 58, motifs_opportunite: ['Nouveau site Atelier Central — budget equipement', 'Client interesse par formation'], motifs_risque: ['Proxio present au salon regional', 'Bexor en prospection active'] },
+  { territoire: 'Ouest', commercial_names: ['Marc D.', 'Hugo T.', 'Gabriel L.'], nb_cr: 38, sentiment_dominant: 'positif', nb_mentions_concurrents: 4, nb_opportunites: 2, nb_risques_perte: 1, tendance_vs_mois_precedent: 'baisse', score_priorite: 35, motifs_opportunite: ['Renouvellement anticipe Bertrand', 'Demande commande en ligne'], motifs_risque: ['Budget coupe chez EcoVert'] },
+  { territoire: 'Sud', commercial_names: ['Pierre B.', 'Nathan B.', 'Louis J.'], nb_cr: 28, sentiment_dominant: 'neutre', nb_mentions_concurrents: 6, nb_opportunites: 1, nb_risques_perte: 2, tendance_vs_mois_precedent: 'stable', score_priorite: 42, motifs_opportunite: ['Besoin formation produit detecte'], motifs_risque: ['Proxio moins cher sur catalogue', 'Faible frequence de visite terrain'] },
+];
+
+// === MKT-GEO — Profils regionaux (problematiques locales) ===
+export const REGION_PROFILES: RegionProfile[] = [
+  { region: 'Nord', top_besoins: ['Delais de livraison plus courts', 'Remise sur volume', 'SAV plus reactif'], concurrent_principal: 'Acme', concurrent_mentions: 22, sentiment_dominant: 'negatif', specificite_locale: 'Forte sensibilite aux delais — la logistique industrielle exige du J+2 maximum', nb_signaux: 85 },
+  { region: 'IDF', top_besoins: ['Catalogue numerique', 'Integration API ERP', 'Formation produit'], concurrent_principal: 'Proxio', concurrent_mentions: 10, sentiment_dominant: 'positif', specificite_locale: 'Demande technologique forte — clients attendent des outils digitaux et self-service', nb_signaux: 78 },
+  { region: 'Est', top_besoins: ['Disponibilite stock', 'Integration ERP SAP', 'Livraison express'], concurrent_principal: 'TechPro', concurrent_mentions: 14, sentiment_dominant: 'neutre', specificite_locale: 'Tissu industriel dense — les clients comparent systematiquement 3+ fournisseurs', nb_signaux: 68 },
+  { region: 'Sud-Ouest', top_besoins: ['Prix competitif', 'Bundle produit+service', 'Accompagnement terrain'], concurrent_principal: 'Bexor', concurrent_mentions: 16, sentiment_dominant: 'negatif', specificite_locale: 'Marche tres sensible au prix — les bundles tout-inclus font la difference', nb_signaux: 52 },
+  { region: 'Nord-Est', top_besoins: ['Formation technique', 'SAV reactif', 'Conditions de paiement'], concurrent_principal: 'Proxio', concurrent_mentions: 12, sentiment_dominant: 'neutre', specificite_locale: 'Concurrence locale forte via salons regionaux — presence terrain essentielle', nb_signaux: 42 },
+  { region: 'Ouest', top_besoins: ['Commande en ligne', 'Reactivite SAV', 'Suivi commercial regulier'], concurrent_principal: 'Proxio', concurrent_mentions: 4, sentiment_dominant: 'positif', specificite_locale: 'Clients fideles mais attendent un canal de commande digital', nb_signaux: 38 },
+  { region: 'Sud', top_besoins: ['Prix competitif', 'Formation produit', 'Frequence de visite'], concurrent_principal: 'Proxio', concurrent_mentions: 6, sentiment_dominant: 'neutre', specificite_locale: 'Territoire sous-visite — les clients se plaignent du manque de presence commerciale', nb_signaux: 28 },
 ];
 
 // === DIR-GEO ===
