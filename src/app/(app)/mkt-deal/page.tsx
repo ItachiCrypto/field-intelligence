@@ -24,6 +24,16 @@ const RESULTAT_OPTIONS: { key: ResultatFilter; label: string }[] = [
 
 const ALL_MOTIFS: DealMotif[] = ['prix', 'produit', 'offre', 'timing', 'concurrent', 'relation', 'budget', 'autre'];
 
+// Static weekly % data for gagne deals
+const GAGNE_TENDANCE = [
+  { semaine: 'S11', relation: 45, produit: 30, prix: 15, autre: 10 },
+  { semaine: 'S12', relation: 40, produit: 25, prix: 25, autre: 10 },
+  { semaine: 'S13', relation: 50, produit: 20, prix: 20, autre: 10 },
+  { semaine: 'S14', relation: 35, produit: 30, prix: 25, autre: 10 },
+];
+
+const GAGNE_LINE_MOTIFS: DealMotif[] = ['relation', 'produit', 'prix', 'autre'];
+
 export default function MktDealPage() {
   const [resultatFilter, setResultatFilter] = useState<ResultatFilter>('all');
   const [motifFilter, setMotifFilter] = useState<MotifFilter>('all');
@@ -33,23 +43,51 @@ export default function MktDealPage() {
   const perdus = useMemo(() => DEALS_ANALYSE.filter((d) => d.resultat === 'perdu'), []);
   const tauxConversion = totalDeals > 0 ? ((gagnes.length / totalDeals) * 100).toFixed(0) : '0';
 
-  // Donut: repartition des deals PERDUS par motif
-  const donutData = useMemo(() => {
+  // Donut gagnes: % par motif
+  const donutGagne = useMemo(() => {
+    const counts: Partial<Record<DealMotif, number>> = {};
+    gagnes.forEach((d) => {
+      counts[d.motif_principal] = (counts[d.motif_principal] || 0) + 1;
+    });
+    const total = gagnes.length || 1;
+    return Object.entries(counts)
+      .map(([motif, count]) => ({
+        name: MOTIF_LABELS[motif as DealMotif],
+        value: Math.round((count! / total) * 100),
+        motif: motif as DealMotif,
+      }))
+      .sort((a, b) => b.value - a.value);
+  }, [gagnes]);
+
+  // Donut perdus: % par motif
+  const donutPerdu = useMemo(() => {
     const counts: Partial<Record<DealMotif, number>> = {};
     perdus.forEach((d) => {
       counts[d.motif_principal] = (counts[d.motif_principal] || 0) + 1;
     });
+    const total = perdus.length || 1;
     return Object.entries(counts)
       .map(([motif, count]) => ({
         name: MOTIF_LABELS[motif as DealMotif],
-        value: count,
+        value: Math.round((count! / total) * 100),
         motif: motif as DealMotif,
       }))
       .sort((a, b) => b.value - a.value);
   }, [perdus]);
 
-  // Line chart: tendance deals perdus par motif (4 semaines)
-  const lineMotifs = useMemo(() => {
+  // Perdu tendance: compute % from DEAL_TENDANCE
+  const perduTendance = useMemo(() => {
+    return DEAL_TENDANCE.map((w) => {
+      const total = ALL_MOTIFS.reduce((sum, m) => sum + w[m], 0) || 1;
+      const row: Record<string, number | string> = { semaine: w.semaine };
+      ALL_MOTIFS.forEach((m) => {
+        row[m] = Math.round((w[m] / total) * 100);
+      });
+      return row;
+    });
+  }, []);
+
+  const perduLineMotifs = useMemo(() => {
     const motifs = new Set<DealMotif>();
     DEAL_TENDANCE.forEach((w) => {
       ALL_MOTIFS.forEach((m) => {
@@ -76,7 +114,7 @@ export default function MktDealPage() {
         </div>
         <div>
           <h1 className="text-xl font-bold text-slate-900">Analyse Deals Gagnes / Perdus</h1>
-          <p className="text-sm text-slate-500">Motifs extraits des comptes rendus de visite</p>
+          <p className="text-sm text-slate-500">Repartition en % des motifs extraits des comptes rendus de visite</p>
         </div>
       </div>
 
@@ -109,100 +147,191 @@ export default function MktDealPage() {
         />
       </div>
 
-      {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Donut -- deals perdus par motif */}
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-          <h2 className="text-sm font-semibold text-slate-900 mb-4">Deals perdus par motif</h2>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={donutData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={55}
-                  outerRadius={90}
-                  paddingAngle={2}
-                  dataKey="value"
-                  nameKey="name"
-                  strokeWidth={0}
-                >
-                  {donutData.map((entry) => (
-                    <Cell key={entry.motif} fill={MOTIF_COLORS[entry.motif]} />
+      {/* Two-column charts */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* LEFT: Deals gagnes */}
+        <div className="space-y-4">
+          <h2 className="text-base font-semibold text-slate-900">Deals gagnes</h2>
+
+          {/* Donut gagnes */}
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+            <h3 className="text-sm font-semibold text-slate-700 mb-3">Repartition par motif (%)</h3>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={donutGagne}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={55}
+                    outerRadius={90}
+                    paddingAngle={2}
+                    dataKey="value"
+                    nameKey="name"
+                    strokeWidth={0}
+                  >
+                    {donutGagne.map((entry) => (
+                      <Cell key={entry.motif} fill={MOTIF_COLORS[entry.motif]} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{
+                      borderRadius: '0.75rem',
+                      border: '1px solid #e2e8f0',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                    }}
+                    formatter={((value: any) => [`${value}%`, '']) as any}
+                  />
+                  <Legend
+                    verticalAlign="bottom"
+                    iconType="circle"
+                    iconSize={8}
+                    formatter={(value) => <span className="text-xs text-slate-600">{value}</span>}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Line chart gagnes */}
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+            <h3 className="text-sm font-semibold text-slate-700 mb-3">Evolution hebdo des motifs gagnes (%)</h3>
+            <div className="h-56">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={GAGNE_TENDANCE} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+                  <XAxis dataKey="semaine" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 11 }} />
+                  <YAxis
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fill: '#94a3b8', fontSize: 12 }}
+                    domain={[0, 60]}
+                    tickFormatter={(v) => `${v}%`}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      borderRadius: '0.75rem',
+                      border: '1px solid #e2e8f0',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                    }}
+                    formatter={((value: any, name: any) => [`${value}%`, MOTIF_LABELS[name as DealMotif] || name]) as any}
+                  />
+                  {GAGNE_LINE_MOTIFS.map((motif) => (
+                    <Line
+                      key={motif}
+                      type="monotone"
+                      dataKey={motif}
+                      name={motif}
+                      stroke={MOTIF_COLORS[motif]}
+                      strokeWidth={2}
+                      dot={{ r: 3, fill: MOTIF_COLORS[motif] }}
+                      activeDot={{ r: 5 }}
+                    />
                   ))}
-                </Pie>
-                <Tooltip
-                  contentStyle={{
-                    borderRadius: '0.75rem',
-                    border: '1px solid #e2e8f0',
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-                  }}
-                  formatter={(value) => [`${value} deals`, '']}
-                />
-                <Legend
-                  verticalAlign="bottom"
-                  iconType="circle"
-                  iconSize={8}
-                  formatter={(value) => <span className="text-xs text-slate-600">{value}</span>}
-                />
-              </PieChart>
-            </ResponsiveContainer>
+                  <Legend
+                    verticalAlign="bottom"
+                    iconType="circle"
+                    iconSize={8}
+                    formatter={(value) => <span className="text-xs text-slate-600">{MOTIF_LABELS[value as DealMotif] || value}</span>}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
           </div>
         </div>
 
-        {/* Line chart -- tendance deals perdus par motif */}
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-          <h2 className="text-sm font-semibold text-slate-900 mb-4">Tendance deals perdus par motif</h2>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={DEAL_TENDANCE} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
-                <XAxis
-                  dataKey="semaine"
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fill: '#64748b', fontSize: 11 }}
-                />
-                <YAxis
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fill: '#94a3b8', fontSize: 12 }}
-                  allowDecimals={false}
-                />
-                <Tooltip
-                  contentStyle={{
-                    borderRadius: '0.75rem',
-                    border: '1px solid #e2e8f0',
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-                  }}
-                />
-                {lineMotifs.map((motif) => (
-                  <Line
-                    key={motif}
-                    type="monotone"
-                    dataKey={motif}
-                    name={MOTIF_LABELS[motif]}
-                    stroke={MOTIF_COLORS[motif]}
-                    strokeWidth={2}
-                    dot={{ r: 3, fill: MOTIF_COLORS[motif] }}
-                    activeDot={{ r: 5 }}
+        {/* RIGHT: Deals perdus */}
+        <div className="space-y-4">
+          <h2 className="text-base font-semibold text-slate-900">Deals perdus</h2>
+
+          {/* Donut perdus */}
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+            <h3 className="text-sm font-semibold text-slate-700 mb-3">Repartition par motif (%)</h3>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={donutPerdu}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={55}
+                    outerRadius={90}
+                    paddingAngle={2}
+                    dataKey="value"
+                    nameKey="name"
+                    strokeWidth={0}
+                  >
+                    {donutPerdu.map((entry) => (
+                      <Cell key={entry.motif} fill={MOTIF_COLORS[entry.motif]} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{
+                      borderRadius: '0.75rem',
+                      border: '1px solid #e2e8f0',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                    }}
+                    formatter={((value: any) => [`${value}%`, '']) as any}
                   />
-                ))}
-                <Legend
-                  verticalAlign="bottom"
-                  iconType="circle"
-                  iconSize={8}
-                  formatter={(value) => <span className="text-xs text-slate-600">{value}</span>}
-                />
-              </LineChart>
-            </ResponsiveContainer>
+                  <Legend
+                    verticalAlign="bottom"
+                    iconType="circle"
+                    iconSize={8}
+                    formatter={(value) => <span className="text-xs text-slate-600">{value}</span>}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Line chart perdus */}
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+            <h3 className="text-sm font-semibold text-slate-700 mb-3">Evolution hebdo des motifs perdus (%)</h3>
+            <div className="h-56">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={perduTendance} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+                  <XAxis dataKey="semaine" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 11 }} />
+                  <YAxis
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fill: '#94a3b8', fontSize: 12 }}
+                    domain={[0, 60]}
+                    tickFormatter={(v) => `${v}%`}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      borderRadius: '0.75rem',
+                      border: '1px solid #e2e8f0',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                    }}
+                    formatter={((value: any, name: any) => [`${value}%`, MOTIF_LABELS[name as DealMotif] || name]) as any}
+                  />
+                  {perduLineMotifs.map((motif) => (
+                    <Line
+                      key={motif}
+                      type="monotone"
+                      dataKey={motif}
+                      name={motif}
+                      stroke={MOTIF_COLORS[motif]}
+                      strokeWidth={2}
+                      dot={{ r: 3, fill: MOTIF_COLORS[motif] }}
+                      activeDot={{ r: 5 }}
+                    />
+                  ))}
+                  <Legend
+                    verticalAlign="bottom"
+                    iconType="circle"
+                    iconSize={8}
+                    formatter={(value) => <span className="text-xs text-slate-600">{MOTIF_LABELS[value as DealMotif] || value}</span>}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Filter pills */}
       <div className="flex flex-col gap-3">
-        {/* Resultat filter */}
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-xs font-medium text-slate-500 uppercase tracking-wider mr-1">Resultat</span>
           {RESULTAT_OPTIONS.map((opt) => (
@@ -220,7 +349,6 @@ export default function MktDealPage() {
             </button>
           ))}
         </div>
-        {/* Motif filter */}
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-xs font-medium text-slate-500 uppercase tracking-wider mr-1">Motif</span>
           <button

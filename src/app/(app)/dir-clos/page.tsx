@@ -40,12 +40,12 @@ export default function DirClosPage() {
   );
 
   const kpis = useMemo(() => {
-    const total = filtered.length;
-    const atteints = filtered.filter(cr => cr.resultat === 'atteint').length;
+    const total = CR_OBJECTIFS.length;
+    const atteints = CR_OBJECTIFS.filter(cr => cr.resultat === 'atteint').length;
     const nonAtteints = total - atteints;
     const taux = total > 0 ? Math.round((atteints / total) * 100) : 0;
     return { total, atteints, nonAtteints, taux };
-  }, [filtered]);
+  }, []);
 
   // Bar chart: taux de reussite par commercial
   const barData = useMemo(() => {
@@ -78,6 +78,32 @@ export default function DirClosPage() {
     }));
   }, []);
 
+  // Causes de non-atteinte
+  const causesData = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const cr of CR_OBJECTIFS) {
+      if (cr.resultat === 'non_atteint' && cr.cause_echec) {
+        counts[cr.cause_echec] = (counts[cr.cause_echec] || 0) + 1;
+      }
+    }
+    return Object.entries(counts)
+      .map(([cause, count]) => ({ name: cause, count }))
+      .sort((a, b) => b.count - a.count);
+  }, []);
+
+  // Facteurs de reussite
+  const facteursData = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const cr of CR_OBJECTIFS) {
+      if (cr.resultat === 'atteint' && cr.facteur_reussite) {
+        counts[cr.facteur_reussite] = (counts[cr.facteur_reussite] || 0) + 1;
+      }
+    }
+    return Object.entries(counts)
+      .map(([facteur, count]) => ({ name: facteur, count }))
+      .sort((a, b) => b.count - a.count);
+  }, []);
+
   // Table rows sorted by date desc
   const tableRows = useMemo(
     () => [...filtered].sort((a, b) => b.date.localeCompare(a.date)),
@@ -108,18 +134,18 @@ export default function DirClosPage() {
         <KpiCard
           label="Objectifs atteints"
           value={kpis.atteints}
-          suffix={`(${kpis.total > 0 ? Math.round((kpis.atteints / kpis.total) * 100) : 0}%)`}
+          suffix={`(${kpis.taux}%)`}
           icon={<CheckCircle className="w-5 h-5" />}
           iconColor="text-emerald-600 bg-emerald-50"
         />
         <KpiCard
-          label="Objectifs non atteints"
+          label="Non atteints"
           value={kpis.nonAtteints}
           icon={<XCircle className="w-5 h-5" />}
           iconColor="text-rose-600 bg-rose-50"
         />
         <KpiCard
-          label="Taux de reussite global"
+          label="Taux reussite global"
           value={kpis.taux}
           suffix="%"
           icon={<Target className="w-5 h-5" />}
@@ -145,7 +171,7 @@ export default function DirClosPage() {
         ))}
       </div>
 
-      {/* Charts */}
+      {/* Charts row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Bar chart */}
         <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
@@ -210,6 +236,55 @@ export default function DirClosPage() {
         </div>
       </div>
 
+      {/* Causes & Facteurs */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Causes de non-atteinte */}
+        <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+          <div className="flex items-center gap-2 mb-4">
+            <XCircle className="w-4 h-4 text-rose-500" />
+            <h2 className="text-sm font-semibold text-slate-700">Causes de non-atteinte</h2>
+          </div>
+          {causesData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={causesData.length * 44 + 20}>
+              <BarChart data={causesData} layout="vertical" margin={{ left: 140, right: 20 }}>
+                <XAxis type="number" allowDecimals={false} tick={{ fill: '#64748b', fontSize: 12 }} />
+                <YAxis type="category" dataKey="name" tick={{ fill: '#334155', fontSize: 12 }} width={135} />
+                <Tooltip
+                  formatter={((value: any) => [value, 'CR']) as any}
+                  contentStyle={{ borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13 }}
+                />
+                <Bar dataKey="count" fill="#f43f5e" radius={[0, 4, 4, 0]} maxBarSize={24} />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <p className="text-sm text-slate-400">Aucune cause renseignee.</p>
+          )}
+        </div>
+
+        {/* Facteurs de reussite */}
+        <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+          <div className="flex items-center gap-2 mb-4">
+            <CheckCircle className="w-4 h-4 text-emerald-500" />
+            <h2 className="text-sm font-semibold text-slate-700">Facteurs de reussite</h2>
+          </div>
+          {facteursData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={facteursData.length * 44 + 20}>
+              <BarChart data={facteursData} layout="vertical" margin={{ left: 140, right: 20 }}>
+                <XAxis type="number" allowDecimals={false} tick={{ fill: '#64748b', fontSize: 12 }} />
+                <YAxis type="category" dataKey="name" tick={{ fill: '#334155', fontSize: 12 }} width={135} />
+                <Tooltip
+                  formatter={((value: any) => [value, 'CR']) as any}
+                  contentStyle={{ borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13 }}
+                />
+                <Bar dataKey="count" fill="#10b981" radius={[0, 4, 4, 0]} maxBarSize={24} />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <p className="text-sm text-slate-400">Aucun facteur renseigne.</p>
+          )}
+        </div>
+      </div>
+
       {/* Table */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
@@ -222,6 +297,7 @@ export default function DirClosPage() {
                 <th className="text-left py-3 px-4 font-semibold text-slate-600">Client</th>
                 <th className="text-left py-3 px-4 font-semibold text-slate-600">Date</th>
                 <th className="text-left py-3 px-4 font-semibold text-slate-600">Region</th>
+                <th className="text-left py-3 px-4 font-semibold text-slate-600">Detail</th>
               </tr>
             </thead>
             <tbody>
@@ -251,6 +327,14 @@ export default function DirClosPage() {
                   <td className="py-3 px-4 text-slate-600">{cr.client_name}</td>
                   <td className="py-3 px-4 text-slate-500 tabular-nums">{formatDate(cr.date)}</td>
                   <td className="py-3 px-4 text-slate-500">{cr.region}</td>
+                  <td className="py-3 px-4 text-slate-500 text-xs max-w-[200px]">
+                    {cr.resultat === 'non_atteint' && cr.cause_echec && (
+                      <span className="text-rose-600">{cr.cause_echec}</span>
+                    )}
+                    {cr.resultat === 'atteint' && cr.facteur_reussite && (
+                      <span className="text-emerald-600">{cr.facteur_reussite}</span>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>

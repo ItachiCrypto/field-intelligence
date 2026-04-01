@@ -116,9 +116,62 @@ export interface CRObjectif {
   client_name: string;
   objectif_type: ObjectifType;
   resultat: 'atteint' | 'non_atteint';
+  cause_echec?: string;       // si non_atteint
+  facteur_reussite?: string;  // si atteint
   date: string;
   region: string;
 }
+
+// Motifs commerciaux pour DIR-LOST (distincts des motifs marketing)
+export type MotifCommercial = 'prix_non_competitif' | 'timing_rate' | 'concurrent_mieux_positionne' | 'relation_insuffisante' | 'besoin_mal_identifie' | 'suivi_insuffisant';
+
+export interface DealCommercial {
+  id: string;
+  motif: MotifCommercial;
+  resultat: 'gagne' | 'perdu';
+  concurrent_nom?: string;
+  commercial_name: string;
+  client_name: string;
+  region: string;
+  date: string;
+  verbatim: string;
+}
+
+export interface DealCommercialTendance {
+  semaine: string;
+  prix_non_competitif: number;
+  timing_rate: number;
+  concurrent_mieux_positionne: number;
+  relation_insuffisante: number;
+  besoin_mal_identifie: number;
+  suivi_insuffisant: number;
+}
+
+export const MOTIF_COMMERCIAL_LABELS: Record<MotifCommercial, string> = {
+  prix_non_competitif: 'Prix non competitif',
+  timing_rate: 'Timing rate',
+  concurrent_mieux_positionne: 'Concurrent mieux positionne',
+  relation_insuffisante: 'Relation insuffisante',
+  besoin_mal_identifie: 'Besoin mal identifie',
+  suivi_insuffisant: 'Suivi commercial insuffisant',
+};
+
+export const MOTIF_COMMERCIAL_COLORS: Record<MotifCommercial, string> = {
+  prix_non_competitif: '#e11d48',
+  timing_rate: '#f59e0b',
+  concurrent_mieux_positionne: '#ef4444',
+  relation_insuffisante: '#8b5cf6',
+  besoin_mal_identifie: '#0ea5e9',
+  suivi_insuffisant: '#64748b',
+};
+
+// Motifs principaux du sentiment (pour MKT-SENTIMENT)
+export interface MotifSentiment {
+  motif: string;
+  type: 'positif' | 'negatif';
+  mentions: number;
+}
+
 
 // DIR-N1 — Vue de pilotage GLOBALE du sentiment client (pas individuel)
 export type SentimentType = 'positif' | 'negatif' | 'neutre' | 'interesse';

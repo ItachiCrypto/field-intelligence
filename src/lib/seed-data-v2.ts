@@ -3,6 +3,7 @@ import {
   OffreConcurrente, CommConcurrente, PositionnementData, GeoSectorCell,
   CRObjectif, SentimentPeriode, SentimentRegion, SegmentSentiment,
   TerritoireSynthese, GeoPoint, RecommandationIA,
+  DealCommercial, DealCommercialTendance, MotifSentiment,
 } from './types-v2';
 
 // === MKT-PRIX ===
@@ -115,33 +116,33 @@ export const GEO_SECTOR_DATA: GeoSectorCell[] = [
   { secteur: 'Distribution', region: 'Est', signaux_concurrence: 9, signaux_besoins: 11, signaux_opportunites: 7, score_intensite: 58 },
 ];
 
-// === DIR-CLOS — Objectifs de visite (pas de CA) ===
+// === DIR-CLOS — Objectifs de visite avec causes/facteurs ===
 export const CR_OBJECTIFS: CRObjectif[] = [
-  { id: 'cr-1', commercial_id: 'com-1', commercial_name: 'Thomas D.', client_name: 'Dupont Industries', objectif_type: 'signature', resultat: 'atteint', date: '2026-03-29', region: 'Nord' },
-  { id: 'cr-2', commercial_id: 'com-1', commercial_name: 'Thomas D.', client_name: 'MetalPro', objectif_type: 'sell_in', resultat: 'atteint', date: '2026-03-28', region: 'Nord' },
-  { id: 'cr-3', commercial_id: 'com-1', commercial_name: 'Thomas D.', client_name: 'Groupe Mercier', objectif_type: 'fidelisation', resultat: 'non_atteint', date: '2026-03-27', region: 'Nord' },
-  { id: 'cr-4', commercial_id: 'com-7', commercial_name: 'Emma V.', client_name: 'BioSante Plus', objectif_type: 'signature', resultat: 'atteint', date: '2026-03-29', region: 'IDF' },
-  { id: 'cr-5', commercial_id: 'com-7', commercial_name: 'Emma V.', client_name: 'Transco Group', objectif_type: 'sell_out', resultat: 'atteint', date: '2026-03-28', region: 'IDF' },
-  { id: 'cr-6', commercial_id: 'com-7', commercial_name: 'Emma V.', client_name: 'NewCorp', objectif_type: 'decouverte', resultat: 'atteint', date: '2026-03-26', region: 'IDF' },
-  { id: 'cr-7', commercial_id: 'com-13', commercial_name: 'Clara S.', client_name: 'Transco Group', objectif_type: 'sell_out', resultat: 'atteint', date: '2026-03-28', region: 'IDF' },
-  { id: 'cr-8', commercial_id: 'com-13', commercial_name: 'Clara S.', client_name: 'BioSante Plus', objectif_type: 'formation', resultat: 'atteint', date: '2026-03-27', region: 'IDF' },
-  { id: 'cr-9', commercial_id: 'com-13', commercial_name: 'Clara S.', client_name: 'TechCom', objectif_type: 'signature', resultat: 'non_atteint', date: '2026-03-25', region: 'IDF' },
-  { id: 'cr-10', commercial_id: 'com-6', commercial_name: 'Lucas M.', client_name: 'Horizon Distribution', objectif_type: 'sell_in', resultat: 'non_atteint', date: '2026-03-28', region: 'Est' },
-  { id: 'cr-11', commercial_id: 'com-6', commercial_name: 'Lucas M.', client_name: 'LogiPro SAS', objectif_type: 'fidelisation', resultat: 'atteint', date: '2026-03-26', region: 'Est' },
-  { id: 'cr-12', commercial_id: 'com-6', commercial_name: 'Lucas M.', client_name: 'EstParts', objectif_type: 'decouverte', resultat: 'non_atteint', date: '2026-03-24', region: 'Est' },
-  { id: 'cr-13', commercial_id: 'com-5', commercial_name: 'Pierre B.', client_name: 'MecanoParts', objectif_type: 'sell_out', resultat: 'non_atteint', date: '2026-03-29', region: 'Sud' },
-  { id: 'cr-14', commercial_id: 'com-5', commercial_name: 'Pierre B.', client_name: 'SudTech', objectif_type: 'signature', resultat: 'non_atteint', date: '2026-03-27', region: 'Sud' },
-  { id: 'cr-15', commercial_id: 'com-5', commercial_name: 'Pierre B.', client_name: 'EcoVert Services', objectif_type: 'decouverte', resultat: 'non_atteint', date: '2026-03-25', region: 'Sud' },
-  { id: 'cr-16', commercial_id: 'com-8', commercial_name: 'Antoine G.', client_name: 'SudFrance Logistique', objectif_type: 'sell_in', resultat: 'atteint', date: '2026-03-28', region: 'Sud-Ouest' },
-  { id: 'cr-17', commercial_id: 'com-8', commercial_name: 'Antoine G.', client_name: 'NovaTech', objectif_type: 'formation', resultat: 'atteint', date: '2026-03-26', region: 'Sud-Ouest' },
-  { id: 'cr-18', commercial_id: 'com-8', commercial_name: 'Antoine G.', client_name: 'AlphaLogistics', objectif_type: 'signature', resultat: 'non_atteint', date: '2026-03-24', region: 'Sud-Ouest' },
-  { id: 'cr-19', commercial_id: 'com-4', commercial_name: 'Marc D.', client_name: 'Bertrand & Fils', objectif_type: 'fidelisation', resultat: 'atteint', date: '2026-03-29', region: 'Ouest' },
-  { id: 'cr-20', commercial_id: 'com-4', commercial_name: 'Marc D.', client_name: 'OmegaCorp', objectif_type: 'sell_out', resultat: 'atteint', date: '2026-03-27', region: 'Ouest' },
-  { id: 'cr-21', commercial_id: 'com-2', commercial_name: 'Sarah R.', client_name: 'Groupe Mercier', objectif_type: 'sell_in', resultat: 'atteint', date: '2026-03-28', region: 'Nord' },
-  { id: 'cr-22', commercial_id: 'com-2', commercial_name: 'Sarah R.', client_name: 'NordParts', objectif_type: 'decouverte', resultat: 'atteint', date: '2026-03-26', region: 'Nord' },
-  { id: 'cr-23', commercial_id: 'com-2', commercial_name: 'Sarah R.', client_name: 'MetalPro', objectif_type: 'signature', resultat: 'non_atteint', date: '2026-03-24', region: 'Nord' },
-  { id: 'cr-24', commercial_id: 'com-9', commercial_name: 'Camille P.', client_name: 'Atelier Central', objectif_type: 'sell_in', resultat: 'non_atteint', date: '2026-03-28', region: 'Nord-Est' },
-  { id: 'cr-25', commercial_id: 'com-9', commercial_name: 'Camille P.', client_name: 'NordEst Indus', objectif_type: 'formation', resultat: 'atteint', date: '2026-03-26', region: 'Nord-Est' },
+  { id: 'cr-1', commercial_id: 'com-1', commercial_name: 'Thomas D.', client_name: 'Dupont Industries', objectif_type: 'signature', resultat: 'atteint', facteur_reussite: 'Relation de confiance', date: '2026-03-29', region: 'Nord' },
+  { id: 'cr-2', commercial_id: 'com-1', commercial_name: 'Thomas D.', client_name: 'MetalPro', objectif_type: 'sell_in', resultat: 'atteint', facteur_reussite: 'Produit adapte', date: '2026-03-28', region: 'Nord' },
+  { id: 'cr-3', commercial_id: 'com-1', commercial_name: 'Thomas D.', client_name: 'Groupe Mercier', objectif_type: 'fidelisation', resultat: 'non_atteint', cause_echec: 'Concurrent deja en place', date: '2026-03-27', region: 'Nord' },
+  { id: 'cr-4', commercial_id: 'com-7', commercial_name: 'Emma V.', client_name: 'BioSante Plus', objectif_type: 'signature', resultat: 'atteint', facteur_reussite: 'Besoin urgent client', date: '2026-03-29', region: 'IDF' },
+  { id: 'cr-5', commercial_id: 'com-7', commercial_name: 'Emma V.', client_name: 'Transco Group', objectif_type: 'sell_out', resultat: 'atteint', facteur_reussite: 'Prix competitif', date: '2026-03-28', region: 'IDF' },
+  { id: 'cr-6', commercial_id: 'com-7', commercial_name: 'Emma V.', client_name: 'NewCorp', objectif_type: 'decouverte', resultat: 'atteint', facteur_reussite: 'Relation de confiance', date: '2026-03-26', region: 'IDF' },
+  { id: 'cr-7', commercial_id: 'com-13', commercial_name: 'Clara S.', client_name: 'Transco Group', objectif_type: 'sell_out', resultat: 'atteint', facteur_reussite: 'Produit adapte', date: '2026-03-28', region: 'IDF' },
+  { id: 'cr-8', commercial_id: 'com-13', commercial_name: 'Clara S.', client_name: 'BioSante Plus', objectif_type: 'formation', resultat: 'atteint', facteur_reussite: 'Relation de confiance', date: '2026-03-27', region: 'IDF' },
+  { id: 'cr-9', commercial_id: 'com-13', commercial_name: 'Clara S.', client_name: 'TechCom', objectif_type: 'signature', resultat: 'non_atteint', cause_echec: 'Client pas interesse', date: '2026-03-25', region: 'IDF' },
+  { id: 'cr-10', commercial_id: 'com-6', commercial_name: 'Lucas M.', client_name: 'Horizon Distribution', objectif_type: 'sell_in', resultat: 'non_atteint', cause_echec: 'Timing mauvais', date: '2026-03-28', region: 'Est' },
+  { id: 'cr-11', commercial_id: 'com-6', commercial_name: 'Lucas M.', client_name: 'LogiPro SAS', objectif_type: 'fidelisation', resultat: 'atteint', facteur_reussite: 'Relation de confiance', date: '2026-03-26', region: 'Est' },
+  { id: 'cr-12', commercial_id: 'com-6', commercial_name: 'Lucas M.', client_name: 'EstParts', objectif_type: 'decouverte', resultat: 'non_atteint', cause_echec: 'Produit pas adapte', date: '2026-03-24', region: 'Est' },
+  { id: 'cr-13', commercial_id: 'com-5', commercial_name: 'Pierre B.', client_name: 'MecanoParts', objectif_type: 'sell_out', resultat: 'non_atteint', cause_echec: 'Client pas interesse', date: '2026-03-29', region: 'Sud' },
+  { id: 'cr-14', commercial_id: 'com-5', commercial_name: 'Pierre B.', client_name: 'SudTech', objectif_type: 'signature', resultat: 'non_atteint', cause_echec: 'Concurrent deja en place', date: '2026-03-27', region: 'Sud' },
+  { id: 'cr-15', commercial_id: 'com-5', commercial_name: 'Pierre B.', client_name: 'EcoVert Services', objectif_type: 'decouverte', resultat: 'non_atteint', cause_echec: 'Timing mauvais', date: '2026-03-25', region: 'Sud' },
+  { id: 'cr-16', commercial_id: 'com-8', commercial_name: 'Antoine G.', client_name: 'SudFrance Logistique', objectif_type: 'sell_in', resultat: 'atteint', facteur_reussite: 'Prix competitif', date: '2026-03-28', region: 'Sud-Ouest' },
+  { id: 'cr-17', commercial_id: 'com-8', commercial_name: 'Antoine G.', client_name: 'NovaTech', objectif_type: 'formation', resultat: 'atteint', facteur_reussite: 'Besoin urgent client', date: '2026-03-26', region: 'Sud-Ouest' },
+  { id: 'cr-18', commercial_id: 'com-8', commercial_name: 'Antoine G.', client_name: 'AlphaLogistics', objectif_type: 'signature', resultat: 'non_atteint', cause_echec: 'Produit pas adapte', date: '2026-03-24', region: 'Sud-Ouest' },
+  { id: 'cr-19', commercial_id: 'com-4', commercial_name: 'Marc D.', client_name: 'Bertrand & Fils', objectif_type: 'fidelisation', resultat: 'atteint', facteur_reussite: 'Relation de confiance', date: '2026-03-29', region: 'Ouest' },
+  { id: 'cr-20', commercial_id: 'com-4', commercial_name: 'Marc D.', client_name: 'OmegaCorp', objectif_type: 'sell_out', resultat: 'atteint', facteur_reussite: 'Produit adapte', date: '2026-03-27', region: 'Ouest' },
+  { id: 'cr-21', commercial_id: 'com-2', commercial_name: 'Sarah R.', client_name: 'Groupe Mercier', objectif_type: 'sell_in', resultat: 'atteint', facteur_reussite: 'Prix competitif', date: '2026-03-28', region: 'Nord' },
+  { id: 'cr-22', commercial_id: 'com-2', commercial_name: 'Sarah R.', client_name: 'NordParts', objectif_type: 'decouverte', resultat: 'atteint', facteur_reussite: 'Besoin urgent client', date: '2026-03-26', region: 'Nord' },
+  { id: 'cr-23', commercial_id: 'com-2', commercial_name: 'Sarah R.', client_name: 'MetalPro', objectif_type: 'signature', resultat: 'non_atteint', cause_echec: 'Client pas interesse', date: '2026-03-24', region: 'Nord' },
+  { id: 'cr-24', commercial_id: 'com-9', commercial_name: 'Camille P.', client_name: 'Atelier Central', objectif_type: 'sell_in', resultat: 'non_atteint', cause_echec: 'Concurrent deja en place', date: '2026-03-28', region: 'Nord-Est' },
+  { id: 'cr-25', commercial_id: 'com-9', commercial_name: 'Camille P.', client_name: 'NordEst Indus', objectif_type: 'formation', resultat: 'atteint', facteur_reussite: 'Produit adapte', date: '2026-03-26', region: 'Nord-Est' },
 ];
 
 // === DIR-N1 — Sentiment global par periode ===
@@ -230,4 +231,41 @@ export const RECOMMANDATIONS_IA: RecommandationIA[] = [
   { id: 'rec-4', type: 'coaching', territoire: 'Sud', commercial_suggere: 'Pierre B.', priorite: 3, action_recommandee: 'Session coaching Pierre B. — taux reussite objectifs 0% ce mois. Analyser approche et technique.', statut: 'nouvelle' },
   { id: 'rec-5', type: 'risque', territoire: 'Nord', commercial_suggere: 'Sarah R.', priorite: 2, action_recommandee: 'Groupe Mercier — sentiment negatif croissant dans les CR. Organiser revue de compte avec KAM.', statut: 'en_cours' },
   { id: 'rec-6', type: 'opportunite', territoire: 'Nord-Est', commercial_suggere: 'Camille P.', priorite: 3, action_recommandee: 'Atelier Central ouvre nouveau site en mai. Preparer proposition equipement complet.', statut: 'nouvelle' },
+];
+
+// === DIR-LOST — Deals avec motifs commerciaux ===
+export const DEALS_COMMERCIAUX: DealCommercial[] = [
+  { id: 'dc-1', motif: 'prix_non_competitif', resultat: 'perdu', concurrent_nom: 'Acme', commercial_name: 'Thomas D.', client_name: 'Dupont Industries', region: 'Nord', date: '2026-03-28', verbatim: 'Notre tarif 12% au-dessus, pas de marge de negociation possible' },
+  { id: 'dc-2', motif: 'relation_insuffisante', resultat: 'gagne', commercial_name: 'Emma V.', client_name: 'BioSante Plus', region: 'IDF', date: '2026-03-27', verbatim: 'Suivi regulier et reactivite ont fait la difference face au concurrent' },
+  { id: 'dc-3', motif: 'besoin_mal_identifie', resultat: 'perdu', concurrent_nom: 'Bexor', commercial_name: 'Antoine G.', client_name: 'SudFrance Logistique', region: 'Sud-Ouest', date: '2026-03-25', verbatim: 'On a propose la mauvaise gamme, Bexor avait mieux compris le besoin' },
+  { id: 'dc-4', motif: 'prix_non_competitif', resultat: 'perdu', concurrent_nom: 'Acme', commercial_name: 'Lucas M.', client_name: 'Horizon Distribution', region: 'Est', date: '2026-03-22', verbatim: 'Ecart de prix trop important, le client ne pouvait pas justifier' },
+  { id: 'dc-5', motif: 'timing_rate', resultat: 'perdu', commercial_name: 'Hugo T.', client_name: 'NovaTech', region: 'Sud-Ouest', date: '2026-03-20', verbatim: 'Arrivee trop tard dans le cycle de decision, concurrent avait deja signe' },
+  { id: 'dc-6', motif: 'relation_insuffisante', resultat: 'gagne', commercial_name: 'Clara S.', client_name: 'Transco Group', region: 'IDF', date: '2026-03-19', verbatim: 'Visites regulieres et accompagnement technique apprecies' },
+  { id: 'dc-7', motif: 'concurrent_mieux_positionne', resultat: 'perdu', concurrent_nom: 'Bexor', commercial_name: 'Camille P.', client_name: 'Atelier Central', region: 'Nord-Est', date: '2026-03-18', verbatim: 'Bexor propose installation gratuite et formation sur site' },
+  { id: 'dc-8', motif: 'prix_non_competitif', resultat: 'gagne', commercial_name: 'Sarah R.', client_name: 'Groupe Mercier', region: 'Nord', date: '2026-03-15', verbatim: 'Alignement prix + engagement SAV premium ont convaincu' },
+  { id: 'dc-9', motif: 'suivi_insuffisant', resultat: 'perdu', commercial_name: 'Pierre B.', client_name: 'MecanoParts', region: 'Sud', date: '2026-03-12', verbatim: 'Client se plaint de ne jamais avoir de nouvelles entre les visites' },
+  { id: 'dc-10', motif: 'besoin_mal_identifie', resultat: 'gagne', commercial_name: 'Lea F.', client_name: 'LogiPro SAS', region: 'Est', date: '2026-03-10', verbatim: 'Deuxieme visite avec le bon diagnostic technique, client convaincu' },
+  { id: 'dc-11', motif: 'concurrent_mieux_positionne', resultat: 'perdu', concurrent_nom: 'Proxio', commercial_name: 'Nathan B.', client_name: 'SudTech', region: 'Sud', date: '2026-03-08', verbatim: 'Proxio a un partenariat ERP qui nous manque' },
+  { id: 'dc-12', motif: 'timing_rate', resultat: 'perdu', commercial_name: 'Gabriel L.', client_name: 'OmegaCorp', region: 'Ouest', date: '2026-03-02', verbatim: 'Budget deja alloue au T1, devra attendre T3' },
+  { id: 'dc-13', motif: 'suivi_insuffisant', resultat: 'gagne', commercial_name: 'Alice M.', client_name: 'TechnoPlus', region: 'Nord-Est', date: '2026-03-04', verbatim: 'Apres mise en place suivi hebdo, le client a renouvele sa confiance' },
+  { id: 'dc-14', motif: 'prix_non_competitif', resultat: 'perdu', concurrent_nom: 'Acme', commercial_name: 'Maxime R.', client_name: 'MetalPro', region: 'Nord', date: '2026-03-01', verbatim: 'Acme -15% sur 2 ans, impossible de s\'aligner' },
+];
+
+export const DEAL_COMMERCIAL_TENDANCE: DealCommercialTendance[] = [
+  { semaine: 'S11', prix_non_competitif: 2, timing_rate: 1, concurrent_mieux_positionne: 0, relation_insuffisante: 1, besoin_mal_identifie: 0, suivi_insuffisant: 1 },
+  { semaine: 'S12', prix_non_competitif: 3, timing_rate: 0, concurrent_mieux_positionne: 1, relation_insuffisante: 0, besoin_mal_identifie: 1, suivi_insuffisant: 0 },
+  { semaine: 'S13', prix_non_competitif: 2, timing_rate: 1, concurrent_mieux_positionne: 1, relation_insuffisante: 0, besoin_mal_identifie: 0, suivi_insuffisant: 1 },
+  { semaine: 'S14', prix_non_competitif: 4, timing_rate: 0, concurrent_mieux_positionne: 1, relation_insuffisante: 0, besoin_mal_identifie: 1, suivi_insuffisant: 0 },
+];
+
+// === MKT-SENTIMENT — Motifs principaux du sentiment ===
+export const MOTIFS_SENTIMENT: MotifSentiment[] = [
+  { motif: 'Qualite produit reconnue', type: 'positif', mentions: 42 },
+  { motif: 'Relation commerciale de confiance', type: 'positif', mentions: 38 },
+  { motif: 'Reactivite SAV', type: 'positif', mentions: 28 },
+  { motif: 'Prix competitif', type: 'positif', mentions: 22 },
+  { motif: 'Prix trop eleve', type: 'negatif', mentions: 35 },
+  { motif: 'Delais de livraison', type: 'negatif', mentions: 28 },
+  { motif: 'SAV peu reactif', type: 'negatif', mentions: 22 },
+  { motif: 'Manque de visite terrain', type: 'negatif', mentions: 18 },
 ];
