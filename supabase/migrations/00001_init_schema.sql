@@ -439,7 +439,7 @@ CREATE TABLE abbreviations (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   company_id uuid REFERENCES companies(id) ON DELETE CASCADE NOT NULL,
   short text,
-  full text,
+  "full" text,
   category abbrev_category
 );
 
