@@ -3,11 +3,12 @@
 import Link from 'next/link';
 import { KpiCard } from '@/components/shared/kpi-card';
 import { SeverityIndicator } from '@/components/shared/severity-indicator';
-import { ACCOUNTS, ALERTS } from '@/lib/seed-data';
+import { useAppData } from '@/lib/data';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { Briefcase, AlertTriangle, TrendingUp } from 'lucide-react';
 
 export function KamDashboard() {
+  const { accounts: ACCOUNTS, alerts: ALERTS } = useAppData();
   const sortedAccounts = [...ACCOUNTS].sort((a, b) => b.risk_score - a.risk_score);
   const criticalAlertCount = ALERTS.filter(
     (a) => a.status === 'nouveau' && (a.severity === 'rouge' || a.severity === 'orange')

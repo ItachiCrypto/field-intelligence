@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { SIGNALS, ALERTS, COMMERCIALS } from '@/lib/seed-data';
+import { useAppData } from '@/lib/data';
 import { SEVERITY_CONFIG } from '@/lib/constants';
 import { Severity } from '@/lib/types';
 import { SeverityIndicator } from '@/components/shared/severity-indicator';
@@ -15,10 +15,11 @@ interface RegionData {
   bySeverity: Record<Severity, number>;
   dominantSeverity: Severity;
   commercialCount: number;
-  topAlert: typeof ALERTS[0] | null;
+  topAlert: any | null;
 }
 
 export default function HeatmapPage() {
+  const { signals: SIGNALS, alerts: ALERTS, commercials: COMMERCIALS } = useAppData();
   const regionData = useMemo(() => {
     const regionMap: Record<string, { signals: typeof SIGNALS; alerts: typeof ALERTS }> = {};
 

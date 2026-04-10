@@ -3,7 +3,7 @@
 import { useMemo } from 'react';
 import { KpiCard } from '@/components/shared/kpi-card';
 import { SignalCard } from '@/components/shared/signal-card';
-import { SIGNALS, ALERTS, COMMERCIALS } from '@/lib/seed-data';
+import { useAppData } from '@/lib/data';
 import Link from 'next/link';
 import {
   FileText,
@@ -45,6 +45,7 @@ function scoreTextColor(score: number): string {
 }
 
 export function DirectorDashboard() {
+  const { signals: SIGNALS, alerts: ALERTS, commercials: COMMERCIALS } = useAppData();
   const totalCR = COMMERCIALS.reduce((s, c) => s + c.cr_week, 0);
   const criticalAlerts = ALERTS.filter(
     (a) => a.severity === 'rouge' && a.status === 'nouveau'

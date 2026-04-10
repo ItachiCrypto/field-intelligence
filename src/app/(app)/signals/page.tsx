@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { SIGNALS } from '@/lib/seed-data';
+import { useAppData } from '@/lib/data';
 import { SIGNAL_TYPES, REGIONS } from '@/lib/constants';
 import { SignalCard } from '@/components/shared/signal-card';
 import { SignalType } from '@/lib/types';
@@ -53,6 +53,7 @@ function PillButton({ active, onClick, children }: { active: boolean; onClick: (
 }
 
 export default function SignalsPage() {
+  const { signals: SIGNALS } = useAppData();
   const [activeType, setActiveType] = useState<SignalType | 'all'>('all');
   const [activeRegion, setActiveRegion] = useState<string>('all');
   const [activePeriod, setActivePeriod] = useState<PeriodFilter>('all');

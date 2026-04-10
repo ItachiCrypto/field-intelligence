@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { COMMERCIALS } from '@/lib/seed-data';
+import { useAppData } from '@/lib/data';
 import { SEVERITY_CONFIG } from '@/lib/constants';
 import { qualityScoreToSeverity, cn } from '@/lib/utils';
 import { KpiCard } from '@/components/shared/kpi-card';
@@ -12,6 +12,7 @@ type SortKey = 'name' | 'region' | 'cr_week' | 'quality_score' | 'useful_signals
 type SortDir = 'asc' | 'desc';
 
 export default function TeamPage() {
+  const { commercials: COMMERCIALS } = useAppData();
   const [sortKey, setSortKey] = useState<SortKey>('quality_score');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
 

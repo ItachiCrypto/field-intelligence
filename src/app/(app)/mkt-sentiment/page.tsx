@@ -1,13 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import {
-  SENTIMENT_PERIODES,
-  SENTIMENT_PERIODE_ACTUELLE,
-  SENTIMENT_PERIODE_PRECEDENTE,
-  SENTIMENT_REGIONS,
-  MOTIFS_SENTIMENT,
-} from '@/lib/seed-data-v2';
+import { useAppData } from '@/lib/data';
 import type { SentimentRegion, MotifSentiment } from '@/lib/types-v2';
 import { cn } from '@/lib/utils';
 import { REGIONS } from '@/lib/constants';
@@ -30,6 +24,7 @@ function changePct(current: number, previous: number) {
 }
 
 export default function MktSentimentPage() {
+  const { sentimentPeriodes: SENTIMENT_PERIODES, sentimentActuelle: SENTIMENT_PERIODE_ACTUELLE, sentimentPrecedente: SENTIMENT_PERIODE_PRECEDENTE, sentimentRegions: SENTIMENT_REGIONS, motifsSentiment: MOTIFS_SENTIMENT } = useAppData();
   const [regionFilter, setRegionFilter] = useState<string>('Toutes');
   const [periodFilter, setPeriodFilter] = useState<string>('Mois');
 

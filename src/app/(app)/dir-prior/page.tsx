@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { RECOMMANDATIONS_IA } from '@/lib/seed-data-v2';
+import { useAppData } from '@/lib/data';
 import { RecommandationIA } from '@/lib/types-v2';
 import { KpiCard } from '@/components/shared/kpi-card';
 import { AbbreviationHighlight } from '@/components/shared/abbreviation-highlight';
@@ -32,6 +32,7 @@ const STATUT_CONFIG: Record<Statut, { bg: string; text: string; label: string }>
 };
 
 export default function DirPriorPage() {
+  const { recommandationsIA: RECOMMANDATIONS_IA } = useAppData();
   const [statuts, setStatuts] = useState<Record<string, Statut>>(() => {
     const init: Record<string, Statut> = {};
     for (const r of RECOMMANDATIONS_IA) {

@@ -2,13 +2,14 @@
 
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
-import { ACCOUNTS } from '@/lib/seed-data';
+import { useAppData } from '@/lib/data';
 import { SEVERITY_CONFIG } from '@/lib/constants';
 import { formatCurrency, formatRelativeTime, scoreToSeverity } from '@/lib/utils';
 import { SeverityIndicator } from '@/components/shared/severity-indicator';
 import { Briefcase, Search } from 'lucide-react';
 
 export default function PortfolioPage() {
+  const { accounts: ACCOUNTS } = useAppData();
   const [search, setSearch] = useState('');
 
   const sortedAccounts = useMemo(() => {

@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { KpiCard } from '@/components/shared/kpi-card';
 import { SignalCard } from '@/components/shared/signal-card';
 import { SeverityIndicator } from '@/components/shared/severity-indicator';
-import { SIGNALS, COMPETITORS, NEEDS } from '@/lib/seed-data';
+import { useAppData } from '@/lib/data';
 import { formatTrend } from '@/lib/utils';
 import {
   Crosshair,
@@ -49,6 +49,7 @@ const SEVERITY_BAR_COLORS: Record<string, string> = {
 };
 
 export function MarketingDashboard() {
+  const { signals: SIGNALS, competitors: COMPETITORS, needs: NEEDS } = useAppData();
   const concurrenceCount = SIGNALS.filter((s) => s.type === 'concurrence').length;
   const besoinsCount = SIGNALS.filter((s) => s.type === 'besoin').length;
   const criticalSignals = SIGNALS.filter((s) => s.severity === 'rouge');

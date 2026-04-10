@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { POSITIONNEMENT } from '@/lib/seed-data-v2';
+import { useAppData } from '@/lib/data';
 import type { Attribut, ValeurPercue } from '@/lib/types-v2';
 import {
   RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
@@ -39,6 +39,7 @@ const ACTOR_COLORS: Record<string, string> = {
 const ATTRIBUTS: Attribut[] = ['prix', 'qualite', 'sav', 'delai', 'relation', 'innovation'];
 
 export default function MktPosPage() {
+  const { positionnement: POSITIONNEMENT } = useAppData();
   const acteurs = useMemo(() => {
     return Array.from(new Set(POSITIONNEMENT.map((p) => p.acteur)));
   }, []);

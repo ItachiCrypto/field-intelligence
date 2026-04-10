@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { REGION_PROFILES, GEO_SECTOR_DATA } from '@/lib/seed-data-v2';
+import { useAppData } from '@/lib/data';
 import type { RegionProfile, SentimentType } from '@/lib/types-v2';
 import { cn } from '@/lib/utils';
 import { KpiCard } from '@/components/shared/kpi-card';
@@ -63,6 +63,7 @@ function computeTopBesoins(profiles: RegionProfile[]) {
 /* ------------------------------------------------------------------ */
 
 export default function MktGeoPage() {
+  const { regionProfiles: REGION_PROFILES, geoSectorData: GEO_SECTOR_DATA } = useAppData();
   /* --- KPIs -------------------------------------------------------- */
   const regionCount = REGION_PROFILES.length;
 

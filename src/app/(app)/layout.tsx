@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { Sidebar } from '@/components/layout/sidebar';
 import { Topbar } from '@/components/layout/topbar';
+import { DataProvider } from '@/lib/queries/data-context';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { profile, loading } = useAuth();
@@ -53,7 +54,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <div className="flex-1 flex flex-col overflow-hidden">
         <Topbar />
         <main className="flex-1 overflow-y-auto p-6 bg-slate-50">
-          {children}
+          <DataProvider>
+            {children}
+          </DataProvider>
         </main>
       </div>
     </div>

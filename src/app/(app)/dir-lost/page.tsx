@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { DEALS_COMMERCIAUX, DEAL_COMMERCIAL_TENDANCE } from '@/lib/seed-data-v2';
+import { useAppData } from '@/lib/data';
 import { MOTIF_COMMERCIAL_LABELS, MOTIF_COMMERCIAL_COLORS } from '@/lib/types-v2';
 import type { MotifCommercial } from '@/lib/types-v2';
 import { cn, formatDate } from '@/lib/utils';
@@ -27,6 +27,7 @@ const RESULTAT_OPTIONS: { key: ResultatFilter; label: string }[] = [
 ];
 
 export default function DirLostPage() {
+  const { dealsCommerciaux: DEALS_COMMERCIAUX, dealCommercialTendance: DEAL_COMMERCIAL_TENDANCE } = useAppData();
   const [resultatFilter, setResultatFilter] = useState<ResultatFilter>('tous');
 
   const totalDeals = DEALS_COMMERCIAUX.length;

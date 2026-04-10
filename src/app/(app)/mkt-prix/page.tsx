@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { PRIX_SIGNALS, TENDANCE_PRIX } from '@/lib/seed-data-v2';
+import { useAppData } from '@/lib/data';
 import { KpiCard } from '@/components/shared/kpi-card';
 import { formatDate } from '@/lib/utils';
 import {
@@ -27,6 +27,7 @@ const STATUT_OPTIONS: { key: StatutFilter; label: string }[] = [
 ];
 
 export default function MktPrixPage() {
+  const { prixSignals: PRIX_SIGNALS, tendancePrix: TENDANCE_PRIX } = useAppData();
   const [statutFilter, setStatutFilter] = useState<StatutFilter>('all');
   const [concurrentFilter, setConcurrentFilter] = useState<ConcurrentFilter>('all');
 

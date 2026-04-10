@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { COMPETITORS, SIGNALS } from '@/lib/seed-data';
+import { useAppData } from '@/lib/data';
 import { SEVERITY_CONFIG, REGIONS } from '@/lib/constants';
 import { SeverityBadge } from '@/components/shared/severity-badge';
 import { SeverityIndicator } from '@/components/shared/severity-indicator';
@@ -21,6 +21,7 @@ const PERIOD_OPTIONS: { key: PeriodFilter; label: string }[] = [
 const BAR_COLORS = ['#e11d48', '#f59e0b', '#6366f1', '#10b981'];
 
 export default function RadarPage() {
+  const { competitors: COMPETITORS, signals: SIGNALS } = useAppData();
   const [periodFilter, setPeriodFilter] = useState<PeriodFilter>('all');
   const [regionFilter, setRegionFilter] = useState<string>('all');
   const [selectedCompetitor, setSelectedCompetitor] = useState<string | null>(null);

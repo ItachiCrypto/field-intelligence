@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { DEALS_ANALYSE, DEAL_TENDANCE } from '@/lib/seed-data-v2';
+import { useAppData } from '@/lib/data';
 import { MOTIF_LABELS, MOTIF_COLORS } from '@/lib/types-v2';
 import type { DealMotif } from '@/lib/types-v2';
 import { cn, formatDate } from '@/lib/utils';
@@ -35,6 +35,7 @@ const GAGNE_TENDANCE = [
 const GAGNE_LINE_MOTIFS: DealMotif[] = ['relation', 'produit', 'prix', 'autre'];
 
 export default function MktDealPage() {
+  const { dealsAnalyse: DEALS_ANALYSE, dealTendance: DEAL_TENDANCE } = useAppData();
   const [resultatFilter, setResultatFilter] = useState<ResultatFilter>('all');
   const [motifFilter, setMotifFilter] = useState<MotifFilter>('all');
 

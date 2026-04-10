@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { GEO_POINTS } from '@/lib/seed-data-v2';
+import { useAppData } from '@/lib/data';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend,
 } from 'recharts';
@@ -17,6 +17,7 @@ const LAYERS: { key: Layer; label: string; color: string; icon: React.ReactNode 
 ];
 
 export default function DirGeoPage() {
+  const { geoPoints: GEO_POINTS } = useAppData();
   const [activeLayers, setActiveLayers] = useState<Set<Layer>>(
     new Set(['opportunites', 'risques', 'concurrence', 'besoins'])
   );

@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { COMM_CONCURRENTES } from '@/lib/seed-data-v2';
+import { useAppData } from '@/lib/data';
 import { KpiCard } from '@/components/shared/kpi-card';
 import { formatDate } from '@/lib/utils';
 import type { CommType, ReactionClient } from '@/lib/types-v2';
@@ -41,6 +41,7 @@ const REACTION_CONFIG: Record<ReactionClient, { bg: string; text: string; border
 const BAR_COLORS = ['#6366f1', '#e11d48', '#f59e0b', '#10b981', '#8b5cf6'];
 
 export default function MktCommPage() {
+  const { commConcurrentes: COMM_CONCURRENTES } = useAppData();
   const totalActions = COMM_CONCURRENTES.length;
   const reactionsPositives = useMemo(() => {
     return COMM_CONCURRENTES.filter((c) => c.reaction_client === 'positive').length;

@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { CR_OBJECTIFS } from '@/lib/seed-data-v2';
+import { useAppData } from '@/lib/data';
 import { ObjectifType, OBJECTIF_LABELS } from '@/lib/types-v2';
 import { KpiCard } from '@/components/shared/kpi-card';
 import { cn, formatDate } from '@/lib/utils';
@@ -32,6 +32,7 @@ const BADGE_STYLES: Record<ObjectifType, string> = {
 type FilterType = 'tous' | ObjectifType;
 
 export default function DirClosPage() {
+  const { crObjectifs: CR_OBJECTIFS } = useAppData();
   const [filter, setFilter] = useState<FilterType>('tous');
 
   const filtered = useMemo(

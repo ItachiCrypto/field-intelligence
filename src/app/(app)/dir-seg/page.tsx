@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { SEGMENT_SENTIMENTS, SEGMENT_INSIGHTS } from '@/lib/seed-data-v2';
+import { useAppData } from '@/lib/data';
 import { ClientSegment } from '@/lib/types-v2';
 import { cn } from '@/lib/utils';
 import {
@@ -39,6 +39,7 @@ const SENTIMENT_LABELS: Record<string, string> = {
 };
 
 export default function DirSegPage() {
+  const { segmentSentiments: SEGMENT_SENTIMENTS, segmentInsights: SEGMENT_INSIGHTS } = useAppData();
   const nouveau = SEGMENT_SENTIMENTS.find(s => s.segment === 'nouveau')!;
   const etabli = SEGMENT_SENTIMENTS.find(s => s.segment === 'etabli')!;
 

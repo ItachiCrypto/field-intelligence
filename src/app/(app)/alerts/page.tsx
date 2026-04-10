@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { ALERTS } from '@/lib/seed-data';
+import { useAppData } from '@/lib/data';
 import { SEVERITY_CONFIG } from '@/lib/constants';
 import { formatRelativeTime } from '@/lib/utils';
 import { KpiCard } from '@/components/shared/kpi-card';
@@ -15,6 +15,7 @@ type TabFilter = 'all' | 'nouveau' | 'en_cours' | 'traite';
 const SEVERITY_ORDER: Record<string, number> = { rouge: 0, orange: 1, jaune: 2, vert: 3 };
 
 export default function AlertsPage() {
+  const { alerts: ALERTS } = useAppData();
   const [activeTab, setActiveTab] = useState<TabFilter>('all');
   const [alertStatuses, setAlertStatuses] = useState<Record<string, AlertStatus>>(() => {
     const init: Record<string, AlertStatus> = {};

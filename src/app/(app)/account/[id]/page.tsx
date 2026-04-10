@@ -2,7 +2,7 @@
 
 import { use, useMemo } from 'react';
 import Link from 'next/link';
-import { ACCOUNTS, AI_RECOMMENDATIONS } from '@/lib/seed-data';
+import { useAppData } from '@/lib/data';
 import { SEVERITY_CONFIG } from '@/lib/constants';
 import { formatCurrency, formatRelativeTime, formatDate, formatTrend, scoreToSeverity } from '@/lib/utils';
 import { SignalCard } from '@/components/shared/signal-card';
@@ -25,6 +25,7 @@ function generateRiskHistory(currentScore: number, trend: number) {
 }
 
 export default function AccountPage({ params }: { params: Promise<{ id: string }> }) {
+  const { accounts: ACCOUNTS, aiRecommendations: AI_RECOMMENDATIONS } = useAppData();
   const { id } = use(params);
   const account = ACCOUNTS.find((a) => a.id === id);
 

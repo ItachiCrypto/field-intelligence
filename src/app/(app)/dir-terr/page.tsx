@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { TERRITOIRES } from '@/lib/seed-data-v2';
+import { useAppData } from '@/lib/data';
 import type { TerritoireSynthese, SentimentType } from '@/lib/types-v2';
 import { cn } from '@/lib/utils';
 import { KpiCard } from '@/components/shared/kpi-card';
@@ -36,6 +36,7 @@ function sentimentBadge(sentiment: SentimentType) {
 /* ------------------------------------------------------------------ */
 
 export default function DirTerrPage() {
+  const { territoires: TERRITOIRES } = useAppData();
 
   /* --- KPI computations --- */
   const kpiOpportunites = useMemo(

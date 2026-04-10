@@ -3,10 +3,11 @@
 import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { Bell, Search, X } from 'lucide-react';
-import { ALERTS, SIGNALS, ACCOUNTS, COMMERCIALS } from '@/lib/seed-data';
+import { useAppData } from '@/lib/data';
 import Link from 'next/link';
 
 export function Topbar() {
+  const { alerts: ALERTS, signals: SIGNALS, accounts: ACCOUNTS, commercials: COMMERCIALS } = useAppData();
   const { profile } = useAuth();
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');

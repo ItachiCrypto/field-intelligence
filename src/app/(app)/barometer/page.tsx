@@ -1,6 +1,6 @@
 'use client';
 
-import { NEEDS } from '@/lib/seed-data';
+import { useAppData } from '@/lib/data';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { BarChart3, ArrowUpRight, ArrowDownRight, Minus, Sparkles } from 'lucide-react';
 
@@ -14,6 +14,7 @@ const TREND_CONFIG = {
 const BAR_COLORS = ['#6366f1', '#818cf8', '#a5b4fc', '#c7d2fe', '#6366f1', '#818cf8', '#a5b4fc', '#c7d2fe'];
 
 export default function BarometerPage() {
+  const { needs: NEEDS } = useAppData();
   const maxMentions = Math.max(...NEEDS.map((n) => n.mentions));
   const chartData = NEEDS.map((n) => ({ name: n.label, mentions: n.mentions }));
 
