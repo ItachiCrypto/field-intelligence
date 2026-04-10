@@ -78,7 +78,7 @@ export function Sidebar() {
             <div className="text-[13px] font-medium text-slate-800 truncate">{profile.name || profile.email}</div>
             <div className="text-[11px] text-slate-400 truncate">{profile.email}</div>
           </div>
-          <button onClick={signOut} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 cursor-pointer" title="Deconnexion">
+          <button onClick={() => { console.log('[sidebar] signOut clicked'); signOut(); }} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 cursor-pointer" title="Deconnexion">
             <LogOut className="w-4 h-4" />
           </button>
         </div>
