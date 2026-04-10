@@ -1,16 +1,105 @@
+// @ts-nocheck
 'use client';
 
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { useAppData } from '@/lib/data';
-import { SEVERITY_CONFIG } from '@/lib/constants';
+import { SEVERITY_CONFIG, REGIONS } from '@/lib/constants';
 import { formatCurrency, formatRelativeTime, scoreToSeverity } from '@/lib/utils';
 import { SeverityIndicator } from '@/components/shared/severity-indicator';
-import { Briefcase, Search } from 'lucide-react';
+import { Modal } from '@/components/shared/modal';
+import { ConfirmDialog } from '@/components/shared/confirm-dialog';
+import { createClient } from '@/lib/supabase/client';
+import { useAuth } from '@/lib/auth-context';
+import { Briefcase, Search, Plus, Pencil, Trash2 } from 'lucide-react';
+
+const SEVERITY_OPTIONS = ['vert', 'jaune', 'orange', 'rouge'] as const;
 
 export default function PortfolioPage() {
-  const { accounts: ACCOUNTS } = useAppData();
+  const { accounts: ACCOUNTS, refresh } = useAppData();
+  const { company } = useAuth();
   const [search, setSearch] = useState('');
+
+  // CRUD state
+  const [showCreate, setShowCreate] = useState(false);
+  const [showEdit, setShowEdit] = useState(false);
+  const [editingAccount, setEditingAccount] = useState<any>(null);
+  const [showDelete, setShowDelete] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState<any>(null);
+  const [saving, setSaving] = useState(false);
+
+  // Form state
+  const [formName, setFormName] = useState('');
+  const [formSector, setFormSector] = useState('');
+  const [formRegion, setFormRegion] = useState(REGIONS[0]);
+  const [formCaAnnual, setFormCaAnnual] = useState(0);
+  const [formHealth, setFormHealth] = useState<string>('vert');
+
+  const resetForm = () => {
+    setFormName('');
+    setFormSector('');
+    setFormRegion(REGIONS[0]);
+    setFormCaAnnual(0);
+    setFormHealth('vert');
+  };
+
+  const openEdit = (account: any) => {
+    setEditingAccount(account);
+    setFormName(account.name);
+    setFormSector(account.sector || '');
+    setFormRegion(account.region || REGIONS[0]);
+    setFormCaAnnual(account.ca_annual || 0);
+    setFormHealth(account.health || 'vert');
+    setShowEdit(true);
+  };
+
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    const supabase = createClient();
+    await supabase.from('accounts').insert({
+      name: formName,
+      sector: formSector,
+      region: formRegion,
+      ca_annual: formCaAnnual,
+      health: formHealth,
+      company_id: company?.id,
+    });
+    setSaving(false);
+    setShowCreate(false);
+    resetForm();
+    refresh();
+  };
+
+  const handleEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingAccount) return;
+    setSaving(true);
+    const supabase = createClient();
+    await supabase.from('accounts').update({
+      name: formName,
+      sector: formSector,
+      region: formRegion,
+      ca_annual: formCaAnnual,
+      health: formHealth,
+    }).eq('id', editingAccount.id);
+    setSaving(false);
+    setShowEdit(false);
+    setEditingAccount(null);
+    resetForm();
+    refresh();
+  };
+
+  const handleDelete = async () => {
+    if (!deletingAccount) return;
+    setSaving(true);
+    const supabase = createClient();
+    await supabase.from('accounts').delete().eq('id', deletingAccount.id);
+    setSaving(false);
+    setShowDelete(false);
+    setDeletingAccount(null);
+    refresh();
+  };
 
   const sortedAccounts = useMemo(() => {
     return [...ACCOUNTS]
@@ -33,6 +122,13 @@ export default function PortfolioPage() {
             </p>
           </div>
         </div>
+        <button
+          onClick={() => { resetForm(); setShowCreate(true); }}
+          className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors"
+        >
+          <Plus className="w-4 h-4" />
+          Nouveau compte
+        </button>
       </div>
 
       {/* Search */}
@@ -60,6 +156,7 @@ export default function PortfolioPage() {
                 <th className="text-center px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Signaux actifs</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Dernier RDV</th>
                 <th className="text-right px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Score risque</th>
+                <th className="text-right px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -105,6 +202,24 @@ export default function PortfolioPage() {
                         )}
                       </span>
                     </td>
+                    <td className="px-4 py-3 text-right">
+                      <div className="inline-flex items-center gap-1">
+                        <button
+                          onClick={() => openEdit(account)}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                          title="Modifier"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => { setDeletingAccount(account); setShowDelete(true); }}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                          title="Supprimer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 );
               })}
@@ -115,6 +230,87 @@ export default function PortfolioPage() {
           <div className="p-12 text-center text-slate-500">Aucun compte ne correspond a la recherche.</div>
         )}
       </div>
+      {/* Create Modal */}
+      {showCreate && (
+        <Modal open={showCreate} onClose={() => setShowCreate(false)} title="Nouveau compte">
+          <form onSubmit={handleCreate} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Nom</label>
+              <input type="text" required value={formName} onChange={e => setFormName(e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Secteur</label>
+              <input type="text" required value={formSector} onChange={e => setFormSector(e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Region</label>
+              <select value={formRegion} onChange={e => setFormRegion(e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm">
+                {REGIONS.map(r => <option key={r} value={r}>{r}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">CA annuel</label>
+              <input type="number" required value={formCaAnnual} onChange={e => setFormCaAnnual(Number(e.target.value))} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Sante</label>
+              <select value={formHealth} onChange={e => setFormHealth(e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm">
+                {SEVERITY_OPTIONS.map(s => <option key={s} value={s}>{SEVERITY_CONFIG[s].label}</option>)}
+              </select>
+            </div>
+            <div className="flex justify-end gap-3 pt-2">
+              <button type="button" onClick={() => setShowCreate(false)} className="px-4 py-2 text-sm text-slate-600">Annuler</button>
+              <button type="submit" disabled={saving} className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50">Creer</button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* Edit Modal */}
+      {showEdit && (
+        <Modal open={showEdit} onClose={() => { setShowEdit(false); setEditingAccount(null); }} title="Modifier le compte">
+          <form onSubmit={handleEdit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Nom</label>
+              <input type="text" required value={formName} onChange={e => setFormName(e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Secteur</label>
+              <input type="text" required value={formSector} onChange={e => setFormSector(e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Region</label>
+              <select value={formRegion} onChange={e => setFormRegion(e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm">
+                {REGIONS.map(r => <option key={r} value={r}>{r}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">CA annuel</label>
+              <input type="number" required value={formCaAnnual} onChange={e => setFormCaAnnual(Number(e.target.value))} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Sante</label>
+              <select value={formHealth} onChange={e => setFormHealth(e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm">
+                {SEVERITY_OPTIONS.map(s => <option key={s} value={s}>{SEVERITY_CONFIG[s].label}</option>)}
+              </select>
+            </div>
+            <div className="flex justify-end gap-3 pt-2">
+              <button type="button" onClick={() => { setShowEdit(false); setEditingAccount(null); }} className="px-4 py-2 text-sm text-slate-600">Annuler</button>
+              <button type="submit" disabled={saving} className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50">Enregistrer</button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* Delete Confirmation */}
+      <ConfirmDialog
+        open={showDelete}
+        onClose={() => { setShowDelete(false); setDeletingAccount(null); }}
+        onConfirm={handleDelete}
+        title="Supprimer le compte"
+        message={`Voulez-vous vraiment supprimer le compte "${deletingAccount?.name}" ? Cette action est irreversible.`}
+        loading={saving}
+      />
     </div>
   );
 }

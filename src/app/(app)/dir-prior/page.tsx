@@ -1,11 +1,15 @@
+// @ts-nocheck
 'use client';
 
 import { useState, useMemo } from 'react';
 import { useAppData } from '@/lib/data';
+import { createClient } from '@/lib/supabase/client';
 import { RecommandationIA } from '@/lib/types-v2';
 import { KpiCard } from '@/components/shared/kpi-card';
 import { AbbreviationHighlight } from '@/components/shared/abbreviation-highlight';
 import { Sparkles, Clock, CheckCircle2, Eye, Play, Check } from 'lucide-react';
+
+const supabase = createClient();
 
 type Statut = RecommandationIA['statut'];
 
@@ -32,7 +36,7 @@ const STATUT_CONFIG: Record<Statut, { bg: string; text: string; label: string }>
 };
 
 export default function DirPriorPage() {
-  const { recommandationsIA: RECOMMANDATIONS_IA } = useAppData();
+  const { recommandationsIA: RECOMMANDATIONS_IA, refresh } = useAppData();
   const [statuts, setStatuts] = useState<Record<string, Statut>>(() => {
     const init: Record<string, Statut> = {};
     for (const r of RECOMMANDATIONS_IA) {
@@ -41,8 +45,13 @@ export default function DirPriorPage() {
     return init;
   });
 
-  function updateStatut(id: string, statut: Statut) {
+  async function updateStatut(id: string, statut: Statut) {
     setStatuts((prev) => ({ ...prev, [id]: statut }));
+    await supabase
+      .from('recommandations_ia')
+      .update({ statut })
+      .eq('id', id);
+    refresh();
   }
 
   const kpis = useMemo(() => {

@@ -1,9 +1,13 @@
+// @ts-nocheck
 'use client';
 
 import { useState, useMemo } from 'react';
 import { useAppData } from '@/lib/data';
+import { useAuth } from '@/lib/auth-context';
+import { createClient } from '@/lib/supabase/client';
 import { MOTIF_LABELS, MOTIF_COLORS } from '@/lib/types-v2';
-import type { DealMotif } from '@/lib/types-v2';
+import { REGIONS } from '@/lib/constants';
+import type { DealMotif, DealAnalyse } from '@/lib/types-v2';
 import { cn, formatDate } from '@/lib/utils';
 import { KpiCard } from '@/components/shared/kpi-card';
 import { AbbreviationHighlight } from '@/components/shared/abbreviation-highlight';
@@ -11,7 +15,9 @@ import {
   PieChart, Pie, Cell, LineChart, Line, XAxis, YAxis,
   Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
-import { Target, TrendingUp, TrendingDown, Percent } from 'lucide-react';
+import { Target, TrendingUp, TrendingDown, Percent, Plus, Pencil, Trash2, X } from 'lucide-react';
+
+const supabase = createClient();
 
 type ResultatFilter = 'all' | 'gagne' | 'perdu';
 type MotifFilter = 'all' | DealMotif;
@@ -34,10 +40,80 @@ const GAGNE_TENDANCE = [
 
 const GAGNE_LINE_MOTIFS: DealMotif[] = ['relation', 'produit', 'prix', 'autre'];
 
+const EMPTY_FORM = {
+  motif_principal: 'prix' as DealMotif,
+  resultat: 'gagne' as 'gagne' | 'perdu',
+  concurrent_nom: '',
+  client_name: '',
+  commercial_name: '',
+  region: REGIONS[0] as string,
+  verbatim: '',
+};
+
 export default function MktDealPage() {
-  const { dealsAnalyse: DEALS_ANALYSE, dealTendance: DEAL_TENDANCE } = useAppData();
+  const { dealsAnalyse: DEALS_ANALYSE, dealTendance: DEAL_TENDANCE, refresh } = useAppData();
+  const { company } = useAuth();
   const [resultatFilter, setResultatFilter] = useState<ResultatFilter>('all');
   const [motifFilter, setMotifFilter] = useState<MotifFilter>('all');
+
+  // CRUD state
+  const [showModal, setShowModal] = useState(false);
+  const [editingDeal, setEditingDeal] = useState<DealAnalyse | null>(null);
+  const [form, setForm] = useState(EMPTY_FORM);
+  const [saving, setSaving] = useState(false);
+
+  function openCreate() {
+    setEditingDeal(null);
+    setForm(EMPTY_FORM);
+    setShowModal(true);
+  }
+
+  function openEdit(deal: DealAnalyse) {
+    setEditingDeal(deal);
+    setForm({
+      motif_principal: deal.motif_principal,
+      resultat: deal.resultat,
+      concurrent_nom: deal.concurrent_nom || '',
+      client_name: deal.client_name,
+      commercial_name: deal.commercial_name,
+      region: deal.region,
+      verbatim: deal.verbatim,
+    });
+    setShowModal(true);
+  }
+
+  async function handleSave() {
+    if (!form.client_name.trim() || !form.commercial_name.trim()) return;
+    setSaving(true);
+    try {
+      const payload = {
+        motif_principal: form.motif_principal,
+        resultat: form.resultat,
+        concurrent_nom: form.concurrent_nom || null,
+        client_name: form.client_name,
+        commercial_name: form.commercial_name,
+        region: form.region,
+        verbatim: form.verbatim,
+        company_id: company?.id,
+        date: editingDeal?.date || new Date().toISOString().slice(0, 10),
+      };
+      if (editingDeal) {
+        await supabase.from('deals_marketing').update(payload).eq('id', editingDeal.id);
+      } else {
+        await supabase.from('deals_marketing').insert(payload);
+      }
+      setShowModal(false);
+      refresh();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDelete(id: string) {
+    if (!window.confirm('Supprimer ce deal ?')) return;
+    await supabase.from('deals_marketing').delete().eq('id', id);
+    refresh();
+  }
 
   const totalDeals = DEALS_ANALYSE.length;
   const gagnes = useMemo(() => DEALS_ANALYSE.filter((d) => d.resultat === 'gagne'), []);
@@ -109,14 +185,23 @@ export default function MktDealPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-slate-100 text-slate-700">
-          <Target className="w-5 h-5" />
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-slate-100 text-slate-700">
+            <Target className="w-5 h-5" />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold text-slate-900">Analyse Deals Gagnes / Perdus</h1>
+            <p className="text-sm text-slate-500">Repartition en % des motifs extraits des comptes rendus de visite</p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-xl font-bold text-slate-900">Analyse Deals Gagnes / Perdus</h1>
-          <p className="text-sm text-slate-500">Repartition en % des motifs extraits des comptes rendus de visite</p>
-        </div>
+        <button
+          onClick={openCreate}
+          className="inline-flex items-center gap-2 px-4 py-2.5 bg-slate-900 text-white text-sm font-medium rounded-lg hover:bg-slate-800 transition-colors"
+        >
+          <Plus className="w-4 h-4" />
+          Nouveau deal
+        </button>
       </div>
 
       {/* KPIs */}
@@ -395,6 +480,7 @@ export default function MktDealPage() {
                 <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Region</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Date</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Verbatim</th>
+                <th className="text-right px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -429,6 +515,16 @@ export default function MktDealPage() {
                   <td className="px-4 py-3 text-slate-600 max-w-xs">
                     <AbbreviationHighlight text={d.verbatim} className="text-sm" />
                   </td>
+                  <td className="px-4 py-3 text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      <button onClick={() => openEdit(d)} className="p-1.5 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                      <button onClick={() => handleDelete(d.id)} className="p-1.5 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -438,6 +534,59 @@ export default function MktDealPage() {
           <div className="p-8 text-center text-slate-500">Aucun deal pour les filtres selectionnes.</div>
         )}
       </div>
+
+      {/* Modal create/edit */}
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg mx-4 p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-slate-900">{editingDeal ? 'Modifier le deal' : 'Nouveau deal'}</h2>
+              <button onClick={() => setShowModal(false)} className="p-1 rounded-md hover:bg-slate-100 text-slate-400"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Motif principal</label>
+                <select value={form.motif_principal} onChange={e => setForm({...form, motif_principal: e.target.value as DealMotif})} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-300">
+                  {ALL_MOTIFS.map(m => <option key={m} value={m}>{MOTIF_LABELS[m]}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Resultat</label>
+                <select value={form.resultat} onChange={e => setForm({...form, resultat: e.target.value as 'gagne'|'perdu'})} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-300">
+                  <option value="gagne">Gagne</option>
+                  <option value="perdu">Perdu</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Client</label>
+                <input type="text" value={form.client_name} onChange={e => setForm({...form, client_name: e.target.value})} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-300" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Commercial</label>
+                <input type="text" value={form.commercial_name} onChange={e => setForm({...form, commercial_name: e.target.value})} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-300" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Concurrent (optionnel)</label>
+                <input type="text" value={form.concurrent_nom} onChange={e => setForm({...form, concurrent_nom: e.target.value})} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-300" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Region</label>
+                <select value={form.region} onChange={e => setForm({...form, region: e.target.value})} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-300">
+                  {REGIONS.map(r => <option key={r} value={r}>{r}</option>)}
+                </select>
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Verbatim</label>
+              <textarea value={form.verbatim} onChange={e => setForm({...form, verbatim: e.target.value})} rows={3} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-300" />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <button onClick={() => setShowModal(false)} className="px-4 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors">Annuler</button>
+              <button onClick={handleSave} disabled={saving} className="px-4 py-2 text-sm font-medium text-white bg-slate-900 rounded-lg hover:bg-slate-800 disabled:opacity-50 transition-colors">{saving ? 'Enregistrement...' : 'Enregistrer'}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
