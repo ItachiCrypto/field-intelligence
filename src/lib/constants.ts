@@ -28,6 +28,7 @@ export const NAV_BY_ROLE: Record<UserRole, NavItem[]> = {
     { label: 'Dashboard', href: '/dashboard', icon: 'LayoutDashboard' },
     { label: 'Utilisateurs', href: '/admin/users', icon: 'Users' },
     { label: 'Facturation', href: '/admin/billing', icon: 'CreditCard' },
+    { label: 'Integrations', href: '/admin/integrations', icon: 'Link2' },
     { label: 'Parametres', href: '/settings', icon: 'Settings' },
   ],
   marketing: [
