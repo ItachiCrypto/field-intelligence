@@ -137,13 +137,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signOut = async () => {
-    console.log('[auth] signOut called');
-    try {
-      const { error } = await supabase.auth.signOut();
-      console.log('[auth] signOut result:', error?.message ?? 'OK');
-    } catch (e) {
-      console.error('[auth] signOut error:', e);
-    }
+    // Don't await signOut — it can hang due to lock issues.
+    // Just clear storage and redirect immediately.
+    supabase.auth.signOut().catch(() => {});
+    // Also clear localStorage directly as fallback
+    const storageKey = Object.keys(localStorage).find(k => k.startsWith('sb-') && k.endsWith('-auth-token'));
+    if (storageKey) localStorage.removeItem(storageKey);
     setUser(null);
     setProfile(null);
     setCompany(null);
