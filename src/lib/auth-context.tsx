@@ -1,8 +1,8 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import type { User } from '@supabase/supabase-js';
+import type { User, SupabaseClient } from '@supabase/supabase-js';
 
 type UserRole = 'admin' | 'marketing' | 'kam' | 'dirco';
 
@@ -44,50 +44,58 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [company, setCompany] = useState<Company | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const supabase = createClient();
-
-  const fetchProfile = useCallback(async (authUser: User) => {
-    const { data } = await supabase
-      .from('profiles')
-      .select('*, company:companies(*)')
-      .eq('id', authUser.id)
-      .single();
-
-    if (data) {
-      const d = data as any;
-      setProfile({
-        id: d.id,
-        email: d.email,
-        name: d.name,
-        role: d.role,
-        company_id: d.company_id,
-        avatar_url: d.avatar_url,
-      });
-      if (d.company) {
-        setCompany({
-          id: d.company.id,
-          name: d.company.name,
-          plan: d.company.plan,
-          plan_user_limit: d.company.plan_user_limit,
-        });
-      }
-    }
-  }, [supabase]);
+  // Stable reference — never recreated
+  const supabaseRef = useRef<SupabaseClient>(createClient());
+  const supabase = supabaseRef.current;
 
   useEffect(() => {
-    const init = async () => {
+    let mounted = true;
+
+    async function fetchProfile(authUser: User) {
+      const { data } = await supabase
+        .from('profiles')
+        .select('*, company:companies(*)')
+        .eq('id', authUser.id)
+        .single();
+
+      if (!mounted) return;
+
+      if (data) {
+        const d = data as any;
+        setProfile({
+          id: d.id,
+          email: d.email,
+          name: d.name,
+          role: d.role,
+          company_id: d.company_id,
+          avatar_url: d.avatar_url,
+        });
+        if (d.company) {
+          setCompany({
+            id: d.company.id,
+            name: d.company.name,
+            plan: d.company.plan,
+            plan_user_limit: d.company.plan_user_limit,
+          });
+        }
+      }
+    }
+
+    async function init() {
       const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (!mounted) return;
       if (authUser) {
         setUser(authUser);
         await fetchProfile(authUser);
       }
       setLoading(false);
-    };
+    }
 
     init();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        if (!mounted) return;
         if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
           const authUser = session?.user ?? null;
           setUser(authUser);
@@ -103,9 +111,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     );
 
     return () => {
+      mounted = false;
       subscription.unsubscribe();
     };
-  }, [fetchProfile, supabase.auth]);
+  }, [supabase]);
 
   const signOut = async () => {
     await supabase.auth.signOut();
