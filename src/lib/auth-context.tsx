@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import type { User, SupabaseClient } from '@supabase/supabase-js';
 
@@ -38,7 +38,10 @@ const AuthContext = createContext<AuthContextType>({
   signOut: async () => {},
 });
 
-async function fetchProfileData(supabase: SupabaseClient, userId: string) {
+// Singleton client — stable across renders and strict mode
+const supabase = createClient();
+
+async function fetchProfileData(userId: string) {
   try {
     const { data, error } = await supabase
       .from('profiles')
@@ -75,45 +78,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [company, setCompany] = useState<Company | null>(null);
   const [loading, setLoading] = useState(true);
-  const supabaseRef = useRef<SupabaseClient>(createClient());
-  const initDone = useRef(false);
 
   useEffect(() => {
-    if (initDone.current) return;
-    initDone.current = true;
-
-    const supabase = supabaseRef.current;
     let mounted = true;
 
-    // Timeout: if auth takes more than 5s, stop loading anyway
-    const timeout = setTimeout(() => {
-      if (mounted && loading) {
-        console.warn('[auth] Timeout — forcing loading=false');
-        setLoading(false);
-      }
-    }, 5000);
-
-    // Try to get current session
+    // Get current session (no network request, reads from storage)
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (!mounted) return;
 
       if (session?.user) {
         setUser(session.user);
-        const result = await fetchProfileData(supabase, session.user.id);
+        const result = await fetchProfileData(session.user.id);
         if (mounted && result) {
           setProfile(result.profile);
           setCompany(result.company);
         }
       }
-
       if (mounted) setLoading(false);
-      clearTimeout(timeout);
     }).catch(() => {
       if (mounted) setLoading(false);
-      clearTimeout(timeout);
     });
 
-    // Listen for auth changes (login, logout, token refresh)
+    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (!mounted) return;
@@ -121,7 +107,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
           if (session?.user) {
             setUser(session.user);
-            const result = await fetchProfileData(supabase, session.user.id);
+            const result = await fetchProfileData(session.user.id);
             if (mounted && result) {
               setProfile(result.profile);
               setCompany(result.company);
@@ -139,13 +125,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     return () => {
       mounted = false;
-      clearTimeout(timeout);
       subscription.unsubscribe();
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   const signOut = async () => {
-    await supabaseRef.current.auth.signOut();
+    await supabase.auth.signOut();
     setUser(null);
     setProfile(null);
     setCompany(null);
