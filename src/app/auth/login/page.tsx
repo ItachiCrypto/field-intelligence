@@ -31,7 +31,8 @@ export default function LoginPage() {
       return;
     }
 
-    router.push('/dashboard');
+    // Full reload to ensure auth state is picked up cleanly
+    window.location.href = '/dashboard';
   };
 
   const handleGoogleLogin = async () => {
