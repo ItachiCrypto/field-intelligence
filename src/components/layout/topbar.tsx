@@ -7,12 +7,12 @@ import { ALERTS, SIGNALS, ACCOUNTS, COMMERCIALS } from '@/lib/seed-data';
 import Link from 'next/link';
 
 export function Topbar() {
-  const { user } = useAuth();
+  const { profile } = useAuth();
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const searchRef = useRef<HTMLInputElement>(null);
 
-  if (!user) return null;
+  if (!profile) return null;
 
   const unread = ALERTS.filter(a => a.status === 'nouveau').length;
 

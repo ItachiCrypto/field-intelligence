@@ -7,16 +7,16 @@ import { Sidebar } from '@/components/layout/sidebar';
 import { Topbar } from '@/components/layout/topbar';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
+  const { profile, loading } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
-    if (!loading && !user) {
+    if (!loading && !profile) {
       router.replace('/auth/login');
     }
-  }, [user, loading, router]);
+  }, [profile, loading, router]);
 
-  if (loading || !user) {
+  if (loading || !profile) {
     return (
       <div className="flex flex-1 items-center justify-center">
         <div className="animate-pulse text-gray-400">Chargement...</div>

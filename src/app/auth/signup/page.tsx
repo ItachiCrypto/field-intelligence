@@ -6,23 +6,39 @@ import { createClient } from '@/lib/supabase/client';
 import { Zap } from 'lucide-react';
 import Link from 'next/link';
 
-export default function LoginPage() {
+export default function SignupPage() {
   const router = useRouter();
   const supabase = createClient();
 
+  const [companyName, setCompanyName] = useState('');
+  const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const handleEmailLogin = async (e: React.FormEvent) => {
+  const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+
+    if (password.length < 6) {
+      setError('Le mot de passe doit contenir au moins 6 caracteres.');
+      return;
+    }
+
     setLoading(true);
 
-    const { error: authError } = await supabase.auth.signInWithPassword({
+    const { error: authError } = await supabase.auth.signUp({
       email,
       password,
+      options: {
+        data: {
+          company_name: companyName,
+          name: fullName,
+          role: 'admin',
+        },
+        emailRedirectTo: window.location.origin + '/auth/callback',
+      },
     });
 
     if (authError) {
@@ -31,10 +47,10 @@ export default function LoginPage() {
       return;
     }
 
-    router.push('/dashboard');
+    router.push('/auth/verify');
   };
 
-  const handleGoogleLogin = async () => {
+  const handleGoogleSignup = async () => {
     setError(null);
     const { error: authError } = await supabase.auth.signInWithOAuth({
       provider: 'google',
@@ -56,8 +72,8 @@ export default function LoginPage() {
           <div className="inline-flex items-center justify-center w-12 h-12 bg-indigo-600 rounded-xl mb-4">
             <Zap className="w-6 h-6 text-white" />
           </div>
-          <h1 className="text-2xl font-semibold text-slate-900">Field Intelligence</h1>
-          <p className="text-sm text-slate-500 mt-1">Connectez-vous a votre compte</p>
+          <h1 className="text-2xl font-semibold text-slate-900">Creer votre entreprise</h1>
+          <p className="text-sm text-slate-500 mt-1">Lancez votre compte Field Intelligence</p>
         </div>
 
         {/* Error banner */}
@@ -67,8 +83,36 @@ export default function LoginPage() {
           </div>
         )}
 
-        {/* Email form */}
-        <form onSubmit={handleEmailLogin} className="space-y-4">
+        {/* Signup form */}
+        <form onSubmit={handleSignup} className="space-y-4">
+          <div>
+            <label htmlFor="company" className="block text-sm font-medium text-slate-700 mb-1">
+              Nom de l'entreprise
+            </label>
+            <input
+              id="company"
+              type="text"
+              value={companyName}
+              onChange={(e) => setCompanyName(e.target.value)}
+              required
+              className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-slate-900 placeholder:text-slate-400"
+              placeholder="Acme SAS"
+            />
+          </div>
+          <div>
+            <label htmlFor="fullName" className="block text-sm font-medium text-slate-700 mb-1">
+              Nom complet
+            </label>
+            <input
+              id="fullName"
+              type="text"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              required
+              className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-slate-900 placeholder:text-slate-400"
+              placeholder="Jean Dupont"
+            />
+          </div>
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-slate-700 mb-1">
               Email
@@ -80,7 +124,7 @@ export default function LoginPage() {
               onChange={(e) => setEmail(e.target.value)}
               required
               className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-slate-900 placeholder:text-slate-400"
-              placeholder="vous@entreprise.com"
+              placeholder="jean@acme.com"
             />
           </div>
           <div>
@@ -93,8 +137,9 @@ export default function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
+              minLength={6}
               className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-slate-900 placeholder:text-slate-400"
-              placeholder="Votre mot de passe"
+              placeholder="6 caracteres minimum"
             />
           </div>
           <button
@@ -102,7 +147,7 @@ export default function LoginPage() {
             disabled={loading}
             className="w-full py-2.5 px-4 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
           >
-            {loading ? 'Connexion...' : 'Se connecter'}
+            {loading ? 'Creation...' : 'Creer mon compte'}
           </button>
         </form>
 
@@ -118,7 +163,7 @@ export default function LoginPage() {
 
         {/* Google OAuth */}
         <button
-          onClick={handleGoogleLogin}
+          onClick={handleGoogleSignup}
           className="w-full flex items-center justify-center gap-2.5 py-2.5 px-4 text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 hover:border-slate-300 transition-colors cursor-pointer"
         >
           <svg className="w-4 h-4" viewBox="0 0 24 24">
@@ -142,11 +187,11 @@ export default function LoginPage() {
           Continuer avec Google
         </button>
 
-        {/* Signup link */}
+        {/* Login link */}
         <p className="text-center text-sm text-slate-500 mt-6">
-          Pas encore de compte ?{' '}
-          <Link href="/auth/signup" className="text-indigo-600 font-medium hover:text-indigo-700">
-            Creer une entreprise
+          Deja un compte ?{' '}
+          <Link href="/auth/login" className="text-indigo-600 font-medium hover:text-indigo-700">
+            Se connecter
           </Link>
         </p>
       </div>

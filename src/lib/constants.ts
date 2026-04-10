@@ -24,6 +24,12 @@ export interface NavItem {
 }
 
 export const NAV_BY_ROLE: Record<UserRole, NavItem[]> = {
+  admin: [
+    { label: 'Dashboard', href: '/dashboard', icon: 'LayoutDashboard' },
+    { label: 'Utilisateurs', href: '/admin/users', icon: 'Users' },
+    { label: 'Facturation', href: '/admin/billing', icon: 'CreditCard' },
+    { label: 'Parametres', href: '/settings', icon: 'Settings' },
+  ],
   marketing: [
     { label: 'Dashboard', href: '/dashboard', icon: 'LayoutDashboard' },
     { label: 'Radar Concurrentiel', href: '/radar', icon: 'Radar' },
@@ -61,12 +67,14 @@ export const NAV_BY_ROLE: Record<UserRole, NavItem[]> = {
 };
 
 export const ROLE_LABELS: Record<UserRole, string> = {
+  admin: 'Administrateur',
   marketing: 'Responsable Marketing',
   kam: 'Key Account Manager',
   dirco: 'Directeur Commercial',
 };
 
 export const ROLE_COLORS: Record<UserRole, string> = {
+  admin: 'bg-slate-100 text-slate-700',
   marketing: 'bg-indigo-50 text-indigo-700',
   kam: 'bg-teal-50 text-teal-700',
   dirco: 'bg-amber-50 text-amber-700',

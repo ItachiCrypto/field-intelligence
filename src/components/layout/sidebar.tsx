@@ -10,23 +10,23 @@ import {
   Briefcase, Bell, Users, Map, LogOut, BookOpen, Zap,
   DollarSign, TrendingUp, Target, Package, MapPin, Megaphone,
   GitCompare, PieChart, TrendingDown, Brain,
-  Smile,
+  Smile, CreditCard,
 } from 'lucide-react';
 
 const ICON_MAP: Record<string, React.ElementType> = {
   LayoutDashboard, Radar, BarChart3, Activity, Settings,
   Briefcase, Bell, Users, Map, BookOpen,
   DollarSign, TrendingUp, Target, Package, MapPin, Megaphone,
-  GitCompare, PieChart, TrendingDown, Brain, Smile,
+  GitCompare, PieChart, TrendingDown, Brain, Smile, CreditCard,
 };
 
 export function Sidebar() {
-  const { user, logout } = useAuth();
+  const { profile, signOut } = useAuth();
   const pathname = usePathname();
 
-  if (!user) return null;
+  if (!profile) return null;
 
-  const navItems = NAV_BY_ROLE[user.role];
+  const navItems = NAV_BY_ROLE[profile.role];
 
   return (
     <aside className="flex flex-col w-60 bg-white border-r border-slate-200 h-full">
@@ -38,8 +38,8 @@ export function Sidebar() {
           </div>
           <div>
             <h1 className="text-sm font-semibold text-slate-900 leading-tight">Field Intelligence</h1>
-            <span className={cn('inline-block mt-0.5 px-1.5 py-0 rounded text-[10px] font-medium', ROLE_COLORS[user.role])}>
-              {ROLE_LABELS[user.role]}
+            <span className={cn('inline-block mt-0.5 px-1.5 py-0 rounded text-[10px] font-medium', ROLE_COLORS[profile.role])}>
+              {ROLE_LABELS[profile.role]}
             </span>
           </div>
         </div>
@@ -72,13 +72,13 @@ export function Sidebar() {
       <div className="px-4 py-3 border-t border-slate-100">
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-xs font-semibold text-slate-600">
-            {user.name.split(' ').map(n => n[0]).join('')}
+            {(profile.name || profile.email).split(' ').map(n => n[0]).join('').toUpperCase()}
           </div>
           <div className="flex-1 min-w-0">
-            <div className="text-[13px] font-medium text-slate-800 truncate">{user.name}</div>
-            <div className="text-[11px] text-slate-400 truncate">{user.email}</div>
+            <div className="text-[13px] font-medium text-slate-800 truncate">{profile.name || profile.email}</div>
+            <div className="text-[11px] text-slate-400 truncate">{profile.email}</div>
           </div>
-          <button onClick={logout} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 cursor-pointer" title="Deconnexion">
+          <button onClick={signOut} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 cursor-pointer" title="Deconnexion">
             <LogOut className="w-4 h-4" />
           </button>
         </div>

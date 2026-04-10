@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { useAuth } from '@/lib/auth-context';
-import { useRouter } from 'next/navigation';
 import { ROLE_LABELS, ROLE_COLORS } from '@/lib/constants';
 import Link from 'next/link';
 import { Settings, User, Bell, LogOut, Mail, MessageSquare, Smartphone, Monitor, BookOpen, ChevronRight } from 'lucide-react';
@@ -48,21 +47,16 @@ function ToggleRow({ icon, label, description, checked, onChange }: ToggleRowPro
 }
 
 export default function SettingsPage() {
-  const { user, logout } = useAuth();
-  const router = useRouter();
+  const { profile, company, signOut } = useAuth();
   const [notifEmail, setNotifEmail] = useState(true);
   const [notifSlack, setNotifSlack] = useState(true);
   const [notifTeams, setNotifTeams] = useState(false);
   const [notifPush, setNotifPush] = useState(false);
 
-  if (!user) return null;
+  if (!profile) return null;
 
-  const handleLogout = () => {
-    logout();
-    router.replace('/auth/login');
-  };
-
-  const initials = user.name
+  const displayName = profile.name || profile.email;
+  const initials = displayName
     .split(' ')
     .map((n) => n[0])
     .join('')
@@ -93,14 +87,17 @@ export default function SettingsPage() {
             {initials}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-base font-semibold text-slate-900">{user.name}</p>
-            <p className="text-sm text-slate-500">{user.email}</p>
+            <p className="text-base font-semibold text-slate-900">{displayName}</p>
+            <p className="text-sm text-slate-500">{profile.email}</p>
+            {company && (
+              <p className="text-xs text-slate-400 mt-0.5">{company.name}</p>
+            )}
             <span className={cn(
               'inline-flex items-center mt-2 px-2.5 py-0.5 rounded-full text-xs font-medium border',
-              ROLE_COLORS[user.role],
-              user.role === 'marketing' ? 'border-indigo-200' : user.role === 'kam' ? 'border-teal-200' : 'border-amber-200'
+              ROLE_COLORS[profile.role],
+              profile.role === 'marketing' ? 'border-indigo-200' : profile.role === 'kam' ? 'border-teal-200' : 'border-amber-200'
             )}>
-              {ROLE_LABELS[user.role]}
+              {ROLE_LABELS[profile.role]}
             </span>
           </div>
         </div>
@@ -166,8 +163,8 @@ export default function SettingsPage() {
         </div>
         <p className="text-sm text-slate-600 mb-4">Se deconnecter de votre session Field Intelligence.</p>
         <button
-          onClick={handleLogout}
-          className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-rose-700 bg-rose-50 border border-rose-200 rounded-xl hover:bg-rose-100 transition-colors"
+          onClick={signOut}
+          className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-rose-700 bg-rose-50 border border-rose-200 rounded-xl hover:bg-rose-100 transition-colors cursor-pointer"
         >
           <LogOut className="w-4 h-4" />
           Se deconnecter
