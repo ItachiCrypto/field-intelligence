@@ -37,7 +37,7 @@ export default function DirGeoPage() {
 
   const sorted = useMemo(
     () => [...GEO_POINTS].sort((a, b) => b.intensite - a.intensite),
-    []
+    [GEO_POINTS]
   );
 
   const chartData = useMemo(

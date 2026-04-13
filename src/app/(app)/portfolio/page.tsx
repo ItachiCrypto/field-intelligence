@@ -105,7 +105,7 @@ export default function PortfolioPage() {
     return [...ACCOUNTS]
       .filter((a) => a.name.toLowerCase().includes(search.toLowerCase()))
       .sort((a, b) => b.risk_score - a.risk_score);
-  }, [search]);
+  }, [ACCOUNTS, search]);
 
   return (
     <div className="space-y-6">

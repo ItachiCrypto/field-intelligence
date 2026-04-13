@@ -16,7 +16,7 @@ const BAR_COLORS = ['#6366f1', '#818cf8', '#a5b4fc', '#c7d2fe', '#6366f1', '#818
 
 export default function BarometerPage() {
   const { needs: NEEDS } = useAppData();
-  const maxMentions = Math.max(...NEEDS.map((n) => n.mentions));
+  const maxMentions = NEEDS.length > 0 ? Math.max(...NEEDS.map((n) => n.mentions)) : 0;
   const chartData = NEEDS.map((n) => ({ name: n.label, mentions: n.mentions }));
 
   return (

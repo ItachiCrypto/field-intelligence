@@ -29,28 +29,28 @@ export default function MktSentimentPage() {
   const [regionFilter, setRegionFilter] = useState<string>('Toutes');
   const [periodFilter, setPeriodFilter] = useState<string>('Mois');
 
-  const cur = SENTIMENT_PERIODE_ACTUELLE;
-  const prev = SENTIMENT_PERIODE_PRECEDENTE;
+  const cur = SENTIMENT_PERIODE_ACTUELLE ?? { positif: 0, negatif: 0, neutre: 0, interesse: 0, total: 0 };
+  const prev = SENTIMENT_PERIODE_PRECEDENTE ?? { positif: 0, negatif: 0, neutre: 0, interesse: 0, total: 0 };
 
   // --- KPIs ---
   const kpis = useMemo(() => ({
     positif: {
-      count: cur.positif,
-      pct: pct(cur.positif, cur.total),
-      change: changePct(cur.positif, prev.positif),
+      count: cur.positif ?? 0,
+      pct: pct(cur.positif ?? 0, cur.total ?? 0),
+      change: changePct(cur.positif ?? 0, prev.positif ?? 0),
     },
     negatif: {
-      count: cur.negatif,
-      pct: pct(cur.negatif, cur.total),
-      change: changePct(cur.negatif, prev.negatif),
+      count: cur.negatif ?? 0,
+      pct: pct(cur.negatif ?? 0, cur.total ?? 0),
+      change: changePct(cur.negatif ?? 0, prev.negatif ?? 0),
     },
     interesse: {
-      count: cur.interesse,
-      change: changePct(cur.interesse, prev.interesse),
+      count: cur.interesse ?? 0,
+      change: changePct(cur.interesse ?? 0, prev.interesse ?? 0),
     },
     total: {
-      count: cur.total,
-      change: changePct(cur.total, prev.total),
+      count: cur.total ?? 0,
+      change: changePct(cur.total ?? 0, prev.total ?? 0),
     },
   }), [cur, prev]);
 

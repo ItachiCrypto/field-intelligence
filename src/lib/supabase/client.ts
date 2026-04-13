@@ -8,6 +8,20 @@ let client: ReturnType<typeof createBrowserClient<Database>> | null = null;
 
 export function createClient() {
   if (client) return client;
+
+  // Patch navigator.locks to prevent deadlocks in React StrictMode.
+  // The Supabase auth-js library uses navigator.locks for session
+  // serialization, but in dev mode with double-renders this causes
+  // permanent hangs where promises never resolve.
+  if (typeof window !== 'undefined' && navigator?.locks) {
+    const originalRequest = navigator.locks.request.bind(navigator.locks);
+    navigator.locks.request = (name: string, optionsOrFn: any, maybeFn?: any) => {
+      const fn = typeof optionsOrFn === 'function' ? optionsOrFn : maybeFn;
+      // Run the function directly without acquiring a lock
+      return fn({ name, mode: 'exclusive' });
+    };
+  }
+
   client = createBrowserClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -16,8 +30,6 @@ export function createClient() {
         persistSession: true,
         autoRefreshToken: true,
         detectSessionInUrl: true,
-        // Disable navigator.locks which can hang in some environments
-        lock: (name: string, acquireTimeout: number, fn: () => Promise<any>) => fn(),
       },
     }
   );

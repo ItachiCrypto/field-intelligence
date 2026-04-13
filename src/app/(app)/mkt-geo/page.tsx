@@ -69,11 +69,12 @@ export default function MktGeoPage() {
   const regionCount = REGION_PROFILES.length;
 
   const mostActive = useMemo(
-    () => [...REGION_PROFILES].sort((a, b) => b.nb_signaux - a.nb_signaux)[0],
+    () => REGION_PROFILES.length > 0 ? [...REGION_PROFILES].sort((a, b) => b.nb_signaux - a.nb_signaux)[0] : null,
     [REGION_PROFILES],
   );
 
   const mostTense = useMemo(() => {
+    if (REGION_PROFILES.length === 0) return null;
     const negatives = REGION_PROFILES.filter((r) => r.sentiment_dominant === 'negatif');
     if (negatives.length === 0) return REGION_PROFILES[0];
     return negatives.sort((a, b) => b.concurrent_mentions - a.concurrent_mentions)[0];
@@ -131,15 +132,15 @@ export default function MktGeoPage() {
         />
         <KpiCard
           label="Region la plus active"
-          value={mostActive.region}
-          suffix={`(${mostActive.nb_signaux} sig.)`}
+          value={mostActive?.region ?? '--'}
+          suffix={mostActive ? `(${mostActive.nb_signaux} sig.)` : ''}
           icon={<MapPin className="w-5 h-5" />}
           iconColor="text-emerald-600 bg-emerald-50"
         />
         <KpiCard
           label="Region sous tension"
-          value={mostTense.region}
-          suffix={`(${mostTense.concurrent_mentions} mentions)`}
+          value={mostTense?.region ?? '--'}
+          suffix={mostTense ? `(${mostTense.concurrent_mentions} mentions)` : ''}
           icon={<AlertTriangle className="w-5 h-5" />}
           iconColor="text-rose-600 bg-rose-50"
         />
