@@ -101,7 +101,7 @@ export default function AlertsPage() {
         />
         <KpiCard
           label="Temps de reponse moyen"
-          value="4h"
+          value={treatedCount > 0 ? '4h' : '--'}
           icon={<Clock className="w-5 h-5" />}
           iconColor="text-sky-600 bg-sky-50"
         />

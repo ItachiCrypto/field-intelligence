@@ -38,6 +38,7 @@ export default function MktPrixPage() {
 
   const ecartMoyen = useMemo(() => {
     const vals = PRIX_SIGNALS.map((s) => s.ecart_pct);
+    if (vals.length === 0) return '0';
     return (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1);
   }, []);
 
