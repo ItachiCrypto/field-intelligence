@@ -30,7 +30,12 @@ export function Topbar() {
   return (
     <header className="h-14 bg-white border-b border-slate-200 flex items-center justify-between px-6">
       <div className="text-[13px] text-slate-400 font-medium">
-        Semaine 14 &mdash; 31 mars 2026
+        {(() => {
+          const now = new Date();
+          const start = new Date(now.getFullYear(), 0, 1);
+          const week = Math.ceil(((now.getTime() - start.getTime()) / 86400000 + start.getDay() + 1) / 7);
+          return `Semaine ${week} \u2014 ${now.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}`;
+        })()}
       </div>
 
       <div className="flex items-center gap-2">

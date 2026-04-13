@@ -83,7 +83,12 @@ export function DirectorDashboard() {
       <div>
         <h1 className="text-2xl font-bold text-slate-900">Dashboard Executif</h1>
         <p className="text-sm text-slate-500 mt-1">
-          Semaine 14 &mdash; 31 mars 2026
+          {(() => {
+            const now = new Date();
+            const start = new Date(now.getFullYear(), 0, 1);
+            const week = Math.ceil(((now.getTime() - start.getTime()) / 86400000 + start.getDay() + 1) / 7);
+            return `Semaine ${week} \u2014 ${now.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}`;
+          })()}
         </p>
       </div>
 
@@ -92,7 +97,6 @@ export function DirectorDashboard() {
         <KpiCard
           label="CR analyses"
           value={totalCR}
-          change={18}
           icon={<FileText className="w-5 h-5" />}
           iconColor="text-indigo-600 bg-indigo-50"
         />
@@ -105,7 +109,6 @@ export function DirectorDashboard() {
         <KpiCard
           label="Score qualite moyen"
           value={avgQuality}
-          change={6}
           suffix="/100"
           icon={<Star className="w-5 h-5" />}
           iconColor="text-amber-600 bg-amber-50"
@@ -248,23 +251,22 @@ export function DirectorDashboard() {
         </div>
       </div>
 
-      {/* Signal highlight */}
-      <div className="bg-amber-50 border border-amber-200 rounded-xl p-5">
-        <div className="flex items-start gap-3">
-          <TrendingUp className="w-5 h-5 text-amber-600 mt-0.5 shrink-0" />
-          <div>
-            <h3 className="text-sm font-semibold text-amber-900">
-              Tendance de la semaine
-            </h3>
-            <p className="text-sm text-amber-800 mt-1 leading-relaxed">
-              Offensive prix Acme detectee sur l&apos;ensemble du territoire : 8 commerciaux
-              remontent des baisses de -12% a -15% sur les gammes A et B. Recommandation :
-              reunir l&apos;equipe pour definir une reponse commerciale coordonnee avant fin
-              de semaine.
-            </p>
+      {/* Signal highlight — only shown when there are signals */}
+      {SIGNALS.length > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-5">
+          <div className="flex items-start gap-3">
+            <TrendingUp className="w-5 h-5 text-amber-600 mt-0.5 shrink-0" />
+            <div>
+              <h3 className="text-sm font-semibold text-amber-900">
+                Tendance de la semaine
+              </h3>
+              <p className="text-sm text-amber-800 mt-1 leading-relaxed">
+                {SIGNALS[0].content}
+              </p>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Nouvelles fonctionnalites */}
       <div>

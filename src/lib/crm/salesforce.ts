@@ -1,9 +1,19 @@
 // @ts-nocheck
 import type { SalesforceTask, SalesforceTokenResponse } from './types';
+import crypto from 'crypto';
 
 const SF_API_VERSION = 'v59.0';
 
-export function getSalesforceAuthUrl(redirectUri: string, state: string): string {
+// PKCE helpers
+export function generateCodeVerifier(): string {
+  return crypto.randomBytes(32).toString('base64url');
+}
+
+export function generateCodeChallenge(verifier: string): string {
+  return crypto.createHash('sha256').update(verifier).digest('base64url');
+}
+
+export function getSalesforceAuthUrl(redirectUri: string, state: string, codeChallenge?: string): string {
   const clientId = process.env.SALESFORCE_CLIENT_ID;
   if (!clientId) throw new Error('SALESFORCE_CLIENT_ID not configured');
   const params = new URLSearchParams({
@@ -13,22 +23,33 @@ export function getSalesforceAuthUrl(redirectUri: string, state: string): string
     scope: 'api refresh_token',
     state,
   });
+  if (codeChallenge) {
+    params.set('code_challenge', codeChallenge);
+    params.set('code_challenge_method', 'S256');
+  }
   return `https://login.salesforce.com/services/oauth2/authorize?${params}`;
 }
 
-export async function exchangeCodeForTokens(code: string, redirectUri: string): Promise<SalesforceTokenResponse> {
+export async function exchangeCodeForTokens(code: string, redirectUri: string, codeVerifier?: string): Promise<SalesforceTokenResponse> {
+  const body: Record<string, string> = {
+    grant_type: 'authorization_code',
+    code,
+    client_id: process.env.SALESFORCE_CLIENT_ID!,
+    client_secret: process.env.SALESFORCE_CLIENT_SECRET!,
+    redirect_uri: redirectUri,
+  };
+  if (codeVerifier) {
+    body.code_verifier = codeVerifier;
+  }
   const res = await fetch('https://login.salesforce.com/services/oauth2/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      grant_type: 'authorization_code',
-      code,
-      client_id: process.env.SALESFORCE_CLIENT_ID!,
-      client_secret: process.env.SALESFORCE_CLIENT_SECRET!,
-      redirect_uri: redirectUri,
-    }),
+    body: new URLSearchParams(body),
   });
-  if (!res.ok) throw new Error(`Salesforce token exchange failed: ${res.statusText}`);
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`Salesforce token exchange failed: ${res.statusText} - ${errText}`);
+  }
   return res.json();
 }
 
@@ -60,7 +81,7 @@ export async function fetchVisitReports(
            Who.Name
     FROM Task
     WHERE LastModifiedDate >= ${since}
-    AND (Subject LIKE '%visite%' OR Subject LIKE '%visit%' OR Subject LIKE '%RDV%' OR Subject LIKE '%rdv%' OR Subject LIKE '%CR%' OR Type = 'Call' OR Type = 'Meeting')
+    AND (Subject LIKE '%visite%' OR Subject LIKE '%visit%' OR Subject LIKE '%RDV%' OR Subject LIKE '%rdv%' OR Subject LIKE '%CR%')
     ORDER BY LastModifiedDate DESC
     LIMIT 200
   `.trim().replace(/\s+/g, ' ');

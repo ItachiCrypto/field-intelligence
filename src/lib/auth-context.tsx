@@ -41,36 +41,52 @@ const AuthContext = createContext<AuthContextType>({
 // Singleton client — stable across renders and strict mode
 const supabase = createClient();
 
-async function fetchProfileData(userId: string) {
-  try {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*, company:companies(*)')
-      .eq('id', userId)
-      .single();
+async function fetchProfileData(userId: string, retries = 2): Promise<{ profile: Profile; company: Company | null } | null> {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*, company:companies(*)')
+        .eq('id', userId)
+        .single();
 
-    if (error || !data) return null;
+      if (error) {
+        console.warn(`[auth] Profile fetch attempt ${attempt + 1} failed:`, error.message);
+        if (attempt < retries) {
+          await new Promise(r => setTimeout(r, 500 * (attempt + 1)));
+          continue;
+        }
+        return null;
+      }
+      if (!data) return null;
 
-    const d = data as any;
-    return {
-      profile: {
-        id: d.id,
-        email: d.email,
-        name: d.name,
-        role: d.role as UserRole,
-        company_id: d.company_id,
-        avatar_url: d.avatar_url,
-      },
-      company: d.company ? {
-        id: d.company.id,
-        name: d.company.name,
-        plan: d.company.plan,
-        plan_user_limit: d.company.plan_user_limit,
-      } : null,
-    };
-  } catch {
-    return null;
+      const d = data as any;
+      return {
+        profile: {
+          id: d.id,
+          email: d.email,
+          name: d.name,
+          role: d.role as UserRole,
+          company_id: d.company_id,
+          avatar_url: d.avatar_url,
+        },
+        company: d.company ? {
+          id: d.company.id,
+          name: d.company.name,
+          plan: d.company.plan,
+          plan_user_limit: d.company.plan_user_limit,
+        } : null,
+      };
+    } catch (err) {
+      console.error(`[auth] Profile fetch attempt ${attempt + 1} exception:`, err);
+      if (attempt < retries) {
+        await new Promise(r => setTimeout(r, 500 * (attempt + 1)));
+        continue;
+      }
+      return null;
+    }
   }
+  return null;
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -137,15 +153,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signOut = async () => {
-    // Don't await signOut — it can hang due to lock issues.
-    // Just clear storage and redirect immediately.
-    supabase.auth.signOut().catch(() => {});
-    // Also clear localStorage directly as fallback
-    const storageKey = Object.keys(localStorage).find(k => k.startsWith('sb-') && k.endsWith('-auth-token'));
-    if (storageKey) localStorage.removeItem(storageKey);
     setUser(null);
     setProfile(null);
     setCompany(null);
+
+    // Try to sign out properly with a timeout to avoid hanging
+    try {
+      await Promise.race([
+        supabase.auth.signOut(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000)),
+      ]);
+    } catch {
+      // If signOut hangs or fails, clear storage manually
+    }
+
+    // Clear localStorage as fallback
+    Object.keys(localStorage)
+      .filter(k => k.startsWith('sb-'))
+      .forEach(k => localStorage.removeItem(k));
+
+    // Clear Supabase cookies
+    document.cookie.split(';').forEach(c => {
+      const name = c.trim().split('=')[0];
+      if (name.startsWith('sb-')) {
+        document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
+      }
+    });
+
     window.location.href = '/auth/login';
   };
 

@@ -14,12 +14,16 @@ export async function POST(request: NextRequest) {
 
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('company_id')
+      .select('company_id, role')
       .eq('id', user.id)
       .single();
 
     if (profileError || !profile?.company_id) {
       return NextResponse.json({ error: 'Profil ou entreprise introuvable' }, { status: 400 });
+    }
+
+    if ((profile as any).role !== 'admin') {
+      return NextResponse.json({ error: 'Acces reserve aux administrateurs' }, { status: 403 });
     }
 
     const { priceId } = await request.json();

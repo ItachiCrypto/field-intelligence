@@ -17,10 +17,11 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // Decode state to retrieve company_id
-    const { company_id } = JSON.parse(
+    // Decode state to retrieve company_id and code_verifier (PKCE)
+    const stateData = JSON.parse(
       Buffer.from(state, 'base64').toString('utf-8')
     );
+    const { company_id, code_verifier } = stateData;
 
     if (!company_id) {
       return NextResponse.redirect(
@@ -29,7 +30,7 @@ export async function GET(request: NextRequest) {
     }
 
     const redirectUri = `${appUrl}/api/integrations/salesforce/callback`;
-    const tokens = await exchangeCodeForTokens(code, redirectUri);
+    const tokens = await exchangeCodeForTokens(code, redirectUri, code_verifier);
 
     // Extract org_id from the id field (format: https://login.salesforce.com/id/ORGID/USERID)
     const idParts = tokens.id.split('/');

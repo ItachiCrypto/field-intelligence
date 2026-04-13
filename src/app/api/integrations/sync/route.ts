@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
 
       const { data: profile } = await supabase
         .from('profiles' as any)
-        .select('company_id')
+        .select('company_id, role')
         .eq('id', user.id)
         .single() as any;
 
@@ -49,6 +49,10 @@ export async function POST(request: NextRequest) {
           { error: 'Profile or company not found' },
           { status: 400 }
         );
+      }
+
+      if (profile.role !== 'admin') {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
       }
       companyId = profile.company_id;
     }
@@ -102,10 +106,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Fetch visit reports from Salesforce
+    // Default to 30 days ago if this is the first sync
+    const since = connection.last_sync_at
+      || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
     const tasks: SalesforceTask[] = await fetchVisitReports(
       accessToken,
       connection.instance_url!,
-      connection.last_sync_at
+      since
     );
 
     // Upsert each task into raw_visit_reports

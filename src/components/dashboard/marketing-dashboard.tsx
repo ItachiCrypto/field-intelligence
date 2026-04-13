@@ -34,12 +34,6 @@ import {
   Cell,
 } from 'recharts';
 
-const WEEKLY_DATA = [
-  { week: 'S11', concurrence: 12, besoins: 8, prix: 5 },
-  { week: 'S12', concurrence: 18, besoins: 11, prix: 7 },
-  { week: 'S13', concurrence: 15, besoins: 14, prix: 9 },
-  { week: 'S14', concurrence: 22, besoins: 10, prix: 6 },
-];
 
 const SEVERITY_BAR_COLORS: Record<string, string> = {
   rouge: '#e11d48',
@@ -54,12 +48,31 @@ export function MarketingDashboard() {
   const besoinsCount = SIGNALS.filter((s) => s.type === 'besoin').length;
   const criticalSignals = SIGNALS.filter((s) => s.severity === 'rouge');
 
+  // Build weekly chart data from real signals
+  const weeklyData = useMemo(() => {
+    if (SIGNALS.length === 0) return [];
+    const weeks: Record<string, { concurrence: number; besoins: number; prix: number }> = {};
+    SIGNALS.forEach((s) => {
+      const d = new Date(s.created_at);
+      const weekNum = Math.ceil(((d.getTime() - new Date(d.getFullYear(), 0, 1).getTime()) / 86400000 + 1) / 7);
+      const key = `S${weekNum}`;
+      if (!weeks[key]) weeks[key] = { concurrence: 0, besoins: 0, prix: 0 };
+      if (s.type === 'concurrence') weeks[key].concurrence++;
+      else if (s.type === 'besoin') weeks[key].besoins++;
+      else if (s.type === 'prix') weeks[key].prix++;
+    });
+    return Object.entries(weeks)
+      .sort(([a], [b]) => parseInt(a.slice(1)) - parseInt(b.slice(1)))
+      .slice(-4)
+      .map(([week, counts]) => ({ week, ...counts }));
+  }, [SIGNALS]);
+
   const competitorData = useMemo(
     () =>
       [...COMPETITORS]
         .sort((a, b) => b.mentions - a.mentions)
         .map((c) => ({ name: c.name, mentions: c.mentions, risk: c.risk })),
-    []
+    [COMPETITORS]
   );
 
   const topCompetitors = COMPETITORS.slice().sort((a, b) => b.mentions - a.mentions);
@@ -78,14 +91,12 @@ export function MarketingDashboard() {
         <KpiCard
           label="Signaux concurrence"
           value={concurrenceCount}
-          change={34}
           icon={<Crosshair className="w-5 h-5" />}
           iconColor="text-rose-600 bg-rose-50"
         />
         <KpiCard
           label="Besoins identifies"
           value={besoinsCount}
-          change={9}
           icon={<Lightbulb className="w-5 h-5" />}
           iconColor="text-sky-600 bg-sky-50"
         />
@@ -98,7 +109,6 @@ export function MarketingDashboard() {
         <KpiCard
           label="Remontees terrain totales"
           value={SIGNALS.length}
-          change={18}
           icon={<Radio className="w-5 h-5" />}
           iconColor="text-indigo-600 bg-indigo-50"
         />
@@ -132,7 +142,7 @@ export function MarketingDashboard() {
           </h3>
           <div className="h-56">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={WEEKLY_DATA}>
+              <LineChart data={weeklyData}>
                 <XAxis
                   dataKey="week"
                   axisLine={false}

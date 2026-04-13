@@ -30,14 +30,6 @@ const RESULTAT_OPTIONS: { key: ResultatFilter; label: string }[] = [
 
 const ALL_MOTIFS: DealMotif[] = ['prix', 'produit', 'offre', 'timing', 'concurrent', 'relation', 'budget', 'autre'];
 
-// Static weekly % data for gagne deals
-const GAGNE_TENDANCE = [
-  { semaine: 'S11', relation: 45, produit: 30, prix: 15, autre: 10 },
-  { semaine: 'S12', relation: 40, produit: 25, prix: 25, autre: 10 },
-  { semaine: 'S13', relation: 50, produit: 20, prix: 20, autre: 10 },
-  { semaine: 'S14', relation: 35, produit: 30, prix: 25, autre: 10 },
-];
-
 const GAGNE_LINE_MOTIFS: DealMotif[] = ['relation', 'produit', 'prix', 'autre'];
 
 const EMPTY_FORM = {
@@ -151,6 +143,30 @@ export default function MktDealPage() {
       }))
       .sort((a, b) => b.value - a.value);
   }, [perdus]);
+
+  // Gagne tendance: compute weekly % from real deals
+  const gagneTendance = useMemo(() => {
+    if (gagnes.length === 0) return [];
+    const weeks: Record<string, Record<string, number>> = {};
+    gagnes.forEach((d) => {
+      const dt = new Date(d.date);
+      const weekNum = Math.ceil(((dt.getTime() - new Date(dt.getFullYear(), 0, 1).getTime()) / 86400000 + 1) / 7);
+      const key = `S${weekNum}`;
+      if (!weeks[key]) weeks[key] = {};
+      weeks[key][d.motif_principal] = (weeks[key][d.motif_principal] || 0) + 1;
+    });
+    return Object.entries(weeks)
+      .sort(([a], [b]) => parseInt(a.slice(1)) - parseInt(b.slice(1)))
+      .slice(-4)
+      .map(([semaine, counts]) => {
+        const total = Object.values(counts).reduce((s, v) => s + v, 0) || 1;
+        const row: Record<string, string | number> = { semaine };
+        GAGNE_LINE_MOTIFS.forEach(m => {
+          row[m] = Math.round(((counts[m] || 0) / total) * 100);
+        });
+        return row;
+      });
+  }, [gagnes]);
 
   // Perdu tendance: compute % from DEAL_TENDANCE
   const perduTendance = useMemo(() => {
@@ -284,7 +300,7 @@ export default function MktDealPage() {
             <h3 className="text-sm font-semibold text-slate-700 mb-3">Evolution hebdo des motifs gagnes (%)</h3>
             <div className="h-56">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={GAGNE_TENDANCE} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+                <LineChart data={gagneTendance} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
                   <XAxis dataKey="semaine" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 11 }} />
                   <YAxis
                     axisLine={false}
