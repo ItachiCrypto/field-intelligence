@@ -29,7 +29,8 @@ export default function HeatmapPage() {
     });
 
     ALERTS.forEach((a) => {
-      const region = a.signal.region;
+      const region = a.signal?.region || a.region;
+      if (!region) return;
       if (!regionMap[region]) regionMap[region] = { signals: [], alerts: [] };
       regionMap[region].alerts.push(a);
     });
@@ -65,7 +66,7 @@ export default function HeatmapPage() {
     });
 
     return result.sort((a, b) => b.totalSignals - a.totalSignals);
-  }, []);
+  }, [SIGNALS, ALERTS, COMMERCIALS]);
 
   const totalRegions = regionData.length;
   const mostActive = regionData[0]?.region || '-';
@@ -163,7 +164,7 @@ export default function HeatmapPage() {
                     <div className="flex items-start gap-2">
                       <AlertTriangle className="w-3.5 h-3.5 text-amber-500 mt-0.5 shrink-0" />
                       <p className="text-xs text-slate-600 leading-relaxed line-clamp-2">
-                        <AbbreviationHighlight text={rd.topAlert.signal.content} />
+                        <AbbreviationHighlight text={rd.topAlert.signal?.content || rd.topAlert.content || ''} />
                       </p>
                     </div>
                   </div>
