@@ -108,9 +108,16 @@ export function useData() {
     if (refreshingRef.current) return;
     refreshingRef.current = true;
 
-    const accessToken = getAccessToken();
+    // Retry getting the access token — cookie may not be set yet on initial load
+    let accessToken = getAccessToken();
     if (!accessToken) {
-      // No access token available
+      for (let i = 0; i < 5; i++) {
+        await new Promise(r => setTimeout(r, 300 * (i + 1)));
+        accessToken = getAccessToken();
+        if (accessToken) break;
+      }
+    }
+    if (!accessToken) {
       refreshingRef.current = false;
       setIsLive(false);
       return;

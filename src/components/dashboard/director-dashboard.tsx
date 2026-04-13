@@ -4,7 +4,6 @@ import { useMemo } from 'react';
 import { KpiCard } from '@/components/shared/kpi-card';
 import { SignalCard } from '@/components/shared/signal-card';
 import { useAppData } from '@/lib/data';
-import Link from 'next/link';
 import {
   FileText,
   AlertTriangle,
@@ -14,13 +13,6 @@ import {
   ArrowDownRight,
   Minus,
   TrendingUp,
-  Target,
-  GitCompare,
-  PieChart,
-  TrendingDown,
-  Map,
-  MapPin,
-  Brain,
 } from 'lucide-react';
 import {
   BarChart,
@@ -268,35 +260,6 @@ export function DirectorDashboard() {
         </div>
       )}
 
-      {/* Nouvelles fonctionnalites */}
-      <div>
-        <h2 className="text-base font-semibold text-slate-900 mb-4">Nouvelles fonctionnalites</h2>
-        <div className="grid grid-cols-3 gap-4">
-          {[
-            { href: '/dir-clos', icon: Target, title: 'Taux Closing', desc: 'Performance et objectifs de l\'equipe', color: 'bg-violet-50 text-violet-600' },
-            { href: '/dir-n1', icon: GitCompare, title: 'Evolution Clients', desc: 'Retours N-1 et depuis dernier RDV', color: 'bg-sky-50 text-sky-600' },
-            { href: '/dir-seg', icon: PieChart, title: 'Segmentation', desc: 'Nouveaux vs Etablis vs Strategiques', color: 'bg-indigo-50 text-indigo-600' },
-            { href: '/dir-lost', icon: TrendingDown, title: 'Deals Perdus', desc: 'Motifs et valeur des deals perdus', color: 'bg-rose-50 text-rose-600' },
-            { href: '/dir-terr', icon: Map, title: 'Carte Territoire', desc: 'Opportunites et risques par zone', color: 'bg-emerald-50 text-emerald-600' },
-            { href: '/dir-geo', icon: MapPin, title: 'Heatmap Geo', desc: 'Vision geographique multicouche', color: 'bg-amber-50 text-amber-600' },
-            { href: '/dir-prior', icon: Brain, title: 'Priorisation IA', desc: 'Recommandations d\'action hebdomadaires', color: 'bg-slate-100 text-slate-600' },
-          ].map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow p-5 flex items-start gap-4"
-            >
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${item.color}`}>
-                <item.icon className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="text-sm font-semibold text-slate-900">{item.title}</h3>
-                <p className="text-xs text-slate-500 mt-1">{item.desc}</p>
-              </div>
-            </Link>
-          ))}
-        </div>
-      </div>
     </div>
   );
 }

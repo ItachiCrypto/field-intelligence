@@ -1,7 +1,6 @@
 'use client';
 
 import { useMemo } from 'react';
-import Link from 'next/link';
 import { KpiCard } from '@/components/shared/kpi-card';
 import { SignalCard } from '@/components/shared/signal-card';
 import { SeverityIndicator } from '@/components/shared/severity-indicator';
@@ -15,12 +14,6 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   Minus,
-  DollarSign,
-  TrendingUp,
-  Target,
-  Package,
-  MapPin,
-  Megaphone,
 } from 'lucide-react';
 import {
   LineChart,
@@ -336,34 +329,6 @@ export function MarketingDashboard() {
         </div>
       </div>
 
-      {/* Nouvelles fonctionnalites */}
-      <div>
-        <h2 className="text-base font-semibold text-slate-900 mb-4">Nouvelles fonctionnalites</h2>
-        <div className="grid grid-cols-3 gap-4">
-          {[
-            { href: '/mkt-prix', icon: DollarSign, title: 'Radar Prix', desc: 'Signaux prix concurrentiels et tendances', color: 'bg-amber-50 text-amber-600' },
-            { href: '/mkt-deal', icon: TrendingUp, title: 'Deals Gagnes/Perdus', desc: 'Analyse des motifs de gain et perte', color: 'bg-emerald-50 text-emerald-600' },
-            { href: '/mkt-pos', icon: Target, title: 'Positionnement', desc: 'Perception client vs concurrents', color: 'bg-violet-50 text-violet-600' },
-            { href: '/mkt-offre', icon: Package, title: 'Offres Concurrentes', desc: 'Offres et bundles detectes sur le terrain', color: 'bg-sky-50 text-sky-600' },
-            { href: '/mkt-geo', icon: MapPin, title: 'Analyse Geo', desc: 'Matrice sectorielle et geographique', color: 'bg-rose-50 text-rose-600' },
-            { href: '/mkt-comm', icon: Megaphone, title: 'Comm Concurrentes', desc: 'Actions communication detectees', color: 'bg-indigo-50 text-indigo-600' },
-          ].map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow p-5 flex items-start gap-4"
-            >
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${item.color}`}>
-                <item.icon className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="text-sm font-semibold text-slate-900">{item.title}</h3>
-                <p className="text-xs text-slate-500 mt-1">{item.desc}</p>
-              </div>
-            </Link>
-          ))}
-        </div>
-      </div>
     </div>
   );
 }
