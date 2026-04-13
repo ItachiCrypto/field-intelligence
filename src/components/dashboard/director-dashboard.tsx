@@ -64,7 +64,7 @@ export function DirectorDashboard() {
           cr: c.cr_week || 0,
           quality: c.quality_score,
         })),
-    []
+    [COMMERCIALS]
   );
 
   const top5ByQuality = useMemo(
@@ -72,7 +72,7 @@ export function DirectorDashboard() {
       [...COMMERCIALS]
         .sort((a, b) => b.quality_score - a.quality_score)
         .slice(0, 5),
-    []
+    [COMMERCIALS]
   );
 
   const criticalSignals = SIGNALS.filter((s) => s.severity === 'rouge');

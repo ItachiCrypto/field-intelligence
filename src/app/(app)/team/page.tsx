@@ -116,7 +116,7 @@ export default function TeamPage() {
       }
       return sortDir === 'asc' ? (va as number) - (vb as number) : (vb as number) - (va as number);
     });
-  }, [sortKey, sortDir]);
+  }, [COMMERCIALS, sortKey, sortDir]);
 
   const avgScore = Math.round(COMMERCIALS.reduce((s, c) => s + c.quality_score, 0) / COMMERCIALS.length);
   const totalCR = COMMERCIALS.reduce((s, c) => s + (c.cr_week || 0), 0);
