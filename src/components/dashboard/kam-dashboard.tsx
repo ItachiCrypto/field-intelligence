@@ -14,7 +14,7 @@ export function KamDashboard() {
     (a) => a.status === 'nouveau' && (a.severity === 'rouge' || a.severity === 'orange')
   ).length;
   const opportunityCount = ACCOUNTS.reduce(
-    (sum, acc) => sum + acc.signals.filter((s) => s.type === 'opportunite').length,
+    (sum, acc) => sum + (acc.signals || []).filter((s: any) => s.type === 'opportunite').length,
     0
   );
 

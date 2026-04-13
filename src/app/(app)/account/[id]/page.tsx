@@ -130,16 +130,16 @@ export default function AccountPage({ params }: { params: Promise<{ id: string }
       <div className="space-y-3">
         <div className="flex items-center gap-3">
           <h2 className="text-base font-semibold text-slate-900">Signaux actifs</h2>
-          {account.signals.length > 0 && (
+          {(account.signals || []).length > 0 && (
             <span className="inline-flex items-center justify-center min-w-[1.5rem] h-6 rounded-full bg-slate-100 text-slate-600 text-xs font-semibold px-1.5 tabular-nums">
-              {account.signals.length}
+              {(account.signals || []).length}
             </span>
           )}
           <div className="flex-1 h-px bg-slate-200" />
         </div>
-        {account.signals.length > 0 ? (
+        {(account.signals || []).length > 0 ? (
           <div className="space-y-3">
-            {[...account.signals]
+            {[...(account.signals || [])]
               .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
               .map((signal) => (
                 <SignalCard key={signal.id} signal={signal} />
@@ -153,12 +153,12 @@ export default function AccountPage({ params }: { params: Promise<{ id: string }
       </div>
 
       {/* Contacts */}
-      {account.contacts.length > 0 && (
+      {(account.contacts || []).length > 0 && (
         <div className="space-y-3">
           <div className="flex items-center gap-3">
             <h2 className="text-base font-semibold text-slate-900">Contacts</h2>
             <span className="inline-flex items-center justify-center min-w-[1.5rem] h-6 rounded-full bg-slate-100 text-slate-600 text-xs font-semibold px-1.5 tabular-nums">
-              {account.contacts.length}
+              {(account.contacts || []).length}
             </span>
             <div className="flex-1 h-px bg-slate-200" />
           </div>
@@ -173,7 +173,7 @@ export default function AccountPage({ params }: { params: Promise<{ id: string }
                 </tr>
               </thead>
               <tbody>
-                {account.contacts.map((contact) => (
+                {(account.contacts || []).map((contact) => (
                   <tr key={contact.id} className="border-b border-slate-100 hover:bg-slate-50/50 transition-colors">
                     <td className="px-4 py-3 font-medium text-slate-900">{contact.name}</td>
                     <td className="px-4 py-3 text-slate-600">{contact.role}</td>
