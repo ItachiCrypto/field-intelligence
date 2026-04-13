@@ -28,8 +28,10 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      // Sign out first to avoid lock conflicts if a session already exists
-      await supabase.auth.signOut().catch(() => {});
+      // Clear any existing session from localStorage to avoid navigator.locks conflict
+      // Do NOT await signOut() — it hangs due to navigator.locks API
+      const storageKey = Object.keys(localStorage).find(k => k.startsWith('sb-') && k.endsWith('-auth-token'));
+      if (storageKey) localStorage.removeItem(storageKey);
 
       const { error: authError } = await Promise.race([
         supabase.auth.signInWithPassword({ email, password }),
