@@ -154,7 +154,7 @@ export default function AlertsPage() {
                   <div className="flex items-center gap-2 mb-2 flex-wrap">
                     <span className="text-xs text-slate-400">{formatRelativeTime(alert.created_at)}</span>
                     <span className="text-slate-300">|</span>
-                    <span className="text-xs font-medium text-slate-700">{alert.signal.client_name}</span>
+                    <span className="text-xs font-medium text-slate-700">{alert.signal?.client_name || alert.client_name || '—'}</span>
                     <SeverityBadge severity={alert.severity} size="sm" showLabel />
                     {currentStatus === 'traite' && (
                       <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 uppercase tracking-wider">
@@ -168,7 +168,7 @@ export default function AlertsPage() {
                     )}
                   </div>
                   <p className="text-sm text-slate-900 leading-relaxed">
-                    <AbbreviationHighlight text={alert.signal.content} />
+                    <AbbreviationHighlight text={alert.signal?.content || alert.content || ''} />
                   </p>
                   <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-100">
                     {currentStatus !== 'traite' && (
