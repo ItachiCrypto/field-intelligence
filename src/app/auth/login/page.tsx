@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Zap } from 'lucide-react';
@@ -15,18 +15,34 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  // Redirect if already logged in
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) window.location.href = '/dashboard';
+    });
+  }, []);
+
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setLoading(true);
 
-    const { error: authError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    try {
+      // Sign out first to avoid lock conflicts if a session already exists
+      await supabase.auth.signOut().catch(() => {});
 
-    if (authError) {
-      setError(authError.message);
+      const { error: authError } = await Promise.race([
+        supabase.auth.signInWithPassword({ email, password }),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Connexion trop longue, veuillez reessayer')), 8000)),
+      ]);
+
+      if (authError) {
+        setError(authError.message);
+        setLoading(false);
+        return;
+      }
+    } catch (err: any) {
+      setError(err.message || 'Erreur de connexion');
       setLoading(false);
       return;
     }
