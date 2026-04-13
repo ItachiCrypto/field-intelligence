@@ -86,3 +86,38 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
+// GET handler for Vercel Cron
+export async function GET(request: NextRequest) {
+  const authHeader = request.headers.get('authorization');
+  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const serviceClient = createServiceClient();
+
+  const { data: pendingReports } = await serviceClient
+    .from('raw_visit_reports')
+    .select('*')
+    .eq('processing_status', 'pending')
+    .lt('processing_attempts', 3)
+    .limit(10);
+
+  if (!pendingReports || pendingReports.length === 0) {
+    return NextResponse.json({ processed: 0, errors: 0 });
+  }
+
+  let processedCount = 0;
+  let errorCount = 0;
+
+  for (const report of pendingReports) {
+    try {
+      await processReport(report);
+      processedCount++;
+    } catch {
+      errorCount++;
+    }
+  }
+
+  return NextResponse.json({ processed: processedCount, errors: errorCount });
+}

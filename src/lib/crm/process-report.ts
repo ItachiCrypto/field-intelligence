@@ -32,34 +32,37 @@ export async function processReport(report: RawVisitReport): Promise<{ success: 
       (abbreviations ?? []).map(a => ({ short: a.short, full: a.full })),
     );
 
-    // Call Claude API
-    const claudeRes = await fetch('https://api.anthropic.com/v1/messages', {
+    // Call OpenAI API (GPT-4o)
+    const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': process.env.ANTHROPIC_API_KEY!,
-        'anthropic-version': '2023-06-01',
+        'Authorization': `Bearer ${process.env.OPENAI_API_KEY!}`,
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
+        model: 'gpt-4o',
         max_tokens: 2000,
-        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.1,
+        messages: [
+          { role: 'system', content: 'Vous etes un expert en analyse de comptes rendus de visite commerciale. Repondez uniquement en JSON valide, sans texte avant ou apres.' },
+          { role: 'user', content: prompt },
+        ],
       }),
     });
 
-    if (!claudeRes.ok) {
-      throw new Error(`Claude API error: ${claudeRes.status} ${await claudeRes.text()}`);
+    if (!openaiRes.ok) {
+      throw new Error(`OpenAI API error: ${openaiRes.status} ${await openaiRes.text()}`);
     }
 
-    const claudeData = await claudeRes.json();
-    const responseText = claudeData.content?.[0]?.text ?? '';
+    const openaiData = await openaiRes.json();
+    const responseText = openaiData.choices?.[0]?.message?.content ?? '';
     const extracted = parseExtractionResponse(responseText);
 
     if (!extracted) {
-      throw new Error('Failed to parse Claude extraction response');
+      throw new Error('Failed to parse OpenAI extraction response');
     }
 
-    const tokensUsed = (claudeData.usage?.input_tokens ?? 0) + (claudeData.usage?.output_tokens ?? 0);
+    const tokensUsed = (openaiData.usage?.total_tokens ?? 0);
     let signalsCreated = 0;
 
     // Insert signals
@@ -165,7 +168,7 @@ export async function processReport(report: RawVisitReport): Promise<{ success: 
       company_id: report.company_id,
       extracted_json: extracted,
       signals_created: signalsCreated,
-      model_used: 'claude-sonnet-4-20250514',
+      model_used: 'gpt-4o',
       tokens_used: tokensUsed,
       processing_time_ms: Date.now() - startTime,
     });

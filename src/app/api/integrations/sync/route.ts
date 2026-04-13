@@ -164,3 +164,76 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
+// GET handler for Vercel Cron
+export async function GET(request: NextRequest) {
+  const authHeader = request.headers.get('authorization');
+  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const serviceClient = createServiceClient();
+
+  // Fetch all connected CRM connections
+  const { data: connections } = await serviceClient
+    .from('crm_connections')
+    .select('*')
+    .eq('status', 'connected');
+
+  if (!connections || connections.length === 0) {
+    return NextResponse.json({ message: 'No connected CRMs', synced: 0 });
+  }
+
+  let totalSynced = 0;
+
+  for (const conn of connections) {
+    try {
+      let accessToken = decrypt(conn.access_token_encrypted);
+      const refreshToken = decrypt(conn.refresh_token_encrypted);
+
+      // Refresh token if expired
+      if (conn.token_expires_at && new Date(conn.token_expires_at) < new Date()) {
+        const refreshed = await refreshAccessToken(refreshToken);
+        accessToken = refreshed.access_token;
+        await serviceClient.from('crm_connections').update({
+          access_token_encrypted: encrypt(accessToken),
+          token_expires_at: new Date(Date.now() + 2 * 3600000).toISOString(),
+        }).eq('id', conn.id);
+      }
+
+      const since = conn.last_sync_at || new Date(Date.now() - 7 * 86400000).toISOString();
+      const tasks = await fetchVisitReports(accessToken, conn.instance_url, since);
+
+      for (const task of tasks) {
+        await serviceClient.from('raw_visit_reports').upsert({
+          company_id: conn.company_id,
+          crm_connection_id: conn.id,
+          external_id: task.Id,
+          external_updated_at: task.LastModifiedDate,
+          content_text: task.Description,
+          subject: task.Subject,
+          commercial_email: task.Owner?.Email ?? null,
+          commercial_name: task.Owner?.Name ?? null,
+          client_name: task.What?.Name || task.Who?.Name || null,
+          visit_date: task.ActivityDate,
+          raw_json: task,
+          processing_status: 'pending',
+        }, { onConflict: 'company_id,external_id' });
+      }
+
+      await serviceClient.from('crm_connections').update({
+        last_sync_at: new Date().toISOString(),
+        records_synced: (conn.records_synced || 0) + tasks.length,
+        last_sync_error: null,
+      }).eq('id', conn.id);
+
+      totalSynced += tasks.length;
+    } catch (err) {
+      await serviceClient.from('crm_connections').update({
+        last_sync_error: err.message,
+      }).eq('id', conn.id);
+    }
+  }
+
+  return NextResponse.json({ synced: totalSynced });
+}
