@@ -39,20 +39,34 @@ const SENTIMENT_LABELS: Record<string, string> = {
   interesse: 'Interesse',
 };
 
+const EMPTY_SEGMENT = { segment: 'nouveau' as const, nb_cr: 0, pct_positif: 0, pct_negatif: 0, pct_neutre: 0, pct_interesse: 0, top_insatisfactions: [] as string[], top_points_positifs: [] as string[] };
+
 export default function DirSegPage() {
   const { segmentSentiments: SEGMENT_SENTIMENTS, segmentInsights: SEGMENT_INSIGHTS } = useAppData();
-  const nouveau = SEGMENT_SENTIMENTS.find(s => s.segment === 'nouveau')!;
-  const etabli = SEGMENT_SENTIMENTS.find(s => s.segment === 'etabli')!;
+  const nouveau = SEGMENT_SENTIMENTS.find(s => s.segment === 'nouveau') ?? EMPTY_SEGMENT;
+  const etabli = SEGMENT_SENTIMENTS.find(s => s.segment === 'etabli') ?? { ...EMPTY_SEGMENT, segment: 'etabli' as const };
 
   // Bar chart: grouped bars comparing sentiment % by segment
   const chartData = useMemo(() => {
     const keys = ['positif', 'negatif', 'neutre', 'interesse'] as const;
     return keys.map(k => ({
       sentiment: SENTIMENT_LABELS[k],
-      Nouveau: nouveau[`pct_${k}`],
-      Etabli: etabli[`pct_${k}`],
+      Nouveau: nouveau[`pct_${k}`] ?? 0,
+      Etabli: etabli[`pct_${k}`] ?? 0,
     }));
   }, [nouveau, etabli]);
+
+  if (SEGMENT_SENTIMENTS.length === 0) {
+    return (
+      <div className="space-y-8">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">Segmentation Clients</h1>
+          <p className="text-sm text-slate-500 mt-1">Comparaison sentiment et retours entre nouveaux et etablis</p>
+        </div>
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-12 text-center text-slate-500">Aucune donnee de segmentation disponible.</div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
