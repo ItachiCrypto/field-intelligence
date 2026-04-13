@@ -81,11 +81,11 @@ export default function MktGeoPage() {
   /* --- Region cards sorted by nb_signaux desc ---------------------- */
   const sortedProfiles = useMemo(
     () => [...REGION_PROFILES].sort((a, b) => b.nb_signaux - a.nb_signaux),
-    [],
+    [REGION_PROFILES],
   );
 
   /* --- Bar chart data: top 3 besoins presence per region ----------- */
-  const topBesoins = useMemo(() => computeTopBesoins(REGION_PROFILES), []);
+  const topBesoins = useMemo(() => computeTopBesoins(REGION_PROFILES), [REGION_PROFILES]);
 
   const besoinsChartData = useMemo(() => {
     return REGION_PROFILES.map((p) => {
@@ -95,11 +95,11 @@ export default function MktGeoPage() {
       });
       return row;
     });
-  }, [topBesoins]);
+  }, [REGION_PROFILES, topBesoins]);
 
   /* --- Heat matrix data ------------------------------------------- */
-  const secteurs = useMemo(() => Array.from(new Set(GEO_SECTOR_DATA.map((d) => d.secteur))).sort(), []);
-  const regions  = useMemo(() => Array.from(new Set(GEO_SECTOR_DATA.map((d) => d.region))).sort(), []);
+  const secteurs = useMemo(() => Array.from(new Set(GEO_SECTOR_DATA.map((d) => d.secteur))).sort(), [GEO_SECTOR_DATA]);
+  const regions  = useMemo(() => Array.from(new Set(GEO_SECTOR_DATA.map((d) => d.region))).sort(), [GEO_SECTOR_DATA]);
 
   const getCell = (secteur: string, region: string) =>
     GEO_SECTOR_DATA.find((d) => d.secteur === secteur && d.region === region);

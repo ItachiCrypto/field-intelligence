@@ -116,7 +116,7 @@ export default function DirClosPage() {
 
   const filtered = useMemo(
     () => filter === 'tous' ? CR_OBJECTIFS : CR_OBJECTIFS.filter(cr => cr.objectif_type === filter),
-    [filter],
+    [CR_OBJECTIFS, filter],
   );
 
   const kpis = useMemo(() => {
@@ -125,7 +125,7 @@ export default function DirClosPage() {
     const nonAtteints = total - atteints;
     const taux = total > 0 ? Math.round((atteints / total) * 100) : 0;
     return { total, atteints, nonAtteints, taux };
-  }, []);
+  }, [CR_OBJECTIFS]);
 
   // Bar chart: taux de reussite par commercial
   const barData = useMemo(() => {
@@ -156,7 +156,7 @@ export default function DirClosPage() {
       value: count,
       type: type as ObjectifType,
     }));
-  }, []);
+  }, [CR_OBJECTIFS]);
 
   // Causes de non-atteinte
   const causesData = useMemo(() => {
@@ -169,7 +169,7 @@ export default function DirClosPage() {
     return Object.entries(counts)
       .map(([cause, count]) => ({ name: cause, count }))
       .sort((a, b) => b.count - a.count);
-  }, []);
+  }, [CR_OBJECTIFS]);
 
   // Facteurs de reussite
   const facteursData = useMemo(() => {
@@ -182,7 +182,7 @@ export default function DirClosPage() {
     return Object.entries(counts)
       .map(([facteur, count]) => ({ name: facteur, count }))
       .sort((a, b) => b.count - a.count);
-  }, []);
+  }, [CR_OBJECTIFS]);
 
   // Table rows sorted by date desc
   const tableRows = useMemo(

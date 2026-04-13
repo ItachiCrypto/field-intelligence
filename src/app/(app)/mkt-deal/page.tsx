@@ -116,8 +116,8 @@ export default function MktDealPage() {
   }
 
   const totalDeals = DEALS_ANALYSE.length;
-  const gagnes = useMemo(() => DEALS_ANALYSE.filter((d) => d.resultat === 'gagne'), []);
-  const perdus = useMemo(() => DEALS_ANALYSE.filter((d) => d.resultat === 'perdu'), []);
+  const gagnes = useMemo(() => DEALS_ANALYSE.filter((d) => d.resultat === 'gagne'), [DEALS_ANALYSE]);
+  const perdus = useMemo(() => DEALS_ANALYSE.filter((d) => d.resultat === 'perdu'), [DEALS_ANALYSE]);
   const tauxConversion = totalDeals > 0 ? ((gagnes.length / totalDeals) * 100).toFixed(0) : '0';
 
   // Donut gagnes: % par motif
@@ -162,7 +162,7 @@ export default function MktDealPage() {
       });
       return row;
     });
-  }, []);
+  }, [DEAL_TENDANCE]);
 
   const perduLineMotifs = useMemo(() => {
     const motifs = new Set<DealMotif>();
@@ -172,7 +172,7 @@ export default function MktDealPage() {
       });
     });
     return Array.from(motifs);
-  }, []);
+  }, [DEAL_TENDANCE]);
 
   // Filtered table
   const filteredDeals = useMemo(() => {
@@ -180,7 +180,7 @@ export default function MktDealPage() {
       .filter((d) => resultatFilter === 'all' || d.resultat === resultatFilter)
       .filter((d) => motifFilter === 'all' || d.motif_principal === motifFilter)
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [resultatFilter, motifFilter]);
+  }, [DEALS_ANALYSE, resultatFilter, motifFilter]);
 
   return (
     <div className="space-y-6">

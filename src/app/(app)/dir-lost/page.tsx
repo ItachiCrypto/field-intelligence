@@ -31,8 +31,8 @@ export default function DirLostPage() {
   const [resultatFilter, setResultatFilter] = useState<ResultatFilter>('tous');
 
   const totalDeals = DEALS_COMMERCIAUX.length;
-  const gagnes = useMemo(() => DEALS_COMMERCIAUX.filter(d => d.resultat === 'gagne'), []);
-  const perdus = useMemo(() => DEALS_COMMERCIAUX.filter(d => d.resultat === 'perdu'), []);
+  const gagnes = useMemo(() => DEALS_COMMERCIAUX.filter(d => d.resultat === 'gagne'), [DEALS_COMMERCIAUX]);
+  const perdus = useMemo(() => DEALS_COMMERCIAUX.filter(d => d.resultat === 'perdu'), [DEALS_COMMERCIAUX]);
   const tauxConversion = totalDeals > 0 ? Math.round((gagnes.length / totalDeals) * 100) : 0;
 
   // Donut gagnes: % par motif
@@ -93,7 +93,7 @@ export default function DirLostPage() {
       });
       return row;
     });
-  }, []);
+  }, [DEAL_COMMERCIAL_TENDANCE]);
 
   // Only show motifs that have data
   const activeLineMotifs = useMemo(() => {
@@ -104,14 +104,14 @@ export default function DirLostPage() {
       });
     });
     return Array.from(motifs);
-  }, []);
+  }, [DEAL_COMMERCIAL_TENDANCE]);
 
   // Filtered table
   const filteredDeals = useMemo(() => {
     return DEALS_COMMERCIAUX
       .filter(d => resultatFilter === 'tous' || d.resultat === resultatFilter)
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [resultatFilter]);
+  }, [DEALS_COMMERCIAUX, resultatFilter]);
 
   return (
     <div className="space-y-6">

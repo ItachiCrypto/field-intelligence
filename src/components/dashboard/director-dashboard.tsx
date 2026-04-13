@@ -50,9 +50,9 @@ export function DirectorDashboard() {
   const criticalAlerts = ALERTS.filter(
     (a) => a.severity === 'rouge' && a.status === 'nouveau'
   );
-  const avgQuality = Math.round(
-    COMMERCIALS.reduce((s, c) => s + c.quality_score, 0) / COMMERCIALS.length
-  );
+  const avgQuality = COMMERCIALS.length > 0
+    ? Math.round(COMMERCIALS.reduce((s, c) => s + c.quality_score, 0) / COMMERCIALS.length)
+    : 0;
 
   const top10ByCR = useMemo(
     () =>

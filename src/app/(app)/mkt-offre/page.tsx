@@ -32,9 +32,9 @@ const BAR_COLORS = ['#6366f1', '#e11d48', '#f59e0b', '#10b981', '#8b5cf6'];
 
 export default function MktOffrePage() {
   const { offresConcurrentes: OFFRES_CONCURRENTES } = useAppData();
-  const offresActives = useMemo(() => OFFRES_CONCURRENTES.filter((o) => o.statut === 'active').length, []);
-  const totalImpactes = useMemo(() => OFFRES_CONCURRENTES.reduce((acc, o) => acc + o.deals_impactes, 0), []);
-  const totalPerdus = useMemo(() => OFFRES_CONCURRENTES.reduce((acc, o) => acc + o.deals_perdus, 0), []);
+  const offresActives = useMemo(() => OFFRES_CONCURRENTES.filter((o) => o.statut === 'active').length, [OFFRES_CONCURRENTES]);
+  const totalImpactes = useMemo(() => OFFRES_CONCURRENTES.reduce((acc, o) => acc + o.deals_impactes, 0), [OFFRES_CONCURRENTES]);
+  const totalPerdus = useMemo(() => OFFRES_CONCURRENTES.reduce((acc, o) => acc + o.deals_perdus, 0), [OFFRES_CONCURRENTES]);
 
   const barData = useMemo(() => {
     return OFFRES_CONCURRENTES
@@ -43,7 +43,7 @@ export default function MktOffrePage() {
         mentions: o.count_mentions,
       }))
       .sort((a, b) => b.mentions - a.mentions);
-  }, []);
+  }, [OFFRES_CONCURRENTES]);
 
   return (
     <div className="space-y-6">
