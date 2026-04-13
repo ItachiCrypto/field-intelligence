@@ -42,15 +42,15 @@ export default function DirTerrPage() {
   /* --- KPI computations --- */
   const kpiOpportunites = useMemo(
     () => TERRITOIRES.filter((t) => t.nb_opportunites >= 3).length,
-    [],
+    [TERRITOIRES],
   );
   const kpiSecuriser = useMemo(
     () => TERRITOIRES.filter((t) => t.nb_risques_perte >= 3).length,
-    [],
+    [TERRITOIRES],
   );
   const kpiSousExploitees = useMemo(
     () => TERRITOIRES.filter((t) => (t.nb_opportunites / t.nb_cr) > 0.05 && t.nb_cr < 50).length,
-    [],
+    [TERRITOIRES],
   );
 
   /* --- Bar chart data: nb_cr par region, sorted desc --- */
@@ -59,7 +59,7 @@ export default function DirTerrPage() {
       [...TERRITOIRES]
         .sort((a, b) => b.nb_cr - a.nb_cr)
         .map((t) => ({ name: t.territoire, cr: t.nb_cr })),
-    [],
+    [TERRITOIRES],
   );
 
   /* --- Section 1: Ou aller chercher du business --- */
@@ -68,7 +68,7 @@ export default function DirTerrPage() {
       [...TERRITOIRES]
         .filter((t) => t.nb_opportunites >= 2)
         .sort((a, b) => b.nb_opportunites - a.nb_opportunites),
-    [],
+    [TERRITOIRES],
   );
 
   /* --- Section 2: Secteurs a securiser --- */
@@ -77,7 +77,7 @@ export default function DirTerrPage() {
       [...TERRITOIRES]
         .filter((t) => t.nb_risques_perte >= 2 || t.nb_mentions_concurrents >= 10)
         .sort((a, b) => (b.nb_risques_perte + b.nb_mentions_concurrents) - (a.nb_risques_perte + a.nb_mentions_concurrents)),
-    [],
+    [TERRITOIRES],
   );
 
   /* --- Section 3: Secteurs sous-exploites --- */
@@ -87,7 +87,7 @@ export default function DirTerrPage() {
         .filter((t) => t.nb_cr < 60 && t.nb_opportunites >= 1)
         .map((t) => ({ ...t, ratio: t.nb_opportunites / t.nb_cr }))
         .sort((a, b) => b.ratio - a.ratio),
-    [],
+    [TERRITOIRES],
   );
 
   return (

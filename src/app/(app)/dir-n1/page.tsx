@@ -68,7 +68,7 @@ export default function DirN1Page() {
       semaine: p.periode,
       ratio: pct(p.positif, p.total),
     })),
-  []);
+  [SENTIMENT_PERIODES]);
 
   // --- Regions sorted by negatif/total desc ---
   const regionsSorted = useMemo(() => {
@@ -81,7 +81,7 @@ export default function DirN1Page() {
       const ratioB = b.total > 0 ? b.negatif / b.total : 0;
       return ratioB - ratioA;
     });
-  }, [regionFilter]);
+  }, [SENTIMENT_REGIONS, regionFilter]);
 
   function stackedBar(r: SentimentRegion) {
     const total = r.total || 1;

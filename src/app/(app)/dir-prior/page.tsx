@@ -1,7 +1,7 @@
 // @ts-nocheck
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useAppData } from '@/lib/data';
 import { createClient } from '@/lib/supabase/client';
 import { RecommandationIA } from '@/lib/types-v2';
@@ -37,13 +37,18 @@ const STATUT_CONFIG: Record<Statut, { bg: string; text: string; label: string }>
 
 export default function DirPriorPage() {
   const { recommandationsIA: RECOMMANDATIONS_IA, refresh } = useAppData();
-  const [statuts, setStatuts] = useState<Record<string, Statut>>(() => {
-    const init: Record<string, Statut> = {};
-    for (const r of RECOMMANDATIONS_IA) {
-      init[r.id] = r.statut;
+  const [statuts, setStatuts] = useState<Record<string, Statut>>({});
+
+  // Sync statuts when data arrives from async fetch
+  useEffect(() => {
+    if (RECOMMANDATIONS_IA.length > 0 && Object.keys(statuts).length === 0) {
+      const init: Record<string, Statut> = {};
+      for (const r of RECOMMANDATIONS_IA) {
+        init[r.id] = r.statut;
+      }
+      setStatuts(init);
     }
-    return init;
-  });
+  }, [RECOMMANDATIONS_IA]);
 
   async function updateStatut(id: string, statut: Statut) {
     setStatuts((prev) => ({ ...prev, [id]: statut }));
@@ -63,7 +68,7 @@ export default function DirPriorPage() {
 
   const sorted = useMemo(
     () => [...RECOMMANDATIONS_IA].sort((a, b) => a.priorite - b.priorite),
-    []
+    [RECOMMANDATIONS_IA]
   );
 
   return (
