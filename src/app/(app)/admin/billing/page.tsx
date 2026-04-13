@@ -76,6 +76,27 @@ export default function AdminBillingPage() {
     }
   }
 
+  async function handleDowngradeToFree() {
+    if (!confirm('Etes-vous sur de vouloir passer au plan Gratuit ? Vous perdrez l\'acces aux fonctionnalites premium et serez limite a 3 utilisateurs.')) {
+      return;
+    }
+    setLoadingCheckout(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/stripe/downgrade', { method: 'POST' });
+      const data = await res.json();
+      if (res.ok) {
+        window.location.href = '/admin/billing?status=success';
+      } else {
+        setError(data.error || 'Impossible de changer de plan.');
+      }
+    } catch {
+      setError('Erreur de connexion au service de paiement.');
+    } finally {
+      setLoadingCheckout(false);
+    }
+  }
+
   async function handleCheckout(priceId: string) {
     setLoadingCheckout(true);
     setError(null);
@@ -255,14 +276,31 @@ export default function AdminBillingPage() {
 
                 {/* Action */}
                 <div className="mt-auto">
-                  {isCurrent ? null : isUpgrade ? (
+                  {isCurrent ? null : planId === 'free' ? (
+                    <button
+                      onClick={() => handleDowngradeToFree()}
+                      disabled={loadingCheckout}
+                      className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      {loadingCheckout ? (
+                        <span className="w-4 h-4 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin" />
+                      ) : (
+                        <ArrowRight className="w-4 h-4" />
+                      )}
+                      Passer au Gratuit
+                    </button>
+                  ) : (
                     <button
                       onClick={() =>
                         plan.stripePriceId &&
                         handleCheckout(plan.stripePriceId)
                       }
                       disabled={loadingCheckout || !plan.stripePriceId}
-                      className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      className={`w-full inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors ${
+                        isUpgrade
+                          ? 'bg-indigo-600 text-white hover:bg-indigo-700'
+                          : 'border border-slate-300 text-slate-700 hover:bg-slate-50'
+                      }`}
                     >
                       {loadingCheckout ? (
                         <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -271,15 +309,7 @@ export default function AdminBillingPage() {
                       )}
                       Passer au {plan.name}
                     </button>
-                  ) : isDowngrade ? (
-                    <a
-                      href="mailto:support@field-intelligence.com"
-                      className="w-full inline-flex items-center justify-center gap-1 text-sm text-slate-500 hover:text-slate-700 transition-colors"
-                    >
-                      Contacter le support
-                      <ArrowRight className="w-3.5 h-3.5" />
-                    </a>
-                  ) : null}
+                  )}
                 </div>
               </div>
             );
