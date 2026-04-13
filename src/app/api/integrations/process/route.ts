@@ -60,8 +60,13 @@ export async function POST(request: NextRequest) {
 
     for (const report of pendingReports) {
       try {
-        await processReport(report as RawVisitReport);
-        processedCount++;
+        const result = await processReport(report as RawVisitReport);
+        if (result.success) {
+          processedCount++;
+        } else {
+          console.error(`Failed to process report ${report.id}:`, result.error);
+          errorCount++;
+        }
       } catch (processError) {
         console.error(
           `Failed to process report ${report.id}:`,
@@ -112,8 +117,12 @@ export async function GET(request: NextRequest) {
 
   for (const report of pendingReports) {
     try {
-      await processReport(report);
-      processedCount++;
+      const result = await processReport(report);
+      if (result.success) {
+        processedCount++;
+      } else {
+        errorCount++;
+      }
     } catch {
       errorCount++;
     }
