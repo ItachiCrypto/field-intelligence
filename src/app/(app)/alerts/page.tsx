@@ -27,23 +27,25 @@ export default function AlertsPage() {
     return init;
   });
 
+  const getStatus = (a: any): AlertStatus => alertStatuses[a.id] ?? a.status ?? 'nouveau';
+
   const untreatedCount = useMemo(
-    () => ALERTS.filter((a) => alertStatuses[a.id] === 'nouveau').length,
-    [alertStatuses]
+    () => ALERTS.filter((a) => getStatus(a) === 'nouveau').length,
+    [ALERTS, alertStatuses]
   );
   const treatedCount = useMemo(
-    () => ALERTS.filter((a) => alertStatuses[a.id] === 'traite').length,
-    [alertStatuses]
+    () => ALERTS.filter((a) => getStatus(a) === 'traite').length,
+    [ALERTS, alertStatuses]
   );
   const enCoursCount = useMemo(
-    () => ALERTS.filter((a) => alertStatuses[a.id] === 'en_cours').length,
-    [alertStatuses]
+    () => ALERTS.filter((a) => getStatus(a) === 'en_cours').length,
+    [ALERTS, alertStatuses]
   );
 
   const filteredAlerts = useMemo(() => {
     return ALERTS
       .filter((a) => {
-        const status = alertStatuses[a.id];
+        const status = getStatus(a);
         if (activeTab === 'all') return true;
         return status === activeTab;
       })
@@ -52,7 +54,7 @@ export default function AlertsPage() {
         if (sevDiff !== 0) return sevDiff;
         return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
       });
-  }, [activeTab, alertStatuses]);
+  }, [ALERTS, activeTab, alertStatuses]);
 
   const markTreated = async (alertId: string) => {
     setAlertStatuses((prev) => ({ ...prev, [alertId]: 'traite' }));
@@ -139,7 +141,7 @@ export default function AlertsPage() {
           </div>
         ) : (
           filteredAlerts.map((alert) => {
-            const currentStatus = alertStatuses[alert.id];
+            const currentStatus = getStatus(alert);
             const sevConfig = SEVERITY_CONFIG[alert.severity];
             return (
               <div
