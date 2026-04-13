@@ -65,6 +65,10 @@ export interface Alert {
   status: AlertStatus;
   created_at: string;
   treated_at?: string;
+  // Denormalized fields (migration 00003)
+  region?: string;
+  client_name?: string;
+  content?: string;
 }
 
 export interface Commercial {
