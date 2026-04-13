@@ -52,6 +52,7 @@ export default function AdminBillingPage() {
 
   const [loadingCheckout, setLoadingCheckout] = useState(false);
   const [loadingPortal, setLoadingPortal] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const currentPlanId = company?.plan ?? 'free';
   const currentPlan = PLANS[currentPlanId];
@@ -59,14 +60,17 @@ export default function AdminBillingPage() {
 
   async function handlePortal() {
     setLoadingPortal(true);
+    setError(null);
     try {
       const res = await fetch('/api/stripe/portal', { method: 'POST' });
       const data = await res.json();
       if (data.url) {
         window.location.href = data.url;
+      } else {
+        setError(data.error || 'Impossible d\'ouvrir le portail de gestion. Verifiez que votre abonnement Stripe est configure.');
       }
     } catch {
-      // silently fail
+      setError('Erreur de connexion au service de paiement.');
     } finally {
       setLoadingPortal(false);
     }
@@ -74,6 +78,7 @@ export default function AdminBillingPage() {
 
   async function handleCheckout(priceId: string) {
     setLoadingCheckout(true);
+    setError(null);
     try {
       const res = await fetch('/api/stripe/checkout', {
         method: 'POST',
@@ -83,9 +88,11 @@ export default function AdminBillingPage() {
       const data = await res.json();
       if (data.url) {
         window.location.href = data.url;
+      } else {
+        setError(data.error || 'Impossible de creer la session de paiement. Verifiez la configuration Stripe.');
       }
     } catch {
-      // silently fail
+      setError('Erreur de connexion au service de paiement.');
     } finally {
       setLoadingCheckout(false);
     }
@@ -104,6 +111,14 @@ export default function AdminBillingPage() {
         <div className="rounded-lg bg-slate-50 border border-slate-200 px-4 py-3 text-sm text-slate-700 flex items-center gap-2">
           <CreditCard className="w-4 h-4 shrink-0" />
           Le paiement a ete annule. Aucune modification n'a ete appliquee.
+        </div>
+      )}
+
+      {/* Error banner */}
+      {error && (
+        <div className="rounded-lg bg-rose-50 border border-rose-200 px-4 py-3 text-sm text-rose-800 flex items-center gap-2">
+          <CreditCard className="w-4 h-4 shrink-0" />
+          {error}
         </div>
       )}
 
