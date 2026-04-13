@@ -15,6 +15,8 @@ export function createClient() {
         persistSession: true,
         autoRefreshToken: true,
         detectSessionInUrl: true,
+        // Disable navigator.locks which hangs in some environments
+        lock: (name: string, acquireTimeout: number, fn: () => Promise<any>) => fn(),
       },
     }
   );

@@ -27,24 +27,13 @@ export default function LoginPage() {
     setError(null);
     setLoading(true);
 
-    try {
-      // Clear any existing session from localStorage to avoid navigator.locks conflict
-      // Do NOT await signOut() — it hangs due to navigator.locks API
-      const storageKey = Object.keys(localStorage).find(k => k.startsWith('sb-') && k.endsWith('-auth-token'));
-      if (storageKey) localStorage.removeItem(storageKey);
+    const { error: authError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
 
-      const { error: authError } = await Promise.race([
-        supabase.auth.signInWithPassword({ email, password }),
-        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Connexion trop longue, veuillez reessayer')), 8000)),
-      ]);
-
-      if (authError) {
-        setError(authError.message);
-        setLoading(false);
-        return;
-      }
-    } catch (err: any) {
-      setError(err.message || 'Erreur de connexion');
+    if (authError) {
+      setError(authError.message);
       setLoading(false);
       return;
     }
