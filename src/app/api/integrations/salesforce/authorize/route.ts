@@ -37,15 +37,23 @@ export async function GET(request: NextRequest) {
       })
     ).toString('base64');
 
+    if (!process.env.SALESFORCE_CLIENT_ID) {
+      // Redirect back with error message
+      const errorUrl = new URL('/admin/integrations', process.env.NEXT_PUBLIC_APP_URL || 'https://field-intelligence-five.vercel.app');
+      errorUrl.searchParams.set('status', 'error');
+      errorUrl.searchParams.set('message', 'Salesforce non configure. Ajoutez SALESFORCE_CLIENT_ID et SALESFORCE_CLIENT_SECRET dans les variables d\'environnement.');
+      return NextResponse.redirect(errorUrl.toString());
+    }
+
     const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL}/api/integrations/salesforce/callback`;
     const authUrl = getSalesforceAuthUrl(redirectUri, state);
 
     return NextResponse.redirect(authUrl);
   } catch (error) {
     console.error('Salesforce authorize error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    const errorUrl = new URL('/admin/integrations', process.env.NEXT_PUBLIC_APP_URL || 'https://field-intelligence-five.vercel.app');
+    errorUrl.searchParams.set('status', 'error');
+    errorUrl.searchParams.set('message', (error as Error).message || 'Erreur interne');
+    return NextResponse.redirect(errorUrl.toString());
   }
 }

@@ -4,7 +4,8 @@ import type { SalesforceTask, SalesforceTokenResponse } from './types';
 const SF_API_VERSION = 'v59.0';
 
 export function getSalesforceAuthUrl(redirectUri: string, state: string): string {
-  const clientId = process.env.SALESFORCE_CLIENT_ID!;
+  const clientId = process.env.SALESFORCE_CLIENT_ID;
+  if (!clientId) throw new Error('SALESFORCE_CLIENT_ID not configured');
   const params = new URLSearchParams({
     response_type: 'code',
     client_id: clientId,
