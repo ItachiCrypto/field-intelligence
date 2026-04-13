@@ -34,17 +34,17 @@ export default function MktPrixPage() {
   const concurrents = useMemo(() => {
     const set = new Set(PRIX_SIGNALS.map((s) => s.concurrent_nom));
     return Array.from(set).sort();
-  }, []);
+  }, [PRIX_SIGNALS]);
 
   const ecartMoyen = useMemo(() => {
     const vals = PRIX_SIGNALS.map((s) => s.ecart_pct);
     if (vals.length === 0) return '0';
     return (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1);
-  }, []);
+  }, [PRIX_SIGNALS]);
 
   const dealsPerdus = useMemo(() => {
     return PRIX_SIGNALS.filter((s) => s.statut_deal === 'perdu').length;
-  }, []);
+  }, [PRIX_SIGNALS]);
 
   const chartData = useMemo(() => {
     const semaines = Array.from(new Set(TENDANCE_PRIX.map((t) => t.semaine))).sort();
@@ -56,11 +56,11 @@ export default function MktPrixPage() {
       }
       return row;
     });
-  }, []);
+  }, [TENDANCE_PRIX]);
 
   const chartConcurrents = useMemo(() => {
     return Array.from(new Set(TENDANCE_PRIX.map((t) => t.concurrent_nom)));
-  }, []);
+  }, [TENDANCE_PRIX]);
 
   const filteredSignals = useMemo(() => {
     return PRIX_SIGNALS.filter((s) => {
@@ -68,7 +68,7 @@ export default function MktPrixPage() {
       if (concurrentFilter !== 'all' && s.concurrent_nom !== concurrentFilter) return false;
       return true;
     }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [statutFilter, concurrentFilter]);
+  }, [PRIX_SIGNALS, statutFilter, concurrentFilter]);
 
   const statutBadge = (statut: string) => {
     const config: Record<string, string> = {

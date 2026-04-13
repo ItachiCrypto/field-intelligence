@@ -1,27 +1,56 @@
 // @ts-nocheck
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { createClient } from '@/lib/supabase/client';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/lib/auth-context';
 
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
-const supabase = createClient();
-
-// Generic fetch helper - fetches from Supabase if company_id available, otherwise returns seed data
-async function fetchTable<T>(tableName: string, companyId: string | null): Promise<T[]> {
-  if (!companyId) return [];
-
+// Get the access token from the auth cookie
+function getAccessToken(): string | null {
   try {
-    const { data, error } = await supabase
-      .from(tableName)
-      .select('*')
-      .eq('company_id', companyId)
-      .order('created_at', { ascending: false });
+    const cookies = document.cookie.split(';');
+    for (const cookie of cookies) {
+      const trimmed = cookie.trim();
+      if (trimmed.startsWith('sb-') && trimmed.includes('-auth-token=')) {
+        const value = decodeURIComponent(trimmed.split('=').slice(1).join('='));
+        if (value.startsWith('base64-')) {
+          const decoded = atob(value.slice(7));
+          const parsed = JSON.parse(decoded);
+          return parsed.access_token || null;
+        }
+        const parsed = JSON.parse(value);
+        return parsed.access_token || null;
+      }
+    }
+  } catch (e) {
+    // Failed to parse auth cookie
+  }
+  return null;
+}
 
-    if (error || !data) return [];
+// Generic fetch helper using raw fetch to bypass Supabase client deadlock
+async function fetchTable<T>(tableName: string, companyId: string, accessToken: string): Promise<T[]> {
+  try {
+    const url = `${SUPABASE_URL}/rest/v1/${tableName}?select=*&company_id=eq.${companyId}`;
+    const resp = await fetch(url, {
+      headers: {
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!resp.ok) {
+      console.warn(`[data] Failed to fetch ${tableName}: HTTP ${resp.status}`);
+      return [];
+    }
+
+    const data = await resp.json();
     return data as T[];
-  } catch {
+  } catch (e) {
+    console.error(`[data] Exception fetching ${tableName}:`, e);
     return [];
   }
 }
@@ -30,6 +59,7 @@ async function fetchTable<T>(tableName: string, companyId: string | null): Promi
 export function useData() {
   const { profile, company } = useAuth();
   const companyId = company?.id ?? null;
+  const refreshingRef = useRef(false);
 
   const [data, setData] = useState({
     // V1 data
@@ -66,7 +96,7 @@ export function useData() {
   });
 
   const [loading, setLoading] = useState(false);
-  const [isLive, setIsLive] = useState(false); // true when data comes from Supabase
+  const [isLive, setIsLive] = useState(false);
 
   const refresh = useCallback(async () => {
     if (!companyId) {
@@ -74,10 +104,21 @@ export function useData() {
       return;
     }
 
+    // Prevent concurrent refreshes (React StrictMode double-mount)
+    if (refreshingRef.current) return;
+    refreshingRef.current = true;
+
+    const accessToken = getAccessToken();
+    if (!accessToken) {
+      // No access token available
+      refreshingRef.current = false;
+      setIsLive(false);
+      return;
+    }
+
     setLoading(true);
 
     try {
-      // Fetch all tables in parallel
       const [
         signals, accounts, alerts, commercials, competitors, needs,
         prixSignals, dealsAnalyse, offresConcurrentes, commConcurrentes, positionnement,
@@ -86,31 +127,31 @@ export function useData() {
         recommandationsIA, dealsCommerciaux, dealCommercialTendance, motifsSentiment,
         tendancePrix, dealTendance,
       ] = await Promise.all([
-        fetchTable('signals', companyId),
-        fetchTable('accounts', companyId),
-        fetchTable('alerts', companyId),
-        fetchTable('commercials', companyId),
-        fetchTable('competitors', companyId),
-        fetchTable('needs', companyId),
-        fetchTable('prix_signals', companyId),
-        fetchTable('deals_marketing', companyId),
-        fetchTable('offres_concurrentes', companyId),
-        fetchTable('comm_concurrentes', companyId),
-        fetchTable('positionnement', companyId),
-        fetchTable('geo_sector_data', companyId),
-        fetchTable('cr_objectifs', companyId),
-        fetchTable('sentiment_periodes', companyId),
-        fetchTable('sentiment_regions', companyId),
-        fetchTable('segment_sentiments', companyId),
-        fetchTable('territoires', companyId),
-        fetchTable('region_profiles', companyId),
-        fetchTable('geo_points', companyId),
-        fetchTable('recommandations_ia', companyId),
-        fetchTable('deals_commerciaux', companyId),
-        fetchTable('deal_commercial_tendance', companyId),
-        fetchTable('motifs_sentiment', companyId),
-        fetchTable('tendance_prix', companyId),
-        fetchTable('deal_tendance', companyId),
+        fetchTable('signals', companyId, accessToken),
+        fetchTable('accounts', companyId, accessToken),
+        fetchTable('alerts', companyId, accessToken),
+        fetchTable('commercials', companyId, accessToken),
+        fetchTable('competitors', companyId, accessToken),
+        fetchTable('needs', companyId, accessToken),
+        fetchTable('prix_signals', companyId, accessToken),
+        fetchTable('deals_marketing', companyId, accessToken),
+        fetchTable('offres_concurrentes', companyId, accessToken),
+        fetchTable('comm_concurrentes', companyId, accessToken),
+        fetchTable('positionnement', companyId, accessToken),
+        fetchTable('geo_sector_data', companyId, accessToken),
+        fetchTable('cr_objectifs', companyId, accessToken),
+        fetchTable('sentiment_periodes', companyId, accessToken),
+        fetchTable('sentiment_regions', companyId, accessToken),
+        fetchTable('segment_sentiments', companyId, accessToken),
+        fetchTable('territoires', companyId, accessToken),
+        fetchTable('region_profiles', companyId, accessToken),
+        fetchTable('geo_points', companyId, accessToken),
+        fetchTable('recommandations_ia', companyId, accessToken),
+        fetchTable('deals_commerciaux', companyId, accessToken),
+        fetchTable('deal_commercial_tendance', companyId, accessToken),
+        fetchTable('motifs_sentiment', companyId, accessToken),
+        fetchTable('tendance_prix', companyId, accessToken),
+        fetchTable('deal_tendance', companyId, accessToken),
       ]);
 
       const hasLiveData = signals.length > 0 || accounts.length > 0;
@@ -131,11 +172,12 @@ export function useData() {
       });
 
       setIsLive(hasLiveData);
-    } catch {
-      // Keep seed data on error
+    } catch (err) {
+      console.error('[data] refresh error:', err);
       setIsLive(false);
     } finally {
       setLoading(false);
+      refreshingRef.current = false;
     }
   }, [companyId]);
 

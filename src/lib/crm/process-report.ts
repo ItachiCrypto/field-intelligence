@@ -32,37 +32,78 @@ export async function processReport(report: RawVisitReport): Promise<{ success: 
       (abbreviations ?? []).map(a => ({ short: a.short, full: a.full })),
     );
 
-    // Call OpenAI API (GPT-4o)
-    const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.OPENAI_API_KEY!}`,
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        max_tokens: 2000,
-        temperature: 0.1,
-        messages: [
-          { role: 'system', content: 'Vous etes un expert en analyse de comptes rendus de visite commerciale. Repondez uniquement en JSON valide, sans texte avant ou apres.' },
-          { role: 'user', content: prompt },
-        ],
-      }),
-    });
+    // Call AI API — try Anthropic first, fall back to OpenAI
+    let responseText = '';
+    let tokensUsedRaw = 0;
+    let modelUsed = '';
 
-    if (!openaiRes.ok) {
-      throw new Error(`OpenAI API error: ${openaiRes.status} ${await openaiRes.text()}`);
+    const anthropicKey = process.env.ANTHROPIC_API_KEY;
+    const openaiKey = process.env.OPENAI_API_KEY;
+
+    if (anthropicKey && anthropicKey !== 'sk-xxx') {
+      // Use Anthropic Claude
+      modelUsed = 'claude-sonnet-4-20250514';
+      const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': anthropicKey,
+          'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify({
+          model: modelUsed,
+          max_tokens: 2000,
+          temperature: 0.1,
+          system: 'Vous etes un expert en analyse de comptes rendus de visite commerciale. Repondez uniquement en JSON valide, sans texte avant ou apres.',
+          messages: [{ role: 'user', content: prompt }],
+        }),
+      });
+
+      if (!anthropicRes.ok) {
+        throw new Error(`Anthropic API error: ${anthropicRes.status} ${await anthropicRes.text()}`);
+      }
+
+      const anthropicData = await anthropicRes.json();
+      responseText = anthropicData.content?.[0]?.text ?? '';
+      tokensUsedRaw = (anthropicData.usage?.input_tokens ?? 0) + (anthropicData.usage?.output_tokens ?? 0);
+    } else if (openaiKey && !openaiKey.includes('xxx')) {
+      // Fallback to OpenAI
+      modelUsed = 'gpt-4o-mini';
+      const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${openaiKey}`,
+        },
+        body: JSON.stringify({
+          model: modelUsed,
+          max_tokens: 2000,
+          temperature: 0.1,
+          messages: [
+            { role: 'system', content: 'Vous etes un expert en analyse de comptes rendus de visite commerciale. Repondez uniquement en JSON valide, sans texte avant ou apres.' },
+            { role: 'user', content: prompt },
+          ],
+        }),
+      });
+
+      if (!openaiRes.ok) {
+        throw new Error(`OpenAI API error: ${openaiRes.status} ${await openaiRes.text()}`);
+      }
+
+      const openaiData = await openaiRes.json();
+      responseText = openaiData.choices?.[0]?.message?.content ?? '';
+      tokensUsedRaw = openaiData.usage?.total_tokens ?? 0;
+    } else {
+      throw new Error('No AI API key configured (ANTHROPIC_API_KEY or OPENAI_API_KEY)');
     }
 
-    const openaiData = await openaiRes.json();
-    const responseText = openaiData.choices?.[0]?.message?.content ?? '';
     const extracted = parseExtractionResponse(responseText);
 
     if (!extracted) {
       throw new Error('Failed to parse OpenAI extraction response');
     }
 
-    const tokensUsed = (openaiData.usage?.total_tokens ?? 0);
+    const tokensUsed = tokensUsedRaw;
     let signalsCreated = 0;
 
     // Insert signals
@@ -168,7 +209,7 @@ export async function processReport(report: RawVisitReport): Promise<{ success: 
       company_id: report.company_id,
       extracted_json: extracted,
       signals_created: signalsCreated,
-      model_used: 'gpt-4o-mini',
+      model_used: modelUsed,
       tokens_used: tokensUsed,
       processing_time_ms: Date.now() - startTime,
     });

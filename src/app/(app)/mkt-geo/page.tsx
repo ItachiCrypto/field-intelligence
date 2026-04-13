@@ -70,14 +70,14 @@ export default function MktGeoPage() {
 
   const mostActive = useMemo(
     () => [...REGION_PROFILES].sort((a, b) => b.nb_signaux - a.nb_signaux)[0],
-    [],
+    [REGION_PROFILES],
   );
 
   const mostTense = useMemo(() => {
     const negatives = REGION_PROFILES.filter((r) => r.sentiment_dominant === 'negatif');
     if (negatives.length === 0) return REGION_PROFILES[0];
     return negatives.sort((a, b) => b.concurrent_mentions - a.concurrent_mentions)[0];
-  }, []);
+  }, [REGION_PROFILES]);
 
   /* --- Region cards sorted by nb_signaux desc ---------------------- */
   const sortedProfiles = useMemo(

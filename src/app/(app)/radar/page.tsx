@@ -112,7 +112,7 @@ export default function RadarPage() {
 
   const chartData = useMemo(() => {
     return COMPETITORS.map((c) => ({ name: c.name, mentions: c.mentions }));
-  }, []);
+  }, [COMPETITORS]);
 
   const competitorSignals = useMemo(() => {
     if (!selectedCompetitor) return [];
@@ -129,7 +129,7 @@ export default function RadarPage() {
         return true;
       })
       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-  }, [selectedCompetitor, regionFilter, periodFilter]);
+  }, [SIGNALS, selectedCompetitor, regionFilter, periodFilter]);
 
   return (
     <div className="space-y-6">

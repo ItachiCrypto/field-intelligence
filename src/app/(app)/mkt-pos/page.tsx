@@ -43,7 +43,7 @@ export default function MktPosPage() {
   const { positionnement: POSITIONNEMENT } = useAppData();
   const acteurs = useMemo(() => {
     return Array.from(new Set(POSITIONNEMENT.map((p) => p.acteur)));
-  }, []);
+  }, [POSITIONNEMENT]);
 
   const radarData = useMemo(() => {
     return ATTRIBUTS.map((attr) => {
@@ -67,7 +67,7 @@ export default function MktPosPage() {
       sums[p.acteur] = (sums[p.acteur] || 0) + p.count;
     });
     return sums;
-  }, []);
+  }, [POSITIONNEMENT]);
 
   return (
     <div className="space-y-6">

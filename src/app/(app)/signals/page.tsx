@@ -126,7 +126,7 @@ export default function SignalsPage() {
         return true;
       })
       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-  }, [activeType, activeRegion, activePeriod]);
+  }, [SIGNALS, activeType, activeRegion, activePeriod]);
 
   const grouped = useMemo(() => {
     const groups: Record<string, typeof filtered> = {};

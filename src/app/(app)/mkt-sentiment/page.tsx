@@ -68,33 +68,33 @@ export default function MktSentimentPage() {
       semaine: p.periode,
       ratio: pct(p.positif, p.total),
     })),
-  []);
+  [SENTIMENT_PERIODES]);
 
   // --- Motifs principaux ---
   const topPositif = useMemo(() => {
     return MOTIFS_SENTIMENT
       .filter((m) => m.type === 'positif')
       .sort((a, b) => b.mentions - a.mentions)[0];
-  }, []);
+  }, [MOTIFS_SENTIMENT]);
 
   const topNegatif = useMemo(() => {
     return MOTIFS_SENTIMENT
       .filter((m) => m.type === 'negatif')
       .sort((a, b) => b.mentions - a.mentions)[0];
-  }, []);
+  }, [MOTIFS_SENTIMENT]);
 
   // --- Motifs bar chart data ---
   const motifsPositifs = useMemo(() =>
     MOTIFS_SENTIMENT
       .filter((m) => m.type === 'positif')
       .sort((a, b) => b.mentions - a.mentions),
-  []);
+  [MOTIFS_SENTIMENT]);
 
   const motifsNegatifs = useMemo(() =>
     MOTIFS_SENTIMENT
       .filter((m) => m.type === 'negatif')
       .sort((a, b) => b.mentions - a.mentions),
-  []);
+  [MOTIFS_SENTIMENT]);
 
   const motifsChartData = useMemo(() => {
     const all = [...motifsPositifs, ...motifsNegatifs];
@@ -116,7 +116,7 @@ export default function MktSentimentPage() {
       const ratioB = b.total > 0 ? b.negatif / b.total : 0;
       return ratioB - ratioA;
     });
-  }, [regionFilter]);
+  }, [SENTIMENT_REGIONS, regionFilter]);
 
   function stackedBar(r: SentimentRegion) {
     const total = r.total || 1;

@@ -46,7 +46,7 @@ export default function MktCommPage() {
   const totalActions = COMM_CONCURRENTES.length;
   const reactionsPositives = useMemo(() => {
     return COMM_CONCURRENTES.filter((c) => c.reaction_client === 'positive').length;
-  }, []);
+  }, [COMM_CONCURRENTES]);
 
   const barData = useMemo(() => {
     const map: Record<string, number> = {};
@@ -56,11 +56,11 @@ export default function MktCommPage() {
     return Object.entries(map)
       .map(([nom, count]) => ({ nom, actions: count }))
       .sort((a, b) => b.actions - a.actions);
-  }, []);
+  }, [COMM_CONCURRENTES]);
 
   const sortedComms = useMemo(() => {
     return [...COMM_CONCURRENTES].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, []);
+  }, [COMM_CONCURRENTES]);
 
   return (
     <div className="space-y-6">
