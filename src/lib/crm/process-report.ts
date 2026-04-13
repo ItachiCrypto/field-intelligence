@@ -40,7 +40,7 @@ export async function processReport(report: RawVisitReport): Promise<{ success: 
         'Authorization': `Bearer ${process.env.OPENAI_API_KEY!}`,
       },
       body: JSON.stringify({
-        model: 'gpt-4o',
+        model: 'gpt-4o-mini',
         max_tokens: 2000,
         temperature: 0.1,
         messages: [
@@ -168,7 +168,7 @@ export async function processReport(report: RawVisitReport): Promise<{ success: 
       company_id: report.company_id,
       extracted_json: extracted,
       signals_created: signalsCreated,
-      model_used: 'gpt-4o',
+      model_used: 'gpt-4o-mini',
       tokens_used: tokensUsed,
       processing_time_ms: Date.now() - startTime,
     });
