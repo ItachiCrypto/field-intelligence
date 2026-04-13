@@ -69,7 +69,7 @@ export function MarketingDashboard() {
   );
 
   const topCompetitors = COMPETITORS.slice().sort((a, b) => b.mentions - a.mentions);
-  const topNeeds = NEEDS.slice(0, 6);
+  const topNeeds = NEEDS.slice(0, 6).map((n, i) => ({ ...n, rank: n.rank ?? n.rank_order ?? i + 1 }));
 
   return (
     <div className="space-y-6">

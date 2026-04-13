@@ -23,60 +23,133 @@ export interface NavItem {
   icon: string;
 }
 
-export const NAV_BY_ROLE: Record<UserRole, NavItem[]> = {
+export interface NavSection {
+  title?: string;
+  items: NavItem[];
+}
+
+export const NAV_BY_ROLE: Record<UserRole, NavSection[]> = {
   admin: [
-    { label: 'Dashboard', href: '/dashboard', icon: 'LayoutDashboard' },
-    { label: 'Utilisateurs', href: '/admin/users', icon: 'Users' },
-    { label: 'Facturation', href: '/admin/billing', icon: 'CreditCard' },
-    { label: 'Fil des Signaux', href: '/signals', icon: 'Activity' },
-    { label: 'Portefeuille', href: '/portfolio', icon: 'Briefcase' },
-    { label: 'Centre d\'Alertes', href: '/alerts', icon: 'Bell' },
-    { label: 'Equipe', href: '/team', icon: 'Users' },
-    { label: 'Carte Terrain', href: '/heatmap', icon: 'Map' },
-    { label: 'Radar Concurrentiel', href: '/radar', icon: 'Radar' },
-    { label: 'Barometre Besoins', href: '/barometer', icon: 'BarChart3' },
-    { label: 'Taux Closing', href: '/dir-clos', icon: 'Target' },
-    { label: 'Deals Gagnes/Perdus', href: '/dir-lost', icon: 'TrendingDown' },
-    { label: 'Carte Territoire', href: '/dir-terr', icon: 'Map' },
-    { label: 'Priorisation IA', href: '/dir-prior', icon: 'Brain' },
-    { label: 'Radar Prix', href: '/mkt-prix', icon: 'DollarSign' },
-    { label: 'Sentiment Client', href: '/mkt-sentiment', icon: 'Smile' },
-    { label: 'Abbreviations', href: '/abbreviations', icon: 'BookOpen' },
-    { label: 'Parametres', href: '/settings', icon: 'Settings' },
+    {
+      title: 'Administration',
+      items: [
+        { label: 'Dashboard', href: '/dashboard', icon: 'LayoutDashboard' },
+        { label: 'Utilisateurs', href: '/admin/users', icon: 'Users' },
+        { label: 'Facturation', href: '/admin/billing', icon: 'CreditCard' },
+      ],
+    },
+    {
+      title: 'KAM',
+      items: [
+        { label: 'Portefeuille', href: '/portfolio', icon: 'Briefcase' },
+        { label: 'Centre d\'Alertes', href: '/alerts', icon: 'Bell' },
+      ],
+    },
+    {
+      title: 'Direction Commerciale',
+      items: [
+        { label: 'Equipe', href: '/team', icon: 'Users' },
+        { label: 'Carte Terrain', href: '/heatmap', icon: 'Map' },
+        { label: 'Fil des Signaux', href: '/signals', icon: 'Activity' },
+        { label: 'Taux Closing', href: '/dir-clos', icon: 'Target' },
+        { label: 'Deals Gagnes/Perdus', href: '/dir-lost', icon: 'TrendingDown' },
+        { label: 'Carte Territoire', href: '/dir-terr', icon: 'Map' },
+        { label: 'Priorisation IA', href: '/dir-prior', icon: 'Brain' },
+        { label: 'Pilotage N-1', href: '/dir-n1', icon: 'Gauge' },
+        { label: 'Segmentation', href: '/dir-seg', icon: 'PieChart' },
+        { label: 'Analyse Geo', href: '/dir-geo', icon: 'MapPin' },
+      ],
+    },
+    {
+      title: 'Marketing',
+      items: [
+        { label: 'Radar Concurrentiel', href: '/radar', icon: 'Radar' },
+        { label: 'Barometre Besoins', href: '/barometer', icon: 'BarChart3' },
+        { label: 'Radar Prix', href: '/mkt-prix', icon: 'DollarSign' },
+        { label: 'Deals Marketing', href: '/mkt-deal', icon: 'TrendingUp' },
+        { label: 'Positionnement', href: '/mkt-pos', icon: 'Target' },
+        { label: 'Offres Concurrentes', href: '/mkt-offre', icon: 'Package' },
+        { label: 'Analyse Geo', href: '/mkt-geo', icon: 'MapPin' },
+        { label: 'Comm Concurrentes', href: '/mkt-comm', icon: 'Megaphone' },
+        { label: 'Sentiment Client', href: '/mkt-sentiment', icon: 'Smile' },
+        { label: 'Segmentation', href: '/mkt-seg', icon: 'PieChart' },
+      ],
+    },
+    {
+      items: [
+        { label: 'Abbreviations', href: '/abbreviations', icon: 'BookOpen' },
+        { label: 'Parametres', href: '/settings', icon: 'Settings' },
+      ],
+    },
   ],
   marketing: [
-    { label: 'Dashboard', href: '/dashboard', icon: 'LayoutDashboard' },
-    { label: 'Radar Concurrentiel', href: '/radar', icon: 'Radar' },
-    { label: 'Barometre Besoins', href: '/barometer', icon: 'BarChart3' },
-    { label: 'Fil des Signaux', href: '/signals', icon: 'Activity' },
-    { label: 'Radar Prix', href: '/mkt-prix', icon: 'DollarSign' },
-    { label: 'Deals Gagnes/Perdus', href: '/mkt-deal', icon: 'TrendingUp' },
-    { label: 'Positionnement', href: '/mkt-pos', icon: 'Target' },
-    { label: 'Offres Concurrentes', href: '/mkt-offre', icon: 'Package' },
-    { label: 'Analyse Geo', href: '/mkt-geo', icon: 'MapPin' },
-    { label: 'Comm Concurrentes', href: '/mkt-comm', icon: 'Megaphone' },
-    { label: 'Sentiment Client', href: '/mkt-sentiment', icon: 'Smile' },
-    { label: 'Segmentation', href: '/mkt-seg', icon: 'PieChart' },
-    { label: 'Abbreviations', href: '/abbreviations', icon: 'BookOpen' },
-    { label: 'Parametres', href: '/settings', icon: 'Settings' },
+    {
+      items: [
+        { label: 'Dashboard', href: '/dashboard', icon: 'LayoutDashboard' },
+        { label: 'Fil des Signaux', href: '/signals', icon: 'Activity' },
+      ],
+    },
+    {
+      title: 'Concurrence',
+      items: [
+        { label: 'Radar Concurrentiel', href: '/radar', icon: 'Radar' },
+        { label: 'Offres Concurrentes', href: '/mkt-offre', icon: 'Package' },
+        { label: 'Comm Concurrentes', href: '/mkt-comm', icon: 'Megaphone' },
+        { label: 'Positionnement', href: '/mkt-pos', icon: 'Target' },
+        { label: 'Radar Prix', href: '/mkt-prix', icon: 'DollarSign' },
+      ],
+    },
+    {
+      title: 'Analyse',
+      items: [
+        { label: 'Barometre Besoins', href: '/barometer', icon: 'BarChart3' },
+        { label: 'Deals Gagnes/Perdus', href: '/mkt-deal', icon: 'TrendingUp' },
+        { label: 'Analyse Geo', href: '/mkt-geo', icon: 'MapPin' },
+        { label: 'Sentiment Client', href: '/mkt-sentiment', icon: 'Smile' },
+        { label: 'Segmentation', href: '/mkt-seg', icon: 'PieChart' },
+      ],
+    },
+    {
+      items: [
+        { label: 'Abbreviations', href: '/abbreviations', icon: 'BookOpen' },
+        { label: 'Parametres', href: '/settings', icon: 'Settings' },
+      ],
+    },
   ],
   kam: [
-    { label: 'Dashboard', href: '/dashboard', icon: 'LayoutDashboard' },
-    { label: 'Portefeuille', href: '/portfolio', icon: 'Briefcase' },
-    { label: 'Centre d\'Alertes', href: '/alerts', icon: 'Bell' },
-    { label: 'Parametres', href: '/settings', icon: 'Settings' },
+    {
+      items: [
+        { label: 'Dashboard', href: '/dashboard', icon: 'LayoutDashboard' },
+        { label: 'Portefeuille', href: '/portfolio', icon: 'Briefcase' },
+        { label: 'Centre d\'Alertes', href: '/alerts', icon: 'Bell' },
+        { label: 'Parametres', href: '/settings', icon: 'Settings' },
+      ],
+    },
   ],
   dirco: [
-    { label: 'Dashboard', href: '/dashboard', icon: 'LayoutDashboard' },
-    { label: 'Equipe', href: '/team', icon: 'Users' },
-    { label: 'Carte Terrain', href: '/heatmap', icon: 'Map' },
-    { label: 'Fil des Signaux', href: '/signals', icon: 'Activity' },
-    { label: 'Taux Closing', href: '/dir-clos', icon: 'Target' },
-    { label: 'Deals Gagnes/Perdus', href: '/dir-lost', icon: 'TrendingDown' },
-    { label: 'Carte Territoire', href: '/dir-terr', icon: 'Map' },
-    { label: 'Priorisation IA', href: '/dir-prior', icon: 'Brain' },
-    { label: 'Abbreviations', href: '/abbreviations', icon: 'BookOpen' },
-    { label: 'Parametres', href: '/settings', icon: 'Settings' },
+    {
+      items: [
+        { label: 'Dashboard', href: '/dashboard', icon: 'LayoutDashboard' },
+        { label: 'Fil des Signaux', href: '/signals', icon: 'Activity' },
+      ],
+    },
+    {
+      title: 'Pilotage',
+      items: [
+        { label: 'Equipe', href: '/team', icon: 'Users' },
+        { label: 'Carte Terrain', href: '/heatmap', icon: 'Map' },
+        { label: 'Taux Closing', href: '/dir-clos', icon: 'Target' },
+        { label: 'Deals Gagnes/Perdus', href: '/dir-lost', icon: 'TrendingDown' },
+        { label: 'Carte Territoire', href: '/dir-terr', icon: 'Map' },
+        { label: 'Priorisation IA', href: '/dir-prior', icon: 'Brain' },
+      ],
+    },
+    {
+      items: [
+        { label: 'Abbreviations', href: '/abbreviations', icon: 'BookOpen' },
+        { label: 'Parametres', href: '/settings', icon: 'Settings' },
+      ],
+    },
   ],
 };
 

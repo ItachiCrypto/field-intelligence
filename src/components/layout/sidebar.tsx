@@ -9,7 +9,7 @@ import {
   LayoutDashboard, Radar, BarChart3, Activity, Settings,
   Briefcase, Bell, Users, Map, LogOut, BookOpen, Zap,
   DollarSign, TrendingUp, Target, Package, MapPin, Megaphone,
-  GitCompare, PieChart, TrendingDown, Brain,
+  GitCompare, PieChart, TrendingDown, Brain, Gauge,
   Smile, CreditCard, Link2,
 } from 'lucide-react';
 
@@ -17,7 +17,7 @@ const ICON_MAP: Record<string, React.ElementType> = {
   LayoutDashboard, Radar, BarChart3, Activity, Settings,
   Briefcase, Bell, Users, Map, BookOpen,
   DollarSign, TrendingUp, Target, Package, MapPin, Megaphone,
-  GitCompare, PieChart, TrendingDown, Brain, Smile, CreditCard, Link2,
+  GitCompare, PieChart, TrendingDown, Brain, Smile, CreditCard, Link2, Gauge,
 };
 
 export function Sidebar() {
@@ -26,7 +26,7 @@ export function Sidebar() {
 
   if (!profile) return null;
 
-  const navItems = NAV_BY_ROLE[profile.role];
+  const navSections = NAV_BY_ROLE[profile.role];
 
   return (
     <aside className="flex flex-col w-60 bg-white border-r border-slate-200 h-full">
@@ -46,25 +46,41 @@ export function Sidebar() {
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 px-3 py-3 space-y-0.5">
-        {navItems.map((item) => {
-          const Icon = ICON_MAP[item.icon] || LayoutDashboard;
-          const active = pathname === item.href;
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                'flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium',
-                active
-                  ? 'bg-indigo-50 text-indigo-700'
-                  : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
-              )}
-            >
-              <Icon className={cn('w-[18px] h-[18px]', active ? 'text-indigo-600' : '')} />
-              {item.label}
-            </Link>
-          );
+      <nav className="flex-1 px-3 py-3 overflow-y-auto">
+        {navSections.flatMap((section, sIdx) => {
+          const elements: React.ReactNode[] = [];
+          if (sIdx > 0) {
+            elements.push(
+              <div key={`sep-${sIdx}`} className="my-2 mx-2 border-t border-slate-100" />
+            );
+          }
+          if (section.title) {
+            elements.push(
+              <div key={`title-${sIdx}`} className="px-3 pt-1 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                {section.title}
+              </div>
+            );
+          }
+          section.items.forEach((item) => {
+            const Icon = ICON_MAP[item.icon] || LayoutDashboard;
+            const active = pathname === item.href;
+            elements.push(
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn(
+                  'flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-[13px] font-medium',
+                  active
+                    ? 'bg-indigo-50 text-indigo-700'
+                    : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
+                )}
+              >
+                <Icon className={cn('w-[18px] h-[18px] shrink-0', active ? 'text-indigo-600' : '')} />
+                {item.label}
+              </Link>
+            );
+          });
+          return elements;
         })}
       </nav>
 
