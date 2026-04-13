@@ -46,7 +46,7 @@ function scoreTextColor(score: number): string {
 
 export function DirectorDashboard() {
   const { signals: SIGNALS, alerts: ALERTS, commercials: COMMERCIALS } = useAppData();
-  const totalCR = COMMERCIALS.reduce((s, c) => s + c.cr_week, 0);
+  const totalCR = COMMERCIALS.reduce((s, c) => s + (c.cr_week || 0), 0);
   const criticalAlerts = ALERTS.filter(
     (a) => a.severity === 'rouge' && a.status === 'nouveau'
   );
@@ -57,11 +57,11 @@ export function DirectorDashboard() {
   const top10ByCR = useMemo(
     () =>
       [...COMMERCIALS]
-        .sort((a, b) => b.cr_week - a.cr_week)
+        .sort((a, b) => (b.cr_week || 0) - (a.cr_week || 0))
         .slice(0, 10)
         .map((c) => ({
           name: c.name,
-          cr: c.cr_week,
+          cr: c.cr_week || 0,
           quality: c.quality_score,
         })),
     []
@@ -218,7 +218,7 @@ export function DirectorDashboard() {
                 </div>
                 <div className="text-right shrink-0 w-14">
                   <span className="text-xs text-slate-500">
-                    {com.cr_week} CR
+                    {com.cr_week || 0} CR
                   </span>
                 </div>
                 <div className="shrink-0 w-14 text-right">

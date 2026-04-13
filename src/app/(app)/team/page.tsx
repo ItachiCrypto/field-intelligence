@@ -119,7 +119,7 @@ export default function TeamPage() {
   }, [sortKey, sortDir]);
 
   const avgScore = Math.round(COMMERCIALS.reduce((s, c) => s + c.quality_score, 0) / COMMERCIALS.length);
-  const totalCR = COMMERCIALS.reduce((s, c) => s + c.cr_week, 0);
+  const totalCR = COMMERCIALS.reduce((s, c) => s + (c.cr_week || 0), 0);
   const coachingCount = COMMERCIALS.filter((c) => c.quality_trend < -5).length;
 
   const SortIcon = ({ col }: { col: SortKey }) => {
@@ -230,7 +230,7 @@ export default function TeamPage() {
                       </div>
                     </td>
                     <td className="px-4 py-3 text-slate-600">{c.region}</td>
-                    <td className="px-4 py-3 text-center text-slate-900 tabular-nums font-medium">{c.cr_week}</td>
+                    <td className="px-4 py-3 text-center text-slate-900 tabular-nums font-medium">{c.cr_week || 0}</td>
                     <td className="px-4 py-3 text-center">
                       <span className={cn(
                         'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold tabular-nums border',
@@ -240,7 +240,7 @@ export default function TeamPage() {
                         {c.quality_score}%
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-center text-slate-900 tabular-nums">{c.useful_signals}</td>
+                    <td className="px-4 py-3 text-center text-slate-900 tabular-nums">{c.useful_signals || 0}</td>
                     <td className="px-4 py-3 text-center">
                       <span className={cn(
                         'inline-flex items-center gap-0.5 text-xs font-medium tabular-nums',
