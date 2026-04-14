@@ -29,8 +29,8 @@ export default function DirN1Page() {
   const [regionFilter, setRegionFilter] = useState<string>('Toutes');
   const [periodFilter, setPeriodFilter] = useState<string>('Mois');
 
-  const cur = SENTIMENT_PERIODE_ACTUELLE;
-  const prev = SENTIMENT_PERIODE_PRECEDENTE;
+  const cur = SENTIMENT_PERIODE_ACTUELLE ?? { positif: 0, negatif: 0, neutre: 0, interesse: 0, total: 0, periode: '' };
+  const prev = SENTIMENT_PERIODE_PRECEDENTE ?? { positif: 0, negatif: 0, neutre: 0, interesse: 0, total: 0, periode: '' };
 
   // --- KPIs ---
   const kpis = useMemo(() => ({

@@ -145,7 +145,21 @@ export default function AdminUsersPage() {
 
   // --- Guard ---
 
-  if (!profile || !company) return null;
+  if (!profile || !company) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-semibold text-slate-900">Gestion des utilisateurs</h1>
+            <p className="text-sm text-slate-500 mt-1">Chargement...</p>
+          </div>
+        </div>
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-8 text-center text-sm text-slate-400">
+          Chargement de l'equipe...
+        </div>
+      </div>
+    );
+  }
 
   // --- Render ---
 

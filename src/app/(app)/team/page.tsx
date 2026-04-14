@@ -118,7 +118,7 @@ export default function TeamPage() {
     });
   }, [COMMERCIALS, sortKey, sortDir]);
 
-  const avgScore = Math.round(COMMERCIALS.reduce((s, c) => s + c.quality_score, 0) / COMMERCIALS.length);
+  const avgScore = COMMERCIALS.length > 0 ? Math.round(COMMERCIALS.reduce((s, c) => s + c.quality_score, 0) / COMMERCIALS.length) : 0;
   const totalCR = COMMERCIALS.reduce((s, c) => s + (c.cr_week || 0), 0);
   const coachingCount = COMMERCIALS.filter((c) => c.quality_trend < -5).length;
 

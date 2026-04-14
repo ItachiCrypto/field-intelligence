@@ -334,10 +334,10 @@ export default function DirClosPage() {
             <h2 className="text-sm font-semibold text-slate-700">Causes de non-atteinte</h2>
           </div>
           {causesData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={causesData.length * 44 + 20}>
-              <BarChart data={causesData} layout="vertical" margin={{ left: 140, right: 20 }}>
+            <ResponsiveContainer width="100%" height={causesData.length * 52 + 20}>
+              <BarChart data={causesData} layout="vertical" margin={{ left: 10, right: 20 }}>
                 <XAxis type="number" allowDecimals={false} tick={{ fill: '#64748b', fontSize: 12 }} />
-                <YAxis type="category" dataKey="name" tick={{ fill: '#334155', fontSize: 12 }} width={135} />
+                <YAxis type="category" dataKey="name" tick={({ x, y, payload }: any) => { const text = payload.value?.length > 25 ? payload.value.slice(0, 25) + '…' : payload.value; return <text x={x} y={y} dy={4} textAnchor="end" fill="#334155" fontSize={11}>{text}</text>; }} width={160} />
                 <Tooltip
                   formatter={((value: any) => [value, 'CR']) as any}
                   contentStyle={{ borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13 }}
@@ -357,10 +357,10 @@ export default function DirClosPage() {
             <h2 className="text-sm font-semibold text-slate-700">Facteurs de reussite</h2>
           </div>
           {facteursData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={facteursData.length * 44 + 20}>
-              <BarChart data={facteursData} layout="vertical" margin={{ left: 140, right: 20 }}>
+            <ResponsiveContainer width="100%" height={facteursData.length * 52 + 20}>
+              <BarChart data={facteursData} layout="vertical" margin={{ left: 10, right: 20 }}>
                 <XAxis type="number" allowDecimals={false} tick={{ fill: '#64748b', fontSize: 12 }} />
-                <YAxis type="category" dataKey="name" tick={{ fill: '#334155', fontSize: 12 }} width={135} />
+                <YAxis type="category" dataKey="name" tick={({ x, y, payload }: any) => { const text = payload.value?.length > 25 ? payload.value.slice(0, 25) + '…' : payload.value; return <text x={x} y={y} dy={4} textAnchor="end" fill="#334155" fontSize={11}>{text}</text>; }} width={160} />
                 <Tooltip
                   formatter={((value: any) => [value, 'CR']) as any}
                   contentStyle={{ borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13 }}

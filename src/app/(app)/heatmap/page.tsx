@@ -70,7 +70,7 @@ export default function HeatmapPage() {
   }, [SIGNALS, ALERTS, COMMERCIALS]);
 
   const totalRegions = regionData.length;
-  const mostActive = regionData[0]?.region || '-';
+  const mostActive = regionData[0]?.region || (regionData.length > 0 ? 'Non assignee' : '-');
   const totalAlerts = ALERTS.length;
 
   return (
@@ -122,7 +122,7 @@ export default function HeatmapPage() {
               <div className="p-5">
                 {/* Region name and count */}
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-base font-bold text-slate-900">{rd.region}</h3>
+                  <h3 className="text-base font-bold text-slate-900">{rd.region || 'Non assignee'}</h3>
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-medium text-slate-700 tabular-nums">{rd.totalSignals} signaux</span>
                     <span className="text-xs text-slate-400">|</span>
