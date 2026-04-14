@@ -36,6 +36,7 @@ export const NAV_BY_ROLE: Record<UserRole, NavSection[]> = {
         { label: 'Dashboard', href: '/dashboard', icon: 'LayoutDashboard' },
         { label: 'Utilisateurs', href: '/admin/users', icon: 'Users' },
         { label: 'Facturation', href: '/admin/billing', icon: 'CreditCard' },
+        { label: 'Integrations', href: '/admin/integrations', icon: 'Link2' },
       ],
     },
     {

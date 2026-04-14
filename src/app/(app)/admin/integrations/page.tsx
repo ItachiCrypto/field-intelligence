@@ -29,6 +29,7 @@ export default function IntegrationsPage() {
   const [state, setState] = useState<ConnectionState>('loading');
   const [status, setStatus] = useState<SyncStatus | null>(null);
   const [syncing, setSyncing] = useState(false);
+  const [processing, setProcessing] = useState(false);
   const [banner, setBanner] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   const fetchStatus = useCallback(async () => {
@@ -79,6 +80,24 @@ export default function IntegrationsPage() {
       setBanner({ type: 'error', message: 'Erreur lors de la synchronisation.' });
     } finally {
       setSyncing(false);
+    }
+  };
+
+  const handleProcess = async () => {
+    setProcessing(true);
+    try {
+      const res = await fetch('/api/integrations/process', { method: 'POST' });
+      const data = await res.json();
+      await fetchStatus();
+      if (data.error) {
+        setBanner({ type: 'error', message: `Erreur: ${data.error}` });
+      } else {
+        setBanner({ type: 'success', message: `Traitement termine: ${data.processed} CR traitees, ${data.errors} erreurs.` });
+      }
+    } catch {
+      setBanner({ type: 'error', message: 'Erreur lors du traitement.' });
+    } finally {
+      setProcessing(false);
     }
   };
 
@@ -210,6 +229,16 @@ export default function IntegrationsPage() {
                   <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
                   Synchroniser maintenant
                 </button>
+                {recordsPending > 0 && (
+                  <button
+                    onClick={handleProcess}
+                    disabled={processing}
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50"
+                  >
+                    <Zap className={`w-4 h-4 ${processing ? 'animate-pulse' : ''}`} />
+                    {processing ? 'Traitement...' : 'Traiter les CR'}
+                  </button>
+                )}
                 <button
                   onClick={handleDisconnect}
                   className="inline-flex items-center gap-2 px-4 py-2 text-rose-600 text-sm font-medium rounded-lg hover:bg-rose-50 transition-colors"
