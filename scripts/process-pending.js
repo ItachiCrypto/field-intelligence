@@ -151,12 +151,23 @@ async function main() {
       }
 
       // Insert deals
+      const motifToCommercial = {
+        prix: 'prix_non_competitif',
+        produit: 'besoin_mal_identifie',
+        offre: 'concurrent_mieux_positionne',
+        timing: 'timing_rate',
+        concurrent: 'concurrent_mieux_positionne',
+        relation: 'relation_insuffisante',
+        budget: 'prix_non_competitif',
+        autre: 'suivi_insuffisant',
+      };
       for (const deal of (extracted.deals || [])) {
         if (deal.view === 'commercial') {
+          const mappedMotif = motifToCommercial[deal.motif] || 'suivi_insuffisant';
           await db.query(
             `INSERT INTO deals_commerciaux (company_id, motif, resultat, concurrent_nom, commercial_name, client_name, region, verbatim, date, source_report_id)
              VALUES ($1, $2, $3, $4, $5, $6, '', $7, $8, $9)`,
-            [report.company_id, deal.motif, deal.resultat, deal.concurrent_nom || null, report.commercial_name || '', report.client_name || '', deal.verbatim, report.visit_date || new Date().toISOString().split('T')[0], report.id]
+            [report.company_id, mappedMotif, deal.resultat, deal.concurrent_nom || null, report.commercial_name || '', report.client_name || '', deal.verbatim, report.visit_date || new Date().toISOString().split('T')[0], report.id]
           );
         } else {
           await db.query(

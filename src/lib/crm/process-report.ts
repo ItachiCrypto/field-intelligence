@@ -124,6 +124,16 @@ export async function processReport(report: RawVisitReport): Promise<{ success: 
     }
 
     // Insert deals
+    const motifToCommercial: Record<string, string> = {
+      prix: 'prix_non_competitif',
+      produit: 'besoin_mal_identifie',
+      offre: 'concurrent_mieux_positionne',
+      timing: 'timing_rate',
+      concurrent: 'concurrent_mieux_positionne',
+      relation: 'relation_insuffisante',
+      budget: 'prix_non_competitif',
+      autre: 'suivi_insuffisant',
+    };
     for (const deal of extracted.deals) {
       const table = deal.view === 'commercial' ? 'deals_commerciaux' : 'deals_marketing';
       if (table === 'deals_marketing') {
@@ -140,9 +150,10 @@ export async function processReport(report: RawVisitReport): Promise<{ success: 
           source_report_id: report.id,
         });
       } else {
+        const mappedMotif = motifToCommercial[deal.motif] || 'suivi_insuffisant';
         await supabase.from('deals_commerciaux' as any).insert({
           company_id: report.company_id,
-          motif: deal.motif,
+          motif: mappedMotif,
           resultat: deal.resultat,
           concurrent_nom: deal.concurrent_nom ?? null,
           commercial_name: report.commercial_name ?? '',
