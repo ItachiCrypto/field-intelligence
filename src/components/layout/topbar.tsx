@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { Bell, Search, X } from 'lucide-react';
 import { useAppData } from '@/lib/data';
+import { getISOWeekNumber } from '@/lib/date-utils';
 import Link from 'next/link';
 
 export function Topbar() {
@@ -32,8 +33,7 @@ export function Topbar() {
       <div className="text-[13px] text-slate-400 font-medium">
         {(() => {
           const now = new Date();
-          const start = new Date(now.getFullYear(), 0, 1);
-          const week = Math.ceil(((now.getTime() - start.getTime()) / 86400000 + start.getDay() + 1) / 7);
+          const week = getISOWeekNumber(now);
           return `Semaine ${week} \u2014 ${now.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}`;
         })()}
       </div>

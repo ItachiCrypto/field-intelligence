@@ -48,8 +48,9 @@ export default function DirTerrPage() {
     () => TERRITOIRES.filter((t) => t.nb_risques_perte >= 3).length,
     [TERRITOIRES],
   );
+  // Sous-exploite = tres peu de visites (< 2 CR) mais au moins 1 opportunite detectee
   const kpiSousExploitees = useMemo(
-    () => TERRITOIRES.filter((t) => (t.nb_opportunites / t.nb_cr) > 0.05 && t.nb_cr < 50).length,
+    () => TERRITOIRES.filter((t) => t.nb_cr < 2 && t.nb_opportunites >= 1).length,
     [TERRITOIRES],
   );
 
@@ -81,11 +82,12 @@ export default function DirTerrPage() {
   );
 
   /* --- Section 3: Secteurs sous-exploites --- */
+  // Clients visites max 1 fois (nb_cr < 2) avec au moins 1 opportunite
   const regionsSousExploitees = useMemo(
     () =>
       [...TERRITOIRES]
-        .filter((t) => t.nb_cr < 60 && t.nb_opportunites >= 1)
-        .map((t) => ({ ...t, ratio: t.nb_opportunites / t.nb_cr }))
+        .filter((t) => t.nb_cr < 2 && t.nb_opportunites >= 1)
+        .map((t) => ({ ...t, ratio: t.nb_cr > 0 ? t.nb_opportunites / t.nb_cr : t.nb_opportunites }))
         .sort((a, b) => b.ratio - a.ratio),
     [TERRITOIRES],
   );

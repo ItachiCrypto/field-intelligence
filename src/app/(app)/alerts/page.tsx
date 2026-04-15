@@ -10,7 +10,7 @@ import { KpiCard } from '@/components/shared/kpi-card';
 import { SeverityBadge } from '@/components/shared/severity-badge';
 import { AbbreviationHighlight } from '@/components/shared/abbreviation-highlight';
 import { AlertStatus } from '@/lib/types';
-import { Bell, CheckCircle2, Clock, AlertTriangle, MessageSquarePlus } from 'lucide-react';
+import { Bell, CheckCircle2, Clock, AlertTriangle } from 'lucide-react';
 
 const supabase = createClient();
 
@@ -41,6 +41,23 @@ export default function AlertsPage() {
     () => ALERTS.filter((a) => getStatus(a) === 'en_cours').length,
     [ALERTS, alertStatuses]
   );
+
+  // Temps de reponse moyen : moyenne (treated_at - created_at) sur alertes traitees
+  const tempsReponseMoyen = useMemo(() => {
+    const traitees = ALERTS.filter((a) => a.treated_at && a.created_at);
+    if (traitees.length === 0) return '--';
+    const totalMs = traitees.reduce((sum, a) => {
+      return sum + (new Date(a.treated_at).getTime() - new Date(a.created_at).getTime());
+    }, 0);
+    const moyMs = totalMs / traitees.length;
+    if (moyMs < 0) return '--';
+    const totalMinutes = Math.round(moyMs / 60000);
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    if (hours > 0 && minutes > 0) return `${hours}h${String(minutes).padStart(2, '0')}`;
+    if (hours > 0) return `${hours}h`;
+    return `${minutes}min`;
+  }, [ALERTS]);
 
   const filteredAlerts = useMemo(() => {
     return ALERTS
@@ -101,7 +118,7 @@ export default function AlertsPage() {
         />
         <KpiCard
           label="Temps de reponse moyen"
-          value={treatedCount > 0 ? '4h' : '--'}
+          value={tempsReponseMoyen}
           icon={<Clock className="w-5 h-5" />}
           iconColor="text-sky-600 bg-sky-50"
         />
@@ -154,7 +171,7 @@ export default function AlertsPage() {
                   <div className="flex items-center gap-2 mb-2 flex-wrap">
                     <span className="text-xs text-slate-400">{formatRelativeTime(alert.created_at)}</span>
                     <span className="text-slate-300">|</span>
-                    <span className="text-xs font-medium text-slate-700">{alert.signal?.client_name || alert.client_name || '—'}</span>
+                    <span className="text-xs font-medium text-slate-700">{alert.client_name || '—'}</span>
                     <SeverityBadge severity={alert.severity} size="sm" showLabel />
                     {currentStatus === 'traite' && (
                       <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 uppercase tracking-wider">
@@ -170,8 +187,8 @@ export default function AlertsPage() {
                   <p className="text-sm text-slate-900 leading-relaxed">
                     <AbbreviationHighlight text={alert.signal?.content || alert.content || ''} />
                   </p>
-                  <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-100">
-                    {currentStatus !== 'traite' && (
+                  {currentStatus !== 'traite' && (
+                    <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-100">
                       <button
                         onClick={() => markTreated(alert.id)}
                         className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition-colors"
@@ -179,12 +196,8 @@ export default function AlertsPage() {
                         <CheckCircle2 className="w-3.5 h-3.5" />
                         Marquer traite
                       </button>
-                    )}
-                    <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 transition-colors">
-                      <MessageSquarePlus className="w-3.5 h-3.5" />
-                      Ajouter note
-                    </button>
-                  </div>
+                    </div>
+                  )}
                 </div>
               </div>
             );

@@ -24,13 +24,17 @@ export default function HeatmapPage() {
   const regionData = useMemo(() => {
     const regionMap: Record<string, { signals: typeof SIGNALS; alerts: typeof ALERTS }> = {};
 
+    // Index des signaux par id pour lookup rapide de la region via signal_id
+    const signalById: Record<string, (typeof SIGNALS)[number]> = {};
     SIGNALS.forEach((s) => {
+      signalById[s.id] = s;
       if (!regionMap[s.region]) regionMap[s.region] = { signals: [], alerts: [] };
       regionMap[s.region].signals.push(s);
     });
 
     ALERTS.forEach((a) => {
-      const region = a.signal?.region || a.region;
+      // Region : d'abord via signal_id (JOIN client), sinon colonne directe alert.region
+      const region = (a.signal_id && signalById[a.signal_id]?.region) || a.region;
       if (!region) return;
       if (!regionMap[region]) regionMap[region] = { signals: [], alerts: [] };
       regionMap[region].alerts.push(a);

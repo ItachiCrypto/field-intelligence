@@ -73,9 +73,15 @@ export default function IntegrationsPage() {
   const handleSync = async () => {
     setSyncing(true);
     try {
-      await fetch('/api/integrations/sync', { method: 'POST' });
+      const res = await fetch('/api/integrations/sync', { method: 'POST' });
+      const data = await res.json().catch(() => ({}));
       await fetchStatus();
-      setBanner({ type: 'success', message: 'Synchronisation lancee.' });
+      if (!res.ok) {
+        setBanner({ type: 'error', message: data?.error || 'Erreur lors de la synchronisation.' });
+      } else {
+        const synced = data?.synced ?? data?.records_synced ?? 0;
+        setBanner({ type: 'success', message: `${synced} CR synchronises.` });
+      }
     } catch {
       setBanner({ type: 'error', message: 'Erreur lors de la synchronisation.' });
     } finally {

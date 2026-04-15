@@ -54,7 +54,7 @@ export default function MktPosPage() {
       }
       return row;
     });
-  }, [acteurs]);
+  }, [acteurs, POSITIONNEMENT]);
 
   const getValeur = (acteur: string, attribut: Attribut): ValeurPercue | null => {
     const entry = POSITIONNEMENT.find((p) => p.acteur === acteur && p.attribut === attribut);

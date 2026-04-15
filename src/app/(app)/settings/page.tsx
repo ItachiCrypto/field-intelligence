@@ -1,57 +1,13 @@
 'use client';
 
-import { useState } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { ROLE_LABELS, ROLE_COLORS } from '@/lib/constants';
 import Link from 'next/link';
-import { Settings, User, Bell, LogOut, Mail, MessageSquare, Smartphone, Monitor, BookOpen, ChevronRight } from 'lucide-react';
+import { Settings, User, Bell, LogOut, BookOpen, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
-
-interface ToggleRowProps {
-  icon: React.ReactNode;
-  label: string;
-  description: string;
-  checked: boolean;
-  onChange: (val: boolean) => void;
-}
-
-function ToggleRow({ icon, label, description, checked, onChange }: ToggleRowProps) {
-  return (
-    <div className="flex items-center justify-between py-3">
-      <div className="flex items-center gap-3">
-        <div className="text-slate-400">{icon}</div>
-        <div>
-          <p className="text-sm font-medium text-slate-900">{label}</p>
-          <p className="text-xs text-slate-500">{description}</p>
-        </div>
-      </div>
-      <button
-        type="button"
-        role="switch"
-        aria-checked={checked}
-        onClick={() => onChange(!checked)}
-        className={cn(
-          'relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2',
-          checked ? 'bg-indigo-600' : 'bg-slate-200'
-        )}
-      >
-        <span
-          className={cn(
-            'pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out',
-            checked ? 'translate-x-5' : 'translate-x-0'
-          )}
-        />
-      </button>
-    </div>
-  );
-}
 
 export default function SettingsPage() {
   const { profile, company, signOut } = useAuth();
-  const [notifEmail, setNotifEmail] = useState(true);
-  const [notifSlack, setNotifSlack] = useState(true);
-  const [notifTeams, setNotifTeams] = useState(false);
-  const [notifPush, setNotifPush] = useState(false);
 
   if (!profile) return null;
 
@@ -109,36 +65,9 @@ export default function SettingsPage() {
           <Bell className="w-4 h-4 text-slate-400" />
           <h2 className="text-sm font-semibold text-slate-900 uppercase tracking-wider">Notifications</h2>
         </div>
-        <div className="divide-y divide-slate-100">
-          <ToggleRow
-            icon={<Mail className="w-4 h-4" />}
-            label="Email"
-            description="Recevoir les alertes par email"
-            checked={notifEmail}
-            onChange={setNotifEmail}
-          />
-          <ToggleRow
-            icon={<MessageSquare className="w-4 h-4" />}
-            label="Slack"
-            description="Recevoir les alertes sur votre canal Slack"
-            checked={notifSlack}
-            onChange={setNotifSlack}
-          />
-          <ToggleRow
-            icon={<Monitor className="w-4 h-4" />}
-            label="Microsoft Teams"
-            description="Recevoir les alertes sur Microsoft Teams"
-            checked={notifTeams}
-            onChange={setNotifTeams}
-          />
-          <ToggleRow
-            icon={<Smartphone className="w-4 h-4" />}
-            label="Push mobile"
-            description="Notifications push sur votre telephone"
-            checked={notifPush}
-            onChange={setNotifPush}
-          />
-        </div>
+        <p className="text-sm text-slate-500">
+          Les preferences de notification seront disponibles prochainement.
+        </p>
       </div>
 
       {/* Abbreviations link */}

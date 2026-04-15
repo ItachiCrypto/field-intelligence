@@ -108,9 +108,10 @@ export default function AdminUsersPage() {
     setSuccessMsg('');
 
     const token = crypto.randomUUID();
+    const emailLower = inviteEmail.trim().toLowerCase();
     const { error } = await supabase.from('invitations').insert({
       company_id: company.id,
-      email: inviteEmail.trim().toLowerCase(),
+      email: emailLower,
       role: inviteRole,
       token,
       expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
@@ -119,6 +120,26 @@ export default function AdminUsersPage() {
     if (error) {
       setErrorMsg("Erreur lors de l'envoi de l'invitation.");
     } else {
+      // Appel de l'API d'envoi (simule si RESEND_API_KEY absent)
+      try {
+        const resp = await fetch('/api/invitations/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: emailLower,
+            token,
+            role: inviteRole,
+            companyName: company.name,
+          }),
+        });
+        if (!resp.ok) {
+          const data = await resp.json().catch(() => ({}));
+          console.warn('[invite] envoi email echoue:', data?.error);
+        }
+      } catch (err) {
+        console.warn('[invite] erreur appel API envoi:', err);
+      }
+
       setSuccessMsg(`Invitation envoyee a ${inviteEmail.trim()}`);
       setInviteEmail('');
       setInviteRole('marketing');

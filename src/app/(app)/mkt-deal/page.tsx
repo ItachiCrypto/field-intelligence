@@ -9,6 +9,7 @@ import { MOTIF_LABELS, MOTIF_COLORS } from '@/lib/types-v2';
 import { REGIONS } from '@/lib/constants';
 import type { DealMotif, DealAnalyse } from '@/lib/types-v2';
 import { cn, formatDate } from '@/lib/utils';
+import { getISOWeekNumber } from '@/lib/date-utils';
 import { KpiCard } from '@/components/shared/kpi-card';
 import { AbbreviationHighlight } from '@/components/shared/abbreviation-highlight';
 import {
@@ -150,7 +151,7 @@ export default function MktDealPage() {
     const weeks: Record<string, Record<string, number>> = {};
     gagnes.forEach((d) => {
       const dt = new Date(d.date);
-      const weekNum = Math.ceil(((dt.getTime() - new Date(dt.getFullYear(), 0, 1).getTime()) / 86400000 + 1) / 7);
+      const weekNum = getISOWeekNumber(dt);
       const key = `S${weekNum}`;
       if (!weeks[key]) weeks[key] = {};
       weeks[key][d.motif_principal] = (weeks[key][d.motif_principal] || 0) + 1;

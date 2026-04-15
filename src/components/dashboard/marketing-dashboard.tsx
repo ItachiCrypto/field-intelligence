@@ -6,6 +6,7 @@ import { SignalCard } from '@/components/shared/signal-card';
 import { SeverityIndicator } from '@/components/shared/severity-indicator';
 import { useAppData } from '@/lib/data';
 import { formatTrend } from '@/lib/utils';
+import { getISOWeekNumber } from '@/lib/date-utils';
 import {
   Crosshair,
   Lightbulb,
@@ -47,7 +48,7 @@ export function MarketingDashboard() {
     const weeks: Record<string, { concurrence: number; besoins: number; prix: number }> = {};
     SIGNALS.forEach((s) => {
       const d = new Date(s.created_at);
-      const weekNum = Math.ceil(((d.getTime() - new Date(d.getFullYear(), 0, 1).getTime()) / 86400000 + 1) / 7);
+      const weekNum = getISOWeekNumber(d);
       const key = `S${weekNum}`;
       if (!weeks[key]) weeks[key] = { concurrence: 0, besoins: 0, prix: 0 };
       if (s.type === 'concurrence') weeks[key].concurrence++;

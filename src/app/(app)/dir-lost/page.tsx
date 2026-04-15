@@ -34,7 +34,11 @@ export default function DirLostPage() {
   const totalDeals = DEALS_COMMERCIAUX.length;
   const gagnes = useMemo(() => DEALS_COMMERCIAUX.filter(d => d.resultat === 'gagne'), [DEALS_COMMERCIAUX]);
   const perdus = useMemo(() => DEALS_COMMERCIAUX.filter(d => d.resultat === 'perdu'), [DEALS_COMMERCIAUX]);
-  const tauxConversion = totalDeals > 0 ? Math.round((gagnes.length / totalDeals) * 100) : 0;
+  // Taux de conversion = gagnes / (gagnes + perdus) avec garde div-by-zero
+  const denominateurConversion = gagnes.length + perdus.length;
+  const tauxConversion = denominateurConversion > 0
+    ? Math.round((gagnes.length / denominateurConversion) * 100)
+    : null;
 
   // Donut gagnes: % par motif
   const donutGagne = useMemo(() => {
@@ -144,8 +148,8 @@ export default function DirLostPage() {
         />
         <KpiCard
           label="Taux de conversion"
-          value={tauxConversion}
-          suffix="%"
+          value={tauxConversion === null ? '—' : tauxConversion}
+          suffix={tauxConversion === null ? '' : '%'}
           icon={<Percent className="w-5 h-5" />}
           iconColor="text-slate-600 bg-slate-100"
         />

@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 import { KpiCard } from '@/components/shared/kpi-card';
 import { SignalCard } from '@/components/shared/signal-card';
 import { useAppData } from '@/lib/data';
+import { getISOWeekNumber } from '@/lib/date-utils';
 import {
   FileText,
   AlertTriangle,
@@ -45,6 +46,8 @@ export function DirectorDashboard() {
   const avgQuality = COMMERCIALS.length > 0
     ? Math.round(COMMERCIALS.reduce((s, c) => s + c.quality_score, 0) / COMMERCIALS.length)
     : 0;
+  // Nombre de commerciaux "actifs" cette semaine (au moins 1 CR remonte)
+  const activeCount = COMMERCIALS.filter((c) => (c.cr_week || 0) > 0).length;
 
   const top10ByCR = useMemo(
     () =>
@@ -77,8 +80,7 @@ export function DirectorDashboard() {
         <p className="text-sm text-slate-500 mt-1">
           {(() => {
             const now = new Date();
-            const start = new Date(now.getFullYear(), 0, 1);
-            const week = Math.ceil(((now.getTime() - start.getTime()) / 86400000 + start.getDay() + 1) / 7);
+            const week = getISOWeekNumber(now);
             return `Semaine ${week} \u2014 ${now.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}`;
           })()}
         </p>
@@ -107,7 +109,7 @@ export function DirectorDashboard() {
         />
         <KpiCard
           label="Commerciaux actifs"
-          value={`${COMMERCIALS.length}/${COMMERCIALS.length}`}
+          value={`${activeCount}/${COMMERCIALS.length}`}
           icon={<Users className="w-5 h-5" />}
           iconColor="text-emerald-600 bg-emerald-50"
         />

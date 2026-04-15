@@ -62,13 +62,24 @@ export default function MktSentimentPage() {
     { category: 'Interesse', actuel: cur.interesse, precedent: prev.interesse },
   ], [cur, prev]);
 
-  // --- Line chart: positif % per week ---
-  const tendanceData = useMemo(() =>
-    SENTIMENT_PERIODES.map((p) => ({
+  // --- Line chart: positif % per week, filtre par periode ---
+  // Mois = 4 dernieres semaines, Trimestre = 12, Semestre = 24
+  const periodWeeks = useMemo(() => {
+    switch (periodFilter) {
+      case 'Trimestre': return 12;
+      case 'Semestre': return 24;
+      case 'Mois':
+      default: return 4;
+    }
+  }, [periodFilter]);
+
+  const tendanceData = useMemo(() => {
+    const slice = SENTIMENT_PERIODES.slice(-periodWeeks);
+    return slice.map((p) => ({
       semaine: p.periode,
       ratio: pct(p.positif, p.total),
-    })),
-  [SENTIMENT_PERIODES]);
+    }));
+  }, [SENTIMENT_PERIODES, periodWeeks]);
 
   // --- Motifs principaux ---
   const topPositif = useMemo(() => {
@@ -252,7 +263,7 @@ export default function MktSentimentPage() {
         {/* Line chart: tendance positif % */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
           <h2 className="text-base font-semibold text-slate-900 mb-4">
-            Tendance sentiment positif (4 semaines)
+            Tendance sentiment positif ({periodWeeks} semaines)
           </h2>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
