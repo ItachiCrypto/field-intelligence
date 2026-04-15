@@ -1,4 +1,6 @@
 // @ts-nocheck
+// Prompt d'extraction enrichi (audit 2026-04-15) : region, secteur, type_offre,
+// type_action_communication, equilibrage marketing/commercial et positif/negatif.
 import type { ExtractedCRData } from './types';
 
 export function buildExtractionPrompt(
@@ -28,6 +30,8 @@ ${crText}
 Extrayez en JSON strict (pas de texte avant/apres, uniquement le JSON) :
 
 {
+  "region": "IDF|Nord|Sud|Est|Ouest|Sud-Ouest|Sud-Est|Nord-Est ou null",
+  "secteur": "Pharma|Industrie|Tech|BTP|Agroalimentaire|Distribution|Services|Energie|Transport|Automobile|Autre",
   "signals": [
     {
       "type": "concurrence|besoin|prix|satisfaction|opportunite",
@@ -35,7 +39,8 @@ Extrayez en JSON strict (pas de texte avant/apres, uniquement le JSON) :
       "title": "titre court du signal",
       "content": "description du signal",
       "competitor_name": "nom du concurrent ou null",
-      "price_delta": "ecart prix en % ou null"
+      "price_delta": "ecart prix en % ou null",
+      "region": "region (heritee du CR si non specifique)"
     }
   ],
   "deals": [
@@ -44,7 +49,9 @@ Extrayez en JSON strict (pas de texte avant/apres, uniquement le JSON) :
       "motif": "prix|produit|offre|timing|concurrent|relation|budget|autre",
       "resultat": "gagne|perdu|en_cours",
       "concurrent_nom": "nom ou null",
-      "verbatim": "extrait du CR"
+      "type_offre": "remise|bundle|gratuit|upgrade|sav|autre",
+      "verbatim": "extrait du CR",
+      "region": "region (heritee du CR si non specifique)"
     }
   ],
   "prix_signals": [
@@ -52,7 +59,8 @@ Extrayez en JSON strict (pas de texte avant/apres, uniquement le JSON) :
       "concurrent_nom": "nom",
       "ecart_pct": 12,
       "ecart_type": "inferieur|superieur",
-      "verbatim": "extrait"
+      "verbatim": "extrait",
+      "region": "region (heritee du CR si non specifique)"
     }
   ],
   "objectifs": [
@@ -65,24 +73,46 @@ Extrayez en JSON strict (pas de texte avant/apres, uniquement le JSON) :
   ],
   "sentiment": "positif|negatif|neutre|interesse",
   "needs": [
-    { "label": "besoin identifie", "trend": "up|down|stable|new" }
+    { "label": "besoin identifie", "trend": "up|down|stable|new", "region": "region" }
   ],
   "competitors_mentioned": [
-    { "name": "nom", "mention_type": "description courte de la mention" }
+    { "name": "nom", "mention_type": "description courte", "type_action_communication": "remise|campagne|event|partenariat|autre" }
   ]
 }
 
 Regles :
-- Soyez conservateur : n'inventez pas d'information absente du CR
-- Si aucun signal d'un type, retournez un tableau vide
-- Les prix doivent etre en pourcentage (ecart_pct est un nombre, pas une string)
-- Le sentiment est une evaluation globale du ton du CR
-- Chaque deal detecte doit avoir un verbatim extrait directement du CR`;
+- Soyez conservateur : n'inventez pas d'information absente du CR.
+- Si aucun signal d'un type, retournez un tableau vide.
+- Les prix doivent etre en pourcentage (ecart_pct est un nombre, pas une string).
+- Le sentiment est une evaluation globale du ton du CR.
+- Chaque deal detecte doit avoir un verbatim extrait directement du CR.
+
+EQUILIBRAGE MARKETING/COMMERCIAL :
+- Si un deal concerne le positionnement produit, l'offre/packaging, le canal de distribution,
+  la communication/marque, l'image, la visibilite -> view="marketing".
+- Sinon, view="commercial" (processus de vente, relation client, negociation, suivi, timing).
+- Visez un equilibre realiste : ~30% des deals doivent etre "marketing" si les signaux le permettent.
+
+EQUILIBRAGE POSITIF/NEGATIF :
+- Meme dans les CRs positifs (deals gagnes, satisfaction), extraire les signaux verts
+  (type=satisfaction, opportunite), les facteurs de succes, les innovations mentionnees.
+
+EXTRACTION GEOGRAPHIQUE (region) :
+- Paris->IDF, Lille->Nord, Lyon->Sud-Est, Nantes->Ouest, Bordeaux->Sud-Ouest,
+  Strasbourg->Est, Marseille->Sud, Toulouse->Sud-Ouest.
+- Propager la region sur chaque signal/deal/prix_signal/need.
+
+EXTRACTION SECTORIELLE :
+- Deduire le secteur a partir du contexte (produits, terminologie).
+- Valeurs valides : Pharma, Industrie, Tech, BTP, Agroalimentaire, Distribution,
+  Services, Energie, Transport, Automobile, Autre.
+
+TYPE_OFFRE (sur chaque deal) : remise | bundle | gratuit | upgrade | sav | autre.
+TYPE_ACTION_COMMUNICATION (sur chaque competitor_mention) : remise | campagne | event | partenariat | autre.`;
 }
 
 export function parseExtractionResponse(responseText: string): ExtractedCRData | null {
   try {
-    // Find JSON in the response (Claude might add text around it)
     const jsonMatch = responseText.match(/\{[\s\S]*\}/);
     if (!jsonMatch) return null;
     return JSON.parse(jsonMatch[0]) as ExtractedCRData;

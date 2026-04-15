@@ -132,7 +132,7 @@ export function useData() {
         geoSectorData, crObjectifs, sentimentPeriodes, sentimentRegions,
         segmentSentiments, territoires, regionProfiles, geoPoints,
         recommandationsIA, dealsCommerciaux, dealCommercialTendance, motifsSentiment,
-        tendancePrix, dealTendance,
+        tendancePrix, dealTendance, segmentInsights,
       ] = await Promise.all([
         fetchTable('signals', companyId, accessToken),
         fetchTable('accounts', companyId, accessToken),
@@ -159,6 +159,7 @@ export function useData() {
         fetchTable('motifs_sentiment', companyId, accessToken),
         fetchTable('tendance_prix', companyId, accessToken),
         fetchTable('deal_tendance', companyId, accessToken),
+        fetchTable('segment_insights', companyId, accessToken),
       ]);
 
       const hasLiveData = signals.length > 0 || accounts.length > 0;
@@ -173,7 +174,7 @@ export function useData() {
         sentimentActuelle: sentimentPeriodes.length > 0 ? sentimentPeriodes[sentimentPeriodes.length - 1] : null,
         sentimentPrecedente: sentimentPeriodes.length > 1 ? sentimentPeriodes[sentimentPeriodes.length - 2] : null,
         sentimentRegions, segmentSentiments,
-        segmentInsights: [],
+        segmentInsights,
         territoires, regionProfiles, geoPoints,
         recommandationsIA, dealsCommerciaux, dealCommercialTendance, motifsSentiment,
       });

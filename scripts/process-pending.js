@@ -1,5 +1,17 @@
 /**
- * process-pending.js — Process pending raw_visit_reports using OpenAI API
+ * process-pending.js — Pipeline NLP complet pour raw_visit_reports.
+ *
+ * Ameliorations (audit 2026-04-15) :
+ *   T1  — Prompt enrichi (region, secteur, type_offre, type_action_communication, equilibrage marketing/commercial)
+ *   T3  — Peuplement de la table accounts
+ *   T4  — Deduplication des needs
+ *   T5  — generateDerivedTables() sans hardcodes (regions, positionnement, etc.)
+ *   T6  — Filtrage du bruit NLP (concurrents generiques)
+ *   T7  — Populate segment_insights
+ *   T9  — Seed abbreviations par defaut
+ *   T10 — Extraction client_name AVANT les INSERTs
+ *   T11 — quality_trend robuste (fallback 0 si pas de donnees)
+ *
  * Usage: node scripts/process-pending.js
  */
 const { Client } = require('pg');
@@ -14,11 +26,86 @@ if (!OPENAI_API_KEY) {
   process.exit(1);
 }
 
-function buildPrompt(crText) {
+// === T9 : Abreviations par defaut (miroir de src/lib/abbreviations.ts) ===
+const DEFAULT_ABBREVIATIONS = [
+  { short: 'CR', full: 'Compte Rendu', category: 'general' },
+  { short: 'SAV', full: 'Service Apres-Vente', category: 'commercial' },
+  { short: 'KAM', full: 'Key Account Manager', category: 'organisation' },
+  { short: 'CA', full: 'Chiffre d\'Affaires', category: 'commercial' },
+  { short: 'AO', full: 'Appel d\'Offres', category: 'commercial' },
+  { short: 'NPS', full: 'Net Promoter Score', category: 'technique' },
+  { short: 'PME', full: 'Petite et Moyenne Entreprise', category: 'organisation' },
+  { short: 'ETI', full: 'Entreprise de Taille Intermediaire', category: 'organisation' },
+  { short: 'DG', full: 'Directeur General', category: 'organisation' },
+  { short: 'DAF', full: 'Directeur Administratif et Financier', category: 'organisation' },
+  { short: 'RDV', full: 'Rendez-vous', category: 'general' },
+  { short: 'ERP', full: 'Enterprise Resource Planning', category: 'technique' },
+  { short: 'CRM', full: 'Customer Relationship Management', category: 'technique' },
+  { short: 'ROI', full: 'Retour sur Investissement', category: 'commercial' },
+  { short: 'PDG', full: 'President-Directeur General', category: 'organisation' },
+  { short: 'IDF', full: 'Ile-de-France', category: 'general' },
+  { short: 'BtoB', full: 'Business to Business', category: 'commercial' },
+  { short: 'SLA', full: 'Service Level Agreement', category: 'technique' },
+  { short: 'TCO', full: 'Total Cost of Ownership', category: 'technique' },
+  { short: 'Dirco', full: 'Directeur Commercial', category: 'organisation' },
+];
+
+// === T1 : Mapping ville -> region (utilise en fallback si le NLP ne renvoie pas de region) ===
+const CITY_TO_REGION = {
+  // Ile-de-France
+  paris: 'IDF', versailles: 'IDF', nanterre: 'IDF', boulogne: 'IDF', 'saint-denis': 'IDF', evry: 'IDF', creteil: 'IDF', 'la defense': 'IDF',
+  // Nord
+  lille: 'Nord', roubaix: 'Nord', tourcoing: 'Nord', dunkerque: 'Nord', valenciennes: 'Nord', amiens: 'Nord',
+  // Sud (PACA)
+  marseille: 'Sud', nice: 'Sud', toulon: 'Sud', cannes: 'Sud', 'aix-en-provence': 'Sud', avignon: 'Sud', montpellier: 'Sud', nimes: 'Sud', perpignan: 'Sud',
+  // Sud-Est (Rhone)
+  lyon: 'Sud-Est', grenoble: 'Sud-Est', 'saint-etienne': 'Sud-Est', annecy: 'Sud-Est', chambery: 'Sud-Est',
+  // Est
+  strasbourg: 'Est', mulhouse: 'Est', metz: 'Est', nancy: 'Est', reims: 'Est', dijon: 'Est', besancon: 'Est',
+  // Ouest
+  nantes: 'Ouest', rennes: 'Ouest', angers: 'Ouest', 'le mans': 'Ouest', brest: 'Ouest', tours: 'Ouest', caen: 'Ouest', rouen: 'Ouest', 'le havre': 'Ouest',
+  // Sud-Ouest
+  bordeaux: 'Sud-Ouest', toulouse: 'Sud-Ouest', pau: 'Sud-Ouest', limoges: 'Sud-Ouest', 'la rochelle': 'Sud-Ouest', bayonne: 'Sud-Ouest', biarritz: 'Sud-Ouest',
+  // Nord-Est
+  troyes: 'Nord-Est', charleville: 'Nord-Est',
+};
+
+function inferRegionFromText(text) {
+  if (!text) return '';
+  const t = text.toLowerCase();
+  // Test explicit region keywords first
+  const regionKeywords = ['IDF', 'Ile-de-France', 'Nord', 'Sud-Ouest', 'Sud-Est', 'Nord-Est', 'Sud', 'Est', 'Ouest'];
+  for (const r of regionKeywords) {
+    const re = new RegExp(`\\b${r}\\b`, 'i');
+    if (re.test(text)) return r.replace('Ile-de-France', 'IDF');
+  }
+  for (const [city, region] of Object.entries(CITY_TO_REGION)) {
+    if (t.includes(city)) return region;
+  }
+  return '';
+}
+
+// === T10 : Extraction client_name depuis le sujet (regex) ===
+function extractClientNameFromSubject(subject) {
+  if (!subject) return null;
+  const match = subject.match(/(?:Visite|visite|RDV|CR visite|CR RDV)\s+(?:urgente\s+)?(.+?)\s*[-–]/);
+  return match ? match[1].trim() : null;
+}
+
+// === T1 : Prompt enrichi ===
+function buildPrompt(crText, knownCompetitors = [], knownAbbreviations = []) {
+  const competitorsList = knownCompetitors.length > 0
+    ? `Concurrents connus : ${knownCompetitors.join(', ')}.`
+    : 'Aucun concurrent connu.';
+  const abbrList = knownAbbreviations.length > 0
+    ? `Abreviations : ${knownAbbreviations.map(a => `${a.short}=${a.full}`).join(', ')}.`
+    : '';
+
   return `Vous etes un expert en analyse de comptes rendus de visite commerciale francais.
 Analysez ce compte-rendu et extrayez TOUTES les informations structurees en JSON strict.
 
-Aucun concurrent connu.
+${competitorsList}
+${abbrList}
 
 COMPTE-RENDU:
 """
@@ -28,6 +115,8 @@ ${crText}
 Extrayez en JSON strict (pas de texte avant/apres, uniquement le JSON) :
 
 {
+  "region": "IDF|Nord|Sud|Est|Ouest|Sud-Ouest|Sud-Est|Nord-Est ou null",
+  "secteur": "Pharma|Industrie|Tech|BTP|Agroalimentaire|Distribution|Services|Energie|Transport|Automobile|Autre",
   "signals": [
     {
       "type": "concurrence|besoin|prix|satisfaction|opportunite",
@@ -35,7 +124,8 @@ Extrayez en JSON strict (pas de texte avant/apres, uniquement le JSON) :
       "title": "titre court du signal",
       "content": "description du signal",
       "competitor_name": "nom du concurrent ou null",
-      "price_delta": "ecart prix en % ou null"
+      "price_delta": "ecart prix en % ou null",
+      "region": "region (heritee du CR si non specifique)"
     }
   ],
   "deals": [
@@ -44,7 +134,9 @@ Extrayez en JSON strict (pas de texte avant/apres, uniquement le JSON) :
       "motif": "prix|produit|offre|timing|concurrent|relation|budget|autre",
       "resultat": "gagne|perdu|en_cours",
       "concurrent_nom": "nom ou null",
-      "verbatim": "extrait du CR"
+      "type_offre": "remise|bundle|gratuit|upgrade|sav|autre",
+      "verbatim": "extrait du CR",
+      "region": "region (heritee du CR si non specifique)"
     }
   ],
   "prix_signals": [
@@ -52,7 +144,8 @@ Extrayez en JSON strict (pas de texte avant/apres, uniquement le JSON) :
       "concurrent_nom": "nom",
       "ecart_pct": 12,
       "ecart_type": "inferieur|superieur",
-      "verbatim": "extrait"
+      "verbatim": "extrait",
+      "region": "region (heritee du CR si non specifique)"
     }
   ],
   "objectifs": [
@@ -65,19 +158,54 @@ Extrayez en JSON strict (pas de texte avant/apres, uniquement le JSON) :
   ],
   "sentiment": "positif|negatif|neutre|interesse",
   "needs": [
-    { "label": "besoin identifie", "trend": "up|down|stable|new" }
+    { "label": "besoin identifie", "trend": "up|down|stable|new", "region": "region" }
   ],
   "competitors_mentioned": [
-    { "name": "nom", "mention_type": "description courte de la mention" }
+    { "name": "nom", "mention_type": "description courte", "type_action_communication": "remise|campagne|event|partenariat|autre" }
   ]
 }
 
 Regles :
-- Soyez conservateur : n'inventez pas d'information absente du CR
-- Si aucun signal d'un type, retournez un tableau vide
-- Les prix doivent etre en pourcentage (ecart_pct est un nombre, pas une string)
-- Le sentiment est une evaluation globale du ton du CR
-- Chaque deal detecte doit avoir un verbatim extrait directement du CR`;
+- Soyez conservateur : n'inventez pas d'information absente du CR.
+- Si aucun signal d'un type, retournez un tableau vide.
+- Les prix doivent etre en pourcentage (ecart_pct est un nombre, pas une string).
+- Le sentiment est une evaluation globale du ton du CR.
+- Chaque deal detecte doit avoir un verbatim extrait directement du CR.
+
+EQUILIBRAGE MARKETING/COMMERCIAL (important) :
+- Si un deal concerne le positionnement produit, l'offre/packaging, le canal de distribution,
+  la communication/marque, l'image, la visibilite -> view="marketing".
+- Si le deal concerne le processus de vente, la relation client, la negociation, le suivi,
+  le timing commercial, la force de vente -> view="commercial".
+- Visez un equilibre realiste : ~30% des deals doivent etre "marketing" si les signaux le permettent.
+
+EQUILIBRAGE POSITIF/NEGATIF (important) :
+- Meme dans les CRs positifs (deals gagnes, satisfaction client, renouvellement),
+  extraire les signaux verts : type=satisfaction severity=vert, type=opportunite.
+- Capturer les facteurs de succes, les innovations mentionnees, les points forts identifies.
+- Ne pas se concentrer uniquement sur les problemes : les CRs positifs doivent generer
+  des signaux verts et orange clair, pas seulement des "neutres" par defaut.
+
+EXTRACTION GEOGRAPHIQUE (region) :
+- Mapping indicatif : Paris->IDF, Lille->Nord, Lyon->Sud-Est, Nantes->Ouest, Bordeaux->Sud-Ouest,
+  Strasbourg->Est, Marseille->Sud, Toulouse->Sud-Ouest, Nice->Sud, Rennes->Ouest, Dijon->Est.
+- Renvoyer la region au niveau racine ET la propager sur chaque signal/deal/prix_signal/need.
+
+EXTRACTION SECTORIELLE :
+- Deduire le secteur d'activite du client a partir du contexte (produits mentionnes, terminologie metier).
+- Secteurs valides uniquement : Pharma, Industrie, Tech, BTP, Agroalimentaire, Distribution,
+  Services, Energie, Transport, Automobile, Autre.
+
+TYPE_OFFRE (sur chaque deal) :
+- remise : baisse de prix ponctuelle.
+- bundle : regroupement de produits/services.
+- gratuit : essai/produit offert.
+- upgrade : montee de gamme.
+- sav : service apres-vente avantageux.
+- autre : sinon.
+
+TYPE_ACTION_COMMUNICATION (sur chaque competitor_mention) :
+- remise, campagne, event, partenariat, autre.`;
 }
 
 function parseResponse(text) {
@@ -92,7 +220,7 @@ async function callOpenAI(prompt) {
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${OPENAI_API_KEY}` },
     body: JSON.stringify({
       model: 'gpt-4o-mini',
-      max_tokens: 2000,
+      max_tokens: 2500,
       temperature: 0.1,
       messages: [
         { role: 'system', content: 'Vous etes un expert en analyse de comptes rendus de visite commerciale. Repondez uniquement en JSON valide, sans texte avant ou apres.' },
@@ -108,61 +236,190 @@ async function callOpenAI(prompt) {
   };
 }
 
+// === T6 : Filtre du bruit NLP sur les noms de concurrents ===
+function isNoiseCompetitor(name) {
+  if (!name) return true;
+  const s = String(name).trim();
+  if (s.length < 3) return true;
+  // Accepte "Concurrent Local", "concurrents locaux", "Acteur regional", "autre competiteur", etc.
+  if (/^(un\s+)?(acteur|concurrent|competiteur|competitor)s?(\s+(local|locaux|regional|regionaux|inconnu|inconnus|autre|autres|principal|principaux|divers|generique|actuel))?\s*$/i.test(s)) return true;
+  if (/^(inconnu|autre|n\/a|nc|na|divers)$/i.test(s)) return true;
+  return false;
+}
+
+// Mapping des enums type_offre et comm_type
+// enum DB offre_type = {bundle, promotion, nouvelle_gamme, conditions_paiement, essai_gratuit, autre}
+function mapTypeOffreToEnum(t) {
+  if (!t) return 'autre';
+  const v = String(t).toLowerCase();
+  if (v === 'remise') return 'promotion';
+  if (v === 'bundle') return 'bundle';
+  if (v === 'gratuit') return 'essai_gratuit';
+  if (v === 'upgrade') return 'nouvelle_gamme';
+  if (v === 'sav') return 'conditions_paiement';
+  return 'autre';
+}
+
+// enum DB comm_type = {salon, pub, emailing, social, presse, sponsoring, partenariat, autre}
+function mapCommTypeToEnum(t) {
+  if (!t) return 'autre';
+  const v = String(t).toLowerCase();
+  if (v === 'remise') return 'pub';
+  if (v === 'campagne') return 'pub';
+  if (v === 'event') return 'salon';
+  if (v === 'partenariat') return 'partenariat';
+  return 'autre';
+}
+
+// Detection mots-cles dans le contenu pour inferer type_offre / type_action
+function detectTypeOffreFromContent(content) {
+  if (!content) return 'autre';
+  const c = content.toLowerCase();
+  if (/remise|discount|reduction|baisse de prix|promo/i.test(c)) return 'promotion';
+  if (/bundle|package|regroup/i.test(c)) return 'bundle';
+  if (/gratuit|offert|essai|trial/i.test(c)) return 'essai_gratuit';
+  if (/upgrade|montee|premium|nouvelle gamme/i.test(c)) return 'nouvelle_gamme';
+  if (/paiement|echeance|credit|facilite/i.test(c)) return 'conditions_paiement';
+  return 'autre';
+}
+
+function detectTypeActionFromContent(content) {
+  if (!content) return 'autre';
+  const c = content.toLowerCase();
+  if (/salon|foire|expo/i.test(c)) return 'salon';
+  if (/pub|publicite|campagne|annonce|affiche/i.test(c)) return 'pub';
+  if (/mail|email|newsletter|emailing/i.test(c)) return 'emailing';
+  if (/linkedin|facebook|instagram|twitter|reseau social|social media/i.test(c)) return 'social';
+  if (/presse|article|journal|magazine/i.test(c)) return 'presse';
+  if (/sponsor/i.test(c)) return 'sponsoring';
+  if (/partenariat|alliance|collabor/i.test(c)) return 'partenariat';
+  return 'autre';
+}
+
+async function seedAbbreviationsForCompany(db, companyId) {
+  const { rows: existing } = await db.query(`SELECT count(*) FROM abbreviations WHERE company_id = $1`, [companyId]);
+  if (parseInt(existing[0].count) > 0) return 0;
+  let inserted = 0;
+  for (const a of DEFAULT_ABBREVIATIONS) {
+    await db.query(
+      `INSERT INTO abbreviations (company_id, short, "full", category) VALUES ($1, $2, $3, $4)`,
+      [companyId, a.short, a.full, a.category]
+    );
+    inserted++;
+  }
+  return inserted;
+}
+
 async function main() {
   const db = new Client({ connectionString: PG });
   await db.connect();
 
-  // Get pending reports
-  const { rows: reports } = await db.query(
-    `SELECT * FROM raw_visit_reports WHERE processing_status = 'pending' AND processing_attempts < 3 ORDER BY synced_at LIMIT 10`
+  // T9 — Seed abbreviations pour toutes les companies
+  const { rows: allCo } = await db.query(`SELECT id, name FROM companies`);
+  for (const co of allCo) {
+    const n = await seedAbbreviationsForCompany(db, co.id);
+    if (n > 0) console.log(`Abreviations seedees pour ${co.name}: ${n} entrees.`);
+  }
+
+  // T10 — Extraction client_name AVANT le traitement NLP
+  const { rows: noClient } = await db.query(
+    `SELECT id, subject FROM raw_visit_reports WHERE client_name IS NULL OR client_name = ''`
   );
-  console.log(`Found ${reports.length} pending reports`);
+  let clientsPatched = 0;
+  for (const r of noClient) {
+    const clientName = extractClientNameFromSubject(r.subject);
+    if (clientName) {
+      await db.query(`UPDATE raw_visit_reports SET client_name = $1 WHERE id = $2`, [clientName, r.id]);
+      clientsPatched++;
+    }
+  }
+  if (clientsPatched > 0) console.log(`Client_name extraits depuis subject: ${clientsPatched} reports.`);
+
+  // Pending reports a traiter
+  const { rows: reports } = await db.query(
+    `SELECT * FROM raw_visit_reports WHERE processing_status = 'pending' AND processing_attempts < 3 ORDER BY synced_at LIMIT 50`
+  );
+  console.log(`${reports.length} reports en attente.`);
+
+  // Enum validation
+  const validSignalTypes = ['concurrence','besoin','prix','satisfaction','opportunite'];
+  const validSeverity = ['rouge','orange','jaune','vert'];
+  const validObjTypes = ['signature','sell_out','sell_in','formation','decouverte','fidelisation'];
+  const validObjResultat = ['atteint','non_atteint'];
+  const validEcartType = ['inferieur','superieur'];
+  const validStatutDeal = ['gagne','perdu','en_cours'];
+  const validNeedTrend = ['up','down','stable','new'];
+  const validRegions = ['IDF','Nord','Sud','Est','Ouest','Sud-Ouest','Sud-Est','Nord-Est'];
+  const validSecteurs = ['Pharma','Industrie','Tech','BTP','Agroalimentaire','Distribution','Services','Energie','Transport','Automobile','Autre'];
+
+  const mapSignalType = (t) => { const m = { concurrent: 'concurrence', competition: 'concurrence', opportunity: 'opportunite', need: 'besoin', price: 'prix', quality: 'satisfaction' }; return validSignalTypes.includes(t) ? t : m[t] || 'satisfaction'; };
+  const mapSeverity = (s) => validSeverity.includes(s) ? s : 'jaune';
+  const mapObjType = (t) => { const m = { certification: 'formation', renouvellement: 'fidelisation', prospection: 'decouverte', upsell: 'sell_in', crosssell: 'sell_in', 'cross-sell': 'sell_in', 'sell-in': 'sell_in', 'sell-out': 'sell_out', partenariat: 'fidelisation' }; return validObjTypes.includes(t) ? t : m[t] || 'decouverte'; };
+  const mapObjResultat = (r) => validObjResultat.includes(r) ? r : (r === 'en_cours' ? 'non_atteint' : 'non_atteint');
+  const mapEcartType = (t) => validEcartType.includes(t) ? t : 'inferieur';
+  const mapStatutDeal = (s) => validStatutDeal.includes(s) ? s : 'en_cours';
+  const mapNeedTrend = (t) => validNeedTrend.includes(t) ? t : 'new';
+  const mapRegion = (r) => validRegions.includes(r) ? r : '';
+  const mapSecteur = (s) => validSecteurs.includes(s) ? s : 'Autre';
 
   for (const report of reports) {
     const start = Date.now();
-    console.log(`\nProcessing: ${report.subject}...`);
+    console.log(`\nTraitement: ${report.subject}...`);
 
-    // Mark processing
     await db.query(`UPDATE raw_visit_reports SET processing_status = 'processing', processing_attempts = processing_attempts + 1 WHERE id = $1`, [report.id]);
 
     if (!report.content_text || report.content_text.trim().length < 10) {
       await db.query(`UPDATE raw_visit_reports SET processing_status = 'skipped', processed_at = NOW() WHERE id = $1`, [report.id]);
-      console.log('  -> Skipped (no content)');
+      console.log('  -> Passe (contenu vide)');
       continue;
     }
 
     try {
-      const prompt = buildPrompt(report.content_text);
+      // Recupere concurrents connus + abreviations pour enrichir le prompt
+      const { rows: knownComps } = await db.query(
+        `SELECT name FROM competitors WHERE company_id = $1`, [report.company_id]
+      );
+      const { rows: knownAbbr } = await db.query(
+        `SELECT short, "full" FROM abbreviations WHERE company_id = $1`, [report.company_id]
+      );
+
+      const prompt = buildPrompt(
+        report.content_text,
+        knownComps.map(c => c.name),
+        knownAbbr.map(a => ({ short: a.short, full: a.full })),
+      );
       const { text, tokens } = await callOpenAI(prompt);
       const extracted = parseResponse(text);
 
-      if (!extracted) throw new Error('Failed to parse response');
+      if (!extracted) throw new Error('Impossible de parser la reponse NLP');
+
+      // T1 — Region racine inferee (fallback : mots-cles dans le CR)
+      const rootRegion = mapRegion(extracted.region) || inferRegionFromText(report.content_text) || inferRegionFromText(report.subject);
+      const rootSecteur = mapSecteur(extracted.secteur);
 
       let signalsCreated = 0;
+      const visitDate = report.visit_date || new Date().toISOString().split('T')[0];
+      const clientName = report.client_name || extractClientNameFromSubject(report.subject) || '';
 
-      // Enum validation maps
-      const validSignalTypes = ['concurrence','besoin','prix','satisfaction','opportunite'];
-      const validSeverity = ['rouge','orange','jaune','vert'];
-      const validObjTypes = ['signature','sell_out','sell_in','formation','decouverte','fidelisation'];
-      const validObjResultat = ['atteint','non_atteint'];
-      const validEcartType = ['inferieur','superieur'];
-      const validStatutDeal = ['gagne','perdu','en_cours'];
-      const validNeedTrend = ['up','down','stable','new'];
+      // Sanitize helper : convertit string "null"/"" vers null, "12%" vers 12, etc.
+      const sanitizeInt = (v) => {
+        if (v === null || v === undefined) return null;
+        if (typeof v === 'number') return Math.round(v);
+        const s = String(v).trim();
+        if (!s || s.toLowerCase() === 'null' || s.toLowerCase() === 'n/a') return null;
+        const num = parseInt(s.replace(/[^\d-]/g, ''), 10);
+        return Number.isFinite(num) ? num : null;
+      };
 
-      const mapSignalType = (t) => { const m = { concurrent: 'concurrence', competition: 'concurrence', opportunity: 'opportunite', need: 'besoin', price: 'prix', quality: 'satisfaction' }; return validSignalTypes.includes(t) ? t : m[t] || 'satisfaction'; };
-      const mapSeverity = (s) => validSeverity.includes(s) ? s : 'jaune';
-      const mapObjType = (t) => { const m = { certification: 'formation', renouvellement: 'fidelisation', prospection: 'decouverte', upsell: 'sell_in', crosssell: 'sell_in', 'cross-sell': 'sell_in', 'sell-in': 'sell_in', 'sell-out': 'sell_out', partenariat: 'fidelisation' }; return validObjTypes.includes(t) ? t : m[t] || 'decouverte'; };
-      const mapObjResultat = (r) => validObjResultat.includes(r) ? r : (r === 'en_cours' ? 'non_atteint' : 'non_atteint');
-      const mapEcartType = (t) => validEcartType.includes(t) ? t : 'inferieur';
-      const mapStatutDeal = (s) => validStatutDeal.includes(s) ? s : 'en_cours';
-      const mapNeedTrend = (t) => validNeedTrend.includes(t) ? t : 'new';
-
-      // Insert signals
+      // Insert signals (T1 : propage region)
       for (const sig of (extracted.signals || [])) {
+        const sigRegion = mapRegion(sig.region) || rootRegion;
         await db.query(
           `INSERT INTO signals (company_id, type, severity, title, content, competitor_name, price_delta, region, treated, source_report_id)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, '', false, $8)`,
-          [report.company_id, mapSignalType(sig.type), mapSeverity(sig.severity), sig.title, sig.content, sig.competitor_name || null, sig.price_delta || null, report.id]
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, false, $9)`,
+          [report.company_id, mapSignalType(sig.type), mapSeverity(sig.severity), sig.title, sig.content,
+            isNoiseCompetitor(sig.competitor_name) ? null : sig.competitor_name,
+            sanitizeInt(sig.price_delta), sigRegion, report.id]
         );
         signalsCreated++;
       }
@@ -179,94 +436,126 @@ async function main() {
         autre: 'suivi_insuffisant',
       };
       for (const deal of (extracted.deals || [])) {
+        const dealRegion = mapRegion(deal.region) || rootRegion;
+        const typeOffre = mapTypeOffreToEnum(deal.type_offre);
         if (deal.view === 'commercial') {
           const mappedMotif = motifToCommercial[deal.motif] || 'suivi_insuffisant';
           await db.query(
             `INSERT INTO deals_commerciaux (company_id, motif, resultat, concurrent_nom, commercial_name, client_name, region, verbatim, date, source_report_id)
-             VALUES ($1, $2, $3, $4, $5, $6, '', $7, $8, $9)`,
-            [report.company_id, mappedMotif, mapStatutDeal(deal.resultat), deal.concurrent_nom || null, report.commercial_name || '', report.client_name || '', deal.verbatim, report.visit_date || new Date().toISOString().split('T')[0], report.id]
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+            [report.company_id, mappedMotif, mapStatutDeal(deal.resultat),
+              isNoiseCompetitor(deal.concurrent_nom) ? null : deal.concurrent_nom,
+              report.commercial_name || '', clientName, dealRegion, deal.verbatim, visitDate, report.id]
           );
         } else {
           const validDealMotif = ['prix','produit','offre','timing','concurrent','relation','budget','autre'];
           const dealMotif = validDealMotif.includes(deal.motif) ? deal.motif : 'autre';
           await db.query(
             `INSERT INTO deals_marketing (company_id, motif_principal, resultat, concurrent_nom, commercial_name, client_name, region, verbatim, date, source_report_id)
-             VALUES ($1, $2, $3, $4, $5, $6, '', $7, $8, $9)`,
-            [report.company_id, dealMotif, mapStatutDeal(deal.resultat), deal.concurrent_nom || null, report.commercial_name || '', report.client_name || '', deal.verbatim, report.visit_date || new Date().toISOString().split('T')[0], report.id]
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+            [report.company_id, dealMotif, mapStatutDeal(deal.resultat),
+              isNoiseCompetitor(deal.concurrent_nom) ? null : deal.concurrent_nom,
+              report.commercial_name || '', clientName, dealRegion, deal.verbatim, visitDate, report.id]
           );
+        }
+        // Memorise le type_offre dans un champ libre via signal ? Non : on stocke en table dediee offres_concurrentes en aval.
+        // Ici on conserve dans un tableau pour la phase generateDerivedTables.
+        if (deal.concurrent_nom && !isNoiseCompetitor(deal.concurrent_nom)) {
+          // Rien a stocker ici : la table offres_concurrentes sera regeneree a partir des signals + type_offre detecte.
         }
         signalsCreated++;
       }
 
-      // Insert prix_signals
+      // Insert prix_signals (T1 : propage region)
       for (const px of (extracted.prix_signals || [])) {
+        if (isNoiseCompetitor(px.concurrent_nom)) continue;
+        const pxRegion = mapRegion(px.region) || rootRegion;
         await db.query(
           `INSERT INTO prix_signals (company_id, concurrent_nom, ecart_pct, ecart_type, statut_deal, commercial_name, client_name, region, verbatim, date, source_report_id)
-           VALUES ($1, $2, $3, $4, 'en_cours', $5, $6, '', $7, $8, $9)`,
-          [report.company_id, px.concurrent_nom, px.ecart_pct, mapEcartType(px.ecart_type), report.commercial_name || '', report.client_name || '', px.verbatim, report.visit_date || new Date().toISOString().split('T')[0], report.id]
+           VALUES ($1, $2, $3, $4, 'en_cours', $5, $6, $7, $8, $9, $10)`,
+          [report.company_id, px.concurrent_nom, sanitizeInt(px.ecart_pct) ?? 0, mapEcartType(px.ecart_type), report.commercial_name || '', clientName, pxRegion, px.verbatim, visitDate, report.id]
         );
         signalsCreated++;
       }
 
-      // Insert objectifs
+      // Insert objectifs (T1 : propage region)
       for (const obj of (extracted.objectifs || [])) {
         await db.query(
           `INSERT INTO cr_objectifs (company_id, commercial_name, client_name, objectif_type, resultat, cause_echec, facteur_reussite, date, region, source_report_id)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, '', $9)`,
-          [report.company_id, report.commercial_name || '', report.client_name || '', mapObjType(obj.type), mapObjResultat(obj.resultat), obj.cause_echec || null, obj.facteur_reussite || null, report.visit_date || new Date().toISOString().split('T')[0], report.id]
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+          [report.company_id, report.commercial_name || '', clientName, mapObjType(obj.type), mapObjResultat(obj.resultat), obj.cause_echec || null, obj.facteur_reussite || null, visitDate, rootRegion, report.id]
         );
         signalsCreated++;
       }
 
-      // Insert needs
+      // T4 — Deduplication des needs : UPDATE mentions+1 si existe, INSERT sinon
       for (const need of (extracted.needs || [])) {
-        await db.query(
-          `INSERT INTO needs (company_id, label, mentions, evolution, trend, source_report_id)
-           VALUES ($1, $2, 1, 0, $3, $4)`,
-          [report.company_id, need.label, mapNeedTrend(need.trend), report.id]
+        const label = (need.label || '').trim();
+        if (!label) continue;
+        const { rows: existingNeed } = await db.query(
+          `SELECT id, mentions FROM needs WHERE company_id = $1 AND LOWER(label) = LOWER($2)`,
+          [report.company_id, label]
         );
+        if (existingNeed.length > 0) {
+          const newMentions = parseInt(existingNeed[0].mentions || 0) + 1;
+          // Calcul trend : up si mention recente > mention plus vieille
+          const { rows: weekCounts } = await db.query(
+            `SELECT COUNT(*) FILTER (WHERE r.visit_date > NOW() - INTERVAL '7 days') as recent,
+                    COUNT(*) FILTER (WHERE r.visit_date <= NOW() - INTERVAL '7 days') as older
+             FROM needs n LEFT JOIN raw_visit_reports r ON r.id = n.source_report_id
+             WHERE n.company_id = $1 AND LOWER(n.label) = LOWER($2)`,
+            [report.company_id, label]
+          );
+          const recent = parseInt(weekCounts[0].recent);
+          const older = parseInt(weekCounts[0].older);
+          const newTrend = recent > older ? 'up' : recent < older ? 'down' : 'stable';
+          await db.query(
+            `UPDATE needs SET mentions = $1, trend = $2, evolution = mentions - $3 WHERE id = $4`,
+            [newMentions, newTrend, parseInt(existingNeed[0].mentions || 0), existingNeed[0].id]
+          );
+        } else {
+          await db.query(
+            `INSERT INTO needs (company_id, label, mentions, evolution, trend, source_report_id)
+             VALUES ($1, $2, 1, 0, $3, $4)`,
+            [report.company_id, label, mapNeedTrend(need.trend), report.id]
+          );
+        }
       }
 
-      // Log processing result
       await db.query(
         `INSERT INTO processing_results (raw_report_id, company_id, extracted_json, signals_created, model_used, tokens_used, processing_time_ms)
          VALUES ($1, $2, $3, $4, $5, $6, $7)`,
         [report.id, report.company_id, JSON.stringify(extracted), signalsCreated, 'gpt-4o-mini', tokens, Date.now() - start]
       );
 
-      // Mark done
       await db.query(`UPDATE raw_visit_reports SET processing_status = 'done', processed_at = NOW() WHERE id = $1`, [report.id]);
-      console.log(`  -> OK: ${signalsCreated} items extracted (${tokens} tokens, ${Date.now() - start}ms)`);
+      console.log(`  -> OK: ${signalsCreated} items extraits (${tokens} tokens, ${Date.now() - start}ms, region=${rootRegion}, secteur=${rootSecteur})`);
 
     } catch (err) {
       await db.query(`UPDATE raw_visit_reports SET processing_status = 'error', processing_error = $2 WHERE id = $1`, [report.id, err.message]);
-      console.log(`  -> ERROR: ${err.message}`);
+      console.log(`  -> ERREUR: ${err.message}`);
     }
   }
 
-  // === Post-processing: update derived tables ===
-  console.log('\n--- Post-processing derived tables ---');
+  // === Post-traitement : tables aggregees ===
+  console.log('\n--- Post-traitement tables derivees ---');
 
-  // Get all company IDs that have processed reports (not just from this batch)
   const { rows: allCompanies } = await db.query(`SELECT DISTINCT company_id FROM raw_visit_reports WHERE processing_status = 'done'`);
   const companyIds = allCompanies.map(r => r.company_id);
 
   for (const cid of companyIds) {
-    // 1. Upsert commercials from raw_visit_reports
+    // 1. Upsert commercials
     const { rows: commercialNames } = await db.query(
       `SELECT DISTINCT commercial_name FROM raw_visit_reports WHERE commercial_name IS NOT NULL AND commercial_name != '' AND company_id = $1`,
       [cid]
     );
     for (const { commercial_name } of commercialNames) {
-      // Compute real stats for this commercial
       const { rows: crCount } = await db.query(
         `SELECT count(*) as c FROM raw_visit_reports WHERE company_id = $1 AND commercial_name = $2 AND processing_status = 'done'`, [cid, commercial_name]
       );
-      // Signals linked to this commercial's reports
       const { rows: sigCount } = await db.query(
         `SELECT count(*) as c FROM signals s JOIN raw_visit_reports r ON s.source_report_id = r.id WHERE s.company_id = $1 AND r.commercial_name = $2`, [cid, commercial_name]
       );
-      // Quality score: based on objectifs atteints ratio + signal severity balance
       const { rows: objStats } = await db.query(
         `SELECT
           count(*) FILTER (WHERE resultat = 'atteint') as atteints,
@@ -282,16 +571,15 @@ async function main() {
           count(*) as total
         FROM signals s JOIN raw_visit_reports r ON s.source_report_id = r.id WHERE s.company_id = $1 AND r.commercial_name = $2`, [cid, commercial_name]
       );
-      // Quality score formula: 40% objectif success rate + 40% signal positivity + 20% activity (CR count)
       const objTotal = parseInt(objStats[0].total) || 0;
       const objRate = objTotal > 0 ? parseInt(objStats[0].atteints) / objTotal : 0.5;
       const sigTotal = parseInt(sevStats[0].total) || 0;
       const sigPositivity = sigTotal > 0 ? (parseInt(sevStats[0].vert) * 1.0 + parseInt(sevStats[0].moyen) * 0.5) / sigTotal : 0.5;
       const crTotal = parseInt(crCount[0].c) || 0;
-      const activityScore = Math.min(crTotal / 10, 1.0); // 10 CRs = max activity score
+      const activityScore = Math.min(crTotal / 10, 1.0);
       const qualityScore = Math.round((objRate * 40 + sigPositivity * 40 + activityScore * 20));
 
-      // Quality trend: compare recent signals vs older ones
+      // T11 — quality_trend robuste
       const { rows: recentSig } = await db.query(
         `SELECT count(*) FILTER (WHERE severity = 'vert') as vert, count(*) as total
         FROM signals s JOIN raw_visit_reports r ON s.source_report_id = r.id
@@ -302,11 +590,17 @@ async function main() {
         FROM signals s JOIN raw_visit_reports r ON s.source_report_id = r.id
         WHERE s.company_id = $1 AND r.commercial_name = $2 AND s.created_at <= NOW() - INTERVAL '7 days'`, [cid, commercial_name]
       );
-      const recentRate = parseInt(recentSig[0].total) > 0 ? parseInt(recentSig[0].vert) / parseInt(recentSig[0].total) : 0.5;
-      const olderRate = parseInt(olderSig[0].total) > 0 ? parseInt(olderSig[0].vert) / parseInt(olderSig[0].total) : 0.5;
-      const qualityTrend = Math.round((recentRate - olderRate) * 100); // positive = improving
+      const olderTotal = parseInt(olderSig[0].total);
+      const recentTotal = parseInt(recentSig[0].total);
+      let qualityTrend;
+      if (olderTotal < 3 || recentTotal < 3) {
+        qualityTrend = 0; // Pas assez de donnees pour comparer
+      } else {
+        const recentRate = parseInt(recentSig[0].vert) / recentTotal;
+        const olderRate = parseInt(olderSig[0].vert) / olderTotal;
+        qualityTrend = Math.round((recentRate - olderRate) * 100);
+      }
 
-      // Determine region from most common client region or report data
       const { rows: regionData } = await db.query(
         `SELECT region, count(*) as c FROM signals s JOIN raw_visit_reports r ON s.source_report_id = r.id
         WHERE s.company_id = $1 AND r.commercial_name = $2 AND s.region IS NOT NULL AND s.region != ''
@@ -322,44 +616,82 @@ async function main() {
           `INSERT INTO commercials (company_id, name, region, quality_score, quality_trend, cr_week, useful_signals) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
           [cid, commercial_name, commercialRegion, qualityScore, qualityTrend, crTotal, parseInt(sigCount[0].c)]
         );
-        console.log(`  Created commercial: ${commercial_name} (score=${qualityScore}, trend=${qualityTrend}, signals=${sigCount[0].c}, CRs=${crTotal})`);
       } else {
         await db.query(
           `UPDATE commercials SET region = $1, quality_score = $2, quality_trend = $3, cr_week = $4, useful_signals = $5 WHERE id = $6`,
           [commercialRegion, qualityScore, qualityTrend, crTotal, parseInt(sigCount[0].c), existing[0].id]
         );
-        console.log(`  Updated commercial: ${commercial_name} (score=${qualityScore}, trend=${qualityTrend}, signals=${sigCount[0].c}, CRs=${crTotal})`);
       }
     }
+    console.log(`  commercials: ${commercialNames.length} maj`);
 
-    // 2. Upsert competitors from signals + prix_signals
+    // 2. Upsert competitors — T5 : evolution, is_new, mention_type reel
+    // Pre-cleanup : supprimer les noms generiques des signals/prix_signals AVANT le GROUP BY
+    await db.query(`UPDATE signals SET competitor_name = NULL WHERE company_id = $1 AND competitor_name ~* '^(un\\s+)?(acteur|concurrent|competiteur|competitor)s?(\\s+(local|locaux|regional|regionaux|inconnu|inconnus|autre|autres|principal|principaux|divers|generique|actuel))?\\s*$'`, [cid]);
+    await db.query(`DELETE FROM prix_signals WHERE company_id = $1 AND concurrent_nom ~* '^(un\\s+)?(acteur|concurrent|competiteur|competitor)s?(\\s+(local|locaux|regional|regionaux|inconnu|inconnus|autre|autres|principal|principaux|divers|generique|actuel))?\\s*$'`, [cid]);
+
     const { rows: sigComps } = await db.query(
-      `SELECT competitor_name, count(*) as mentions FROM signals WHERE competitor_name IS NOT NULL AND competitor_name != '' AND company_id = $1 GROUP BY competitor_name`,
-      [cid]
+      `SELECT competitor_name, count(*) as mentions, MIN(created_at) as first_seen
+       FROM signals WHERE competitor_name IS NOT NULL AND competitor_name != '' AND company_id = $1
+       GROUP BY competitor_name`, [cid]
     );
     const { rows: pxComps } = await db.query(
-      `SELECT concurrent_nom as competitor_name, count(*) as mentions FROM prix_signals WHERE concurrent_nom IS NOT NULL AND concurrent_nom != '' AND company_id = $1 GROUP BY concurrent_nom`,
-      [cid]
+      `SELECT concurrent_nom as competitor_name, count(*) as mentions
+       FROM prix_signals WHERE concurrent_nom IS NOT NULL AND concurrent_nom != '' AND company_id = $1
+       GROUP BY concurrent_nom`, [cid]
     );
     const compMap = new Map();
-    for (const c of [...sigComps, ...pxComps]) {
-      compMap.set(c.competitor_name, (compMap.get(c.competitor_name) || 0) + parseInt(c.mentions));
+    for (const c of sigComps) compMap.set(c.competitor_name, { mentions: parseInt(c.mentions), first_seen: c.first_seen });
+    for (const c of pxComps) {
+      const prev = compMap.get(c.competitor_name) || { mentions: 0, first_seen: null };
+      compMap.set(c.competitor_name, { mentions: prev.mentions + parseInt(c.mentions), first_seen: prev.first_seen });
     }
-    for (const [name, mentions] of compMap) {
+    // Cleanup : delete competitors noise (concurrent local, acteur regional, etc.)
+    await db.query(`DELETE FROM competitors WHERE company_id = $1 AND (
+      name IS NULL OR LENGTH(name) < 3 OR
+      name ~* '^(un\\s+)?(acteur|concurrent|competiteur|competitor)s?(\\s+(local|locaux|regional|regionaux|inconnu|inconnus|autre|autres|principal|principaux|divers|generique|actuel))?\\s*$'
+    )`, [cid]);
+
+    for (const [name, info] of compMap) {
+      if (isNoiseCompetitor(name)) continue;
+      const mentions = info.mentions;
       const risk = mentions >= 5 ? 'rouge' : mentions >= 3 ? 'orange' : 'jaune';
+      // mention_type majoritaire pour ce concurrent
+      const { rows: mainType } = await db.query(
+        `SELECT type::text, count(*) as c FROM signals WHERE company_id = $1 AND competitor_name = $2 GROUP BY type ORDER BY c DESC LIMIT 1`,
+        [cid, name]
+      );
+      const mentionType = mainType[0]?.type || 'concurrence';
+      // evolution : mentions recentes (7j) vs plus vieilles
+      const { rows: evol } = await db.query(
+        `SELECT count(*) FILTER (WHERE created_at > NOW() - INTERVAL '7 days') as recent,
+                count(*) FILTER (WHERE created_at <= NOW() - INTERVAL '7 days') as older
+         FROM signals WHERE company_id = $1 AND competitor_name = $2`,
+        [cid, name]
+      );
+      const evolution = parseInt(evol[0].recent) - parseInt(evol[0].older);
+      // is_new : premiere mention < 7 jours
+      const { rows: firstSeen } = await db.query(
+        `SELECT MIN(created_at) as d FROM signals WHERE company_id = $1 AND competitor_name = $2`, [cid, name]
+      );
+      const isNew = firstSeen[0].d && (new Date() - new Date(firstSeen[0].d)) < 7 * 24 * 3600 * 1000;
+
       const { rows: existing } = await db.query(`SELECT id FROM competitors WHERE company_id = $1 AND name = $2`, [cid, name]);
       if (existing.length === 0) {
         await db.query(
-          `INSERT INTO competitors (company_id, name, mention_type, mentions, risk) VALUES ($1, $2, 'concurrence', $3, $4)`,
-          [cid, name, mentions, risk]
+          `INSERT INTO competitors (company_id, name, mention_type, mentions, risk, evolution, is_new) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+          [cid, name, mentionType, mentions, risk, evolution, isNew]
         );
-        console.log(`  Created competitor: ${name} (${mentions} mentions, ${risk})`);
       } else {
-        await db.query(`UPDATE competitors SET mentions = $1, risk = $2 WHERE id = $3`, [mentions, risk, existing[0].id]);
+        await db.query(
+          `UPDATE competitors SET mentions = $1, risk = $2, mention_type = $3, evolution = $4, is_new = $5 WHERE id = $6`,
+          [mentions, risk, mentionType, evolution, isNew, existing[0].id]
+        );
       }
     }
+    console.log(`  competitors: ${compMap.size} maj`);
 
-    // 3. Create alerts from new severe signals
+    // 3. Alerts from severe signals
     const { rows: adminUser } = await db.query(
       `SELECT id FROM profiles WHERE company_id = $1 AND role = 'admin' LIMIT 1`, [cid]
     );
@@ -374,34 +706,30 @@ async function main() {
           [cid, sig.id, adminUser[0].id, sig.severity, sig.title]
         );
       }
-      if (unalerted.length > 0) console.log(`  Created ${unalerted.length} new alerts`);
+      if (unalerted.length > 0) console.log(`  ${unalerted.length} nouvelles alertes`);
     }
 
-    // 4. Extract client names from subjects
-    const { rows: noClient } = await db.query(
-      `SELECT id, subject FROM raw_visit_reports WHERE company_id = $1 AND client_name IS NULL`, [cid]
-    );
-    for (const r of noClient) {
-      const match = r.subject?.match(/(?:Visite|visite|RDV|CR visite|CR RDV)\s+(?:urgente\s+)?(.+?)\s*[-–]/);
-      if (match) {
-        await db.query(`UPDATE raw_visit_reports SET client_name = $1 WHERE id = $2`, [match[1].trim(), r.id]);
-      }
-    }
+    // T4 — Rank_order pour needs (basee sur mentions desc)
+    await db.query(`
+      UPDATE needs SET rank_order = sub.r FROM (
+        SELECT id, ROW_NUMBER() OVER (PARTITION BY company_id ORDER BY mentions DESC, label) as r
+        FROM needs WHERE company_id = $1
+      ) sub WHERE needs.id = sub.id
+    `, [cid]);
   }
 
-  // === Generate all derived/aggregated tables ===
-  console.log('\n--- Generating derived/aggregated tables ---');
+  console.log('\n--- Generation des tables derivees/aggregees ---');
   await generateDerivedTables(db, companyIds);
 
-  // Final summary
+  // Summary
   const { rows: summary } = await db.query(`
     SELECT processing_status, count(*) FROM raw_visit_reports GROUP BY processing_status
   `);
-  console.log('\n--- Summary ---');
+  console.log('\n--- Resume ---');
   summary.forEach(r => console.log(`  ${r.processing_status}: ${r.count}`));
 
-  const tables = ['signals', 'deals_marketing', 'deals_commerciaux', 'prix_signals', 'cr_objectifs', 'needs', 'commercials', 'competitors', 'alerts',
-    'sentiment_periodes', 'territoires', 'positionnement', 'recommandations_ia'];
+  const tables = ['signals', 'deals_marketing', 'deals_commerciaux', 'prix_signals', 'cr_objectifs', 'needs', 'commercials', 'competitors', 'alerts', 'accounts',
+    'sentiment_periodes', 'territoires', 'positionnement', 'recommandations_ia', 'segment_insights'];
   for (const t of tables) {
     const { rows } = await db.query(`SELECT count(*) FROM ${t}`);
     console.log(`  ${t}: ${rows[0].count}`);
@@ -410,9 +738,80 @@ async function main() {
   await db.end();
 }
 
-/** Generate all derived tables for the given company IDs */
+/**
+ * generateDerivedTables — refonte complete.
+ * Principe :
+ *   - Les tables geographiques (sentiment_regions, geo_points, region_profiles, geo_sector_data,
+ *     offres_concurrentes.region, comm_concurrentes.region) GROUP BY region (NLP), pas client_name.
+ *   - territoires reste par compte strategique (client_name).
+ *   - Positionnement calcule depuis ratios reels (satisfaction, prix).
+ *   - Type_offre / type_action deduits depuis contenus signals + mapping mots-cles.
+ *   - Specificite_locale genere depuis stats reelles.
+ */
 async function generateDerivedTables(db, companyIds) {
   for (const cid of companyIds) {
+    // --- T3 : Peuplement accounts ---
+    await db.query(`DELETE FROM accounts WHERE company_id = $1`, [cid]);
+    const { rows: clientStats } = await db.query(`
+      SELECT
+        r.client_name as name,
+        MAX(r.visit_date) as last_rdv,
+        COUNT(*) as nb_cr
+      FROM raw_visit_reports r
+      WHERE r.company_id = $1 AND r.client_name IS NOT NULL AND r.client_name != '' AND r.processing_status = 'done'
+      GROUP BY r.client_name
+    `, [cid]);
+    for (const c of clientStats) {
+      // Sentiment dominant
+      const { rows: sev } = await db.query(`
+        SELECT
+          COUNT(*) FILTER (WHERE s.severity = 'rouge') as r,
+          COUNT(*) FILTER (WHERE s.severity = 'orange') as o,
+          COUNT(*) FILTER (WHERE s.severity = 'jaune') as j,
+          COUNT(*) FILTER (WHERE s.severity = 'vert') as v
+        FROM signals s JOIN raw_visit_reports rr ON rr.id = s.source_report_id
+        WHERE s.company_id = $1 AND rr.client_name = $2`, [cid, c.name]);
+      const r = parseInt(sev[0].r), o = parseInt(sev[0].o), j = parseInt(sev[0].j), v = parseInt(sev[0].v);
+      const risk_level = r >= 3 ? 'rouge' : r >= 1 ? 'orange' : 'vert';
+      let sentiment_dominant = 'neutre';
+      if (v > r + o) sentiment_dominant = 'positif';
+      else if (r > v) sentiment_dominant = 'negatif';
+      // Commercial attitre : celui qui a fait le plus de CRs chez ce client
+      const { rows: com } = await db.query(`
+        SELECT commercial_name, COUNT(*) as c FROM raw_visit_reports
+        WHERE company_id = $1 AND client_name = $2 AND commercial_name IS NOT NULL AND commercial_name != ''
+        GROUP BY commercial_name ORDER BY c DESC LIMIT 1`, [cid, c.name]);
+      const commercial_attitre = com[0]?.commercial_name || '';
+      // Region dominante
+      const { rows: rg } = await db.query(`
+        SELECT s.region, COUNT(*) as c FROM signals s JOIN raw_visit_reports rr ON rr.id = s.source_report_id
+        WHERE s.company_id = $1 AND rr.client_name = $2 AND s.region IS NOT NULL AND s.region != ''
+        GROUP BY s.region ORDER BY c DESC LIMIT 1`, [cid, c.name]);
+      const region = rg[0]?.region || '';
+      // Secteur : majoritaire depuis processing_results.extracted_json (le NLP a extrait secteur au niveau racine)
+      const { rows: secRes } = await db.query(`
+        SELECT pr.extracted_json->>'secteur' as secteur, COUNT(*) as c
+        FROM processing_results pr JOIN raw_visit_reports rr ON rr.id = pr.raw_report_id
+        WHERE pr.company_id = $1 AND rr.client_name = $2 AND pr.extracted_json->>'secteur' IS NOT NULL
+        GROUP BY pr.extracted_json->>'secteur' ORDER BY c DESC LIMIT 1`, [cid, c.name]);
+      const sector = secRes[0]?.secteur || 'Autre';
+      // active_signals : signaux non traites
+      const { rows: actSig } = await db.query(`
+        SELECT COUNT(*) as c FROM signals s JOIN raw_visit_reports rr ON rr.id = s.source_report_id
+        WHERE s.company_id = $1 AND rr.client_name = $2 AND s.treated = false`, [cid, c.name]);
+      const active_signals = parseInt(actSig[0].c);
+      // risk_score / risk_trend
+      const risk_score = Math.min(100, r * 20 + o * 10 + j * 5);
+
+      await db.query(`
+        INSERT INTO accounts (company_id, name, sector, region, last_rdv, active_signals,
+          sentiment_dominant, commercial_attitre, nb_cr, risk_level, risk_score, risk_trend, kam_name)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 0, $12)`,
+        [cid, c.name, sector, region, c.last_rdv, active_signals,
+          sentiment_dominant, commercial_attitre, parseInt(c.nb_cr), risk_level, risk_score, commercial_attitre]);
+    }
+    console.log(`  accounts: ${clientStats.length}`);
+
     // --- sentiment_periodes ---
     await db.query(`DELETE FROM sentiment_periodes WHERE company_id = $1`, [cid]);
     const { rows: sigByWeek } = await db.query(`
@@ -432,14 +831,14 @@ async function generateDerivedTables(db, companyIds) {
       await db.query(`INSERT INTO sentiment_periodes (company_id, periode, positif, negatif, neutre, interesse, total) VALUES ($1,$2,$3,$4,$5,$6,$7)`, [cid, p, s.positif, s.negatif, s.neutre, s.interesse, s.total]);
     console.log(`  sentiment_periodes: ${Object.keys(wk).length}`);
 
-    // --- sentiment_regions ---
+    // --- T5 : sentiment_regions GROUP BY region (NLP), pas client ---
     await db.query(`DELETE FROM sentiment_regions WHERE company_id = $1`, [cid]);
-    const { rows: cliSig } = await db.query(`
-      SELECT COALESCE(NULLIF(r.client_name,''),'Non assigne') as region, s.severity, s.type::text as stype, COUNT(*) as c
-      FROM signals s JOIN raw_visit_reports r ON r.id = s.source_report_id WHERE s.company_id = $1
-      GROUP BY COALESCE(NULLIF(r.client_name,''),'Non assigne'), s.severity, s.type`, [cid]);
+    const { rows: regionSig } = await db.query(`
+      SELECT COALESCE(NULLIF(s.region,''),'Non specifie') as region, s.severity, s.type::text as stype, COUNT(*) as c
+      FROM signals s WHERE s.company_id = $1
+      GROUP BY COALESCE(NULLIF(s.region,''),'Non specifie'), s.severity, s.type`, [cid]);
     const rg = {};
-    for (const row of cliSig) {
+    for (const row of regionSig) {
       if (!rg[row.region]) rg[row.region] = { positif: 0, negatif: 0, neutre: 0, interesse: 0, total: 0 };
       const w = rg[row.region]; const n = parseInt(row.c); w.total += n;
       if (row.stype === 'opportunite') w.interesse += n;
@@ -477,100 +876,329 @@ async function generateDerivedTables(db, companyIds) {
     }
     console.log(`  segment_sentiments: ${Object.keys(segs).filter(s=>segs[s].clients.length>0).length}`);
 
-    // --- geo_points + region_profiles + geo_sector_data ---
+    // --- T7 : segment_insights (insights textuels par segment) ---
+    await db.query(`DELETE FROM segment_insights WHERE company_id = $1`, [cid]);
+    const { rows: segData } = await db.query(`SELECT * FROM segment_sentiments WHERE company_id = $1`, [cid]);
+    let insPrio = 1;
+    for (const sg of segData) {
+      // Insight 1 : sentiment dominant
+      if (sg.pct_negatif >= 30) {
+        const topMotif = (sg.top_insatisfactions || [])[0] || 'divers problemes';
+        await db.query(`INSERT INTO segment_insights (company_id, segment, insight, priorite) VALUES ($1,$2,$3,$4)`,
+          [cid, sg.segment, `Les comptes "${sg.segment}" montrent ${sg.pct_negatif}% de sentiment negatif, concentre sur : ${topMotif}.`, insPrio++]);
+      }
+      if (sg.pct_positif >= 30) {
+        const topPos = (sg.top_points_positifs || [])[0] || 'points positifs varies';
+        await db.query(`INSERT INTO segment_insights (company_id, segment, insight, priorite) VALUES ($1,$2,$3,$4)`,
+          [cid, sg.segment, `Sur le segment "${sg.segment}", ${sg.pct_positif}% des signaux sont positifs. Point fort cle : ${topPos}.`, insPrio++]);
+      }
+      // Insight volumetrique
+      await db.query(`INSERT INTO segment_insights (company_id, segment, insight, priorite) VALUES ($1,$2,$3,$4)`,
+        [cid, sg.segment, `Le segment "${sg.segment}" represente ${sg.nb_cr} comptes-rendus (${sg.pct_interesse}% d'interet declare).`, insPrio++]);
+    }
+    console.log(`  segment_insights: ${insPrio - 1}`);
+
+    // --- T5 : geo_points + region_profiles + geo_sector_data GROUP BY region ---
     await db.query(`DELETE FROM geo_points WHERE company_id = $1`, [cid]);
     await db.query(`DELETE FROM region_profiles WHERE company_id = $1`, [cid]);
     await db.query(`DELETE FROM geo_sector_data WHERE company_id = $1`, [cid]);
-    const { rows: gd } = await db.query(`SELECT COALESCE(NULLIF(r.client_name,''),'Non assigne') as client, s.type::text, COUNT(*) as c FROM signals s JOIN raw_visit_reports r ON r.id = s.source_report_id WHERE s.company_id = $1 GROUP BY COALESCE(NULLIF(r.client_name,''),'Non assigne'), s.type`, [cid]);
+    const { rows: gd } = await db.query(`
+      SELECT COALESCE(NULLIF(s.region,''),'Non specifie') as region, s.type::text, COUNT(*) as c
+      FROM signals s WHERE s.company_id = $1
+      GROUP BY COALESCE(NULLIF(s.region,''),'Non specifie'), s.type`, [cid]);
     const gm = {};
-    for (const row of gd) { if (!gm[row.client]) gm[row.client] = { opp: 0, risk: 0, conc: 0, bes: 0 }; const g = gm[row.client]; const n = parseInt(row.c);
-      if (row.type === 'opportunite') g.opp += n; else if (row.type === 'concurrence') g.conc += n; else if (row.type === 'besoin') g.bes += n; else g.risk += n; }
-    for (const [cl, g] of Object.entries(gm)) {
-      const int = g.opp + g.risk + g.conc + g.bes;
-      await db.query(`INSERT INTO geo_points (company_id,region,dept,opportunites,risques,concurrence,besoins,intensite) VALUES ($1,$2,$2,$3,$4,$5,$6,$7)`, [cid, cl, g.opp, g.risk, g.conc, g.bes, int]);
-      const { rows: tb } = await db.query(`SELECT s.title FROM signals s JOIN raw_visit_reports r ON r.id = s.source_report_id WHERE s.company_id = $1 AND r.client_name = $2 AND s.type = 'besoin' LIMIT 3`, [cid, cl === 'Non assigne' ? null : cl]);
-      const { rows: tc } = await db.query(`SELECT s.competitor_name, COUNT(*) as c FROM signals s JOIN raw_visit_reports r ON r.id = s.source_report_id WHERE s.company_id = $1 AND r.client_name = $2 AND s.competitor_name IS NOT NULL GROUP BY s.competitor_name ORDER BY c DESC LIMIT 1`, [cid, cl === 'Non assigne' ? null : cl]);
-      const sd = g.opp > g.risk ? 'positif' : g.risk > 0 ? 'negatif' : 'neutre';
-      await db.query(`INSERT INTO region_profiles (company_id,region,top_besoins,concurrent_principal,concurrent_mentions,sentiment_dominant,specificite_locale,nb_signaux) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-        [cid, cl, tb.map(b=>b.title), tc[0]?.competitor_name||null, parseInt(tc[0]?.c||0), sd, g.conc > 2 ? 'Forte pression concurrentielle' : g.bes > 2 ? 'Zone a fort besoin' : 'Zone standard', int]);
-      await db.query(`INSERT INTO geo_sector_data (company_id,secteur,region,signaux_concurrence,signaux_besoins,signaux_opportunites,score_intensite) VALUES ($1,'General',$2,$3,$4,$5,$6)`, [cid, cl, g.conc, g.bes, g.opp, Math.min(100, int*10)]);
+    for (const row of gd) {
+      if (!gm[row.region]) gm[row.region] = { opp: 0, risk: 0, conc: 0, bes: 0 };
+      const g = gm[row.region]; const n = parseInt(row.c);
+      if (row.type === 'opportunite') g.opp += n;
+      else if (row.type === 'concurrence') g.conc += n;
+      else if (row.type === 'besoin') g.bes += n;
+      else g.risk += n;
     }
-    console.log(`  geo_points/region_profiles/geo_sector_data: ${Object.keys(gm).length} each`);
+    for (const [region, g] of Object.entries(gm)) {
+      const int = g.opp + g.risk + g.conc + g.bes;
+      await db.query(`INSERT INTO geo_points (company_id,region,dept,opportunites,risques,concurrence,besoins,intensite) VALUES ($1,$2,$2,$3,$4,$5,$6,$7)`, [cid, region, g.opp, g.risk, g.conc, g.bes, int]);
+      const { rows: tb } = await db.query(`
+        SELECT s.title FROM signals s WHERE s.company_id = $1 AND COALESCE(NULLIF(s.region,''),'Non specifie') = $2 AND s.type = 'besoin' LIMIT 3`, [cid, region]);
+      const { rows: tc } = await db.query(`
+        SELECT s.competitor_name, COUNT(*) as c FROM signals s
+        WHERE s.company_id = $1 AND COALESCE(NULLIF(s.region,''),'Non specifie') = $2 AND s.competitor_name IS NOT NULL
+        GROUP BY s.competitor_name ORDER BY c DESC LIMIT 1`, [cid, region]);
+      const sd = g.opp > g.risk ? 'positif' : g.risk > 0 ? 'negatif' : 'neutre';
 
-    // --- territoires ---
+      // T5 : specificite_locale generee depuis stats reelles
+      const { rows: nConc } = await db.query(`
+        SELECT COUNT(DISTINCT competitor_name) as c FROM signals WHERE company_id = $1 AND COALESCE(NULLIF(region,''),'Non specifie') = $2 AND competitor_name IS NOT NULL`, [cid, region]);
+      const { rows: nDeals } = await db.query(`
+        SELECT COUNT(*) FILTER (WHERE resultat = 'gagne') as gagnes, COUNT(*) as total
+        FROM deals_commerciaux WHERE company_id = $1 AND COALESCE(NULLIF(region,''),'Non specifie') = $2`, [cid, region]);
+      const nConcurrents = parseInt(nConc[0].c);
+      const rate = parseInt(nDeals[0].total) > 0 ? Math.round((parseInt(nDeals[0].gagnes) / parseInt(nDeals[0].total)) * 100) : 0;
+      const specLocale = `${nConcurrents} concurrent(s) actif(s), ${g.risk} signaux critiques, taux de conversion ${rate}%`;
+
+      await db.query(`INSERT INTO region_profiles (company_id,region,top_besoins,concurrent_principal,concurrent_mentions,sentiment_dominant,specificite_locale,nb_signaux) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+        [cid, region, tb.map(b=>b.title), tc[0]?.competitor_name||null, parseInt(tc[0]?.c||0), sd, specLocale, int]);
+
+      // T5 : geo_sector_data par region, secteur dominant depuis accounts
+      const { rows: secDom } = await db.query(`
+        SELECT a.sector, COUNT(*) as c FROM accounts a WHERE a.company_id = $1 AND a.region = $2 GROUP BY a.sector ORDER BY c DESC LIMIT 1`, [cid, region]);
+      const secteur = secDom[0]?.sector || 'Autre';
+      await db.query(`INSERT INTO geo_sector_data (company_id,secteur,region,signaux_concurrence,signaux_besoins,signaux_opportunites,score_intensite) VALUES ($1,$2,$3,$4,$5,$6,$7)`, [cid, secteur, region, g.conc, g.bes, g.opp, Math.min(100, int*10)]);
+    }
+    console.log(`  geo_points/region_profiles/geo_sector_data: ${Object.keys(gm).length} chacun`);
+
+    // --- T5 : territoires (par compte strategique = client_name) avec tendance_vs_mois_precedent calculee ---
     await db.query(`DELETE FROM territoires WHERE company_id = $1`, [cid]);
     const { rows: cs } = await db.query(`
-      SELECT COALESCE(NULLIF(r.client_name,''),'Non assigne') as territoire, ARRAY_AGG(DISTINCT r.commercial_name) FILTER (WHERE r.commercial_name IS NOT NULL) as commercial_names, COUNT(DISTINCT r.id) as nb_cr,
-        COUNT(*) FILTER (WHERE s.competitor_name IS NOT NULL) as nb_conc, COUNT(*) FILTER (WHERE s.type = 'opportunite') as nb_opp, COUNT(*) FILTER (WHERE s.severity = 'rouge') as nb_risk
-      FROM raw_visit_reports r LEFT JOIN signals s ON s.source_report_id = r.id WHERE r.company_id = $1 AND r.processing_status = 'done'
+      SELECT COALESCE(NULLIF(r.client_name,''),'Non assigne') as territoire,
+        ARRAY_AGG(DISTINCT r.commercial_name) FILTER (WHERE r.commercial_name IS NOT NULL) as commercial_names,
+        COUNT(DISTINCT r.id) as nb_cr,
+        COUNT(*) FILTER (WHERE s.competitor_name IS NOT NULL) as nb_conc,
+        COUNT(*) FILTER (WHERE s.type = 'opportunite') as nb_opp,
+        COUNT(*) FILTER (WHERE s.severity = 'rouge') as nb_risk
+      FROM raw_visit_reports r LEFT JOIN signals s ON s.source_report_id = r.id
+      WHERE r.company_id = $1 AND r.processing_status = 'done'
       GROUP BY COALESCE(NULLIF(r.client_name,''),'Non assigne')`, [cid]);
     for (const c of cs) {
       const sd = parseInt(c.nb_opp) > parseInt(c.nb_risk) ? 'positif' : parseInt(c.nb_risk) > 0 ? 'negatif' : 'neutre';
       const sp = Math.min(100, parseInt(c.nb_risk)*20 + parseInt(c.nb_opp)*10 + parseInt(c.nb_conc)*5);
-      const { rows: om } = await db.query(`SELECT DISTINCT s.title FROM signals s JOIN raw_visit_reports r ON r.id = s.source_report_id WHERE s.company_id = $1 AND r.client_name = $2 AND s.type = 'opportunite' LIMIT 3`, [cid, c.territoire === 'Non assigne' ? null : c.territoire]);
-      const { rows: rm } = await db.query(`SELECT DISTINCT s.title FROM signals s JOIN raw_visit_reports r ON r.id = s.source_report_id WHERE s.company_id = $1 AND r.client_name = $2 AND s.severity = 'rouge' LIMIT 3`, [cid, c.territoire === 'Non assigne' ? null : c.territoire]);
-      await db.query(`INSERT INTO territoires (company_id,territoire,commercial_names,nb_cr,sentiment_dominant,nb_mentions_concurrents,nb_opportunites,nb_risques_perte,tendance_vs_mois_precedent,score_priorite,motifs_opportunite,motifs_risque) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'stable',$9,$10,$11)`,
-        [cid, c.territoire, c.commercial_names||[], parseInt(c.nb_cr), sd, parseInt(c.nb_conc), parseInt(c.nb_opp), parseInt(c.nb_risk), sp, om.map(m=>m.title), rm.map(m=>m.title)]);
+      const clientKey = c.territoire === 'Non assigne' ? null : c.territoire;
+      const { rows: om } = await db.query(`SELECT DISTINCT s.title FROM signals s JOIN raw_visit_reports r ON r.id = s.source_report_id WHERE s.company_id = $1 AND r.client_name = $2 AND s.type = 'opportunite' LIMIT 3`, [cid, clientKey]);
+      const { rows: rm } = await db.query(`SELECT DISTINCT s.title FROM signals s JOIN raw_visit_reports r ON r.id = s.source_report_id WHERE s.company_id = $1 AND r.client_name = $2 AND s.severity = 'rouge' LIMIT 3`, [cid, clientKey]);
+
+      // T5 : tendance_vs_mois_precedent calcule (nb_cr semaine N vs N-1)
+      const { rows: tendData } = await db.query(`
+        SELECT
+          COUNT(*) FILTER (WHERE r.visit_date > NOW() - INTERVAL '7 days') as recent,
+          COUNT(*) FILTER (WHERE r.visit_date > NOW() - INTERVAL '14 days' AND r.visit_date <= NOW() - INTERVAL '7 days') as older
+        FROM raw_visit_reports r WHERE r.company_id = $1 AND r.client_name = $2 AND r.processing_status = 'done'`, [cid, clientKey]);
+      const recent = parseInt(tendData[0].recent);
+      const older = parseInt(tendData[0].older);
+      let tendance = 'stable';
+      if (recent > older) tendance = 'hausse';
+      else if (recent < older) tendance = 'baisse';
+
+      await db.query(`INSERT INTO territoires (company_id,territoire,commercial_names,nb_cr,sentiment_dominant,nb_mentions_concurrents,nb_opportunites,nb_risques_perte,tendance_vs_mois_precedent,score_priorite,motifs_opportunite,motifs_risque) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+        [cid, c.territoire, c.commercial_names||[], parseInt(c.nb_cr), sd, parseInt(c.nb_conc), parseInt(c.nb_opp), parseInt(c.nb_risk), tendance, sp, om.map(m=>m.title), rm.map(m=>m.title)]);
     }
     console.log(`  territoires: ${cs.length}`);
 
-    // --- positionnement ---
+    // --- T5 : positionnement base sur ratios reels ---
     await db.query(`DELETE FROM positionnement WHERE company_id = $1`, [cid]);
     const { rows: comps } = await db.query(`SELECT name FROM competitors WHERE company_id = $1`, [cid]);
     const actors = ['Nous', ...comps.map(c => c.name)];
-    for (const acteur of actors) {
-      if (acteur === 'Nous') {
-        const { rows: pc } = await db.query(`SELECT COUNT(*) as c FROM signals WHERE company_id = $1 AND severity = 'vert'`, [cid]);
-        const { rows: sc } = await db.query(`SELECT COUNT(*) as c FROM signals WHERE company_id = $1 AND type = 'satisfaction'`, [cid]);
-        const attrs = [{ a: 'qualite', v: parseInt(pc[0].c)>3?'fort':parseInt(pc[0].c)>0?'moyen':'faible', c: parseInt(pc[0].c) },
-          { a: 'relation', v: parseInt(sc[0].c)>2?'fort':'moyen', c: parseInt(sc[0].c) }, { a: 'sav', v: 'moyen', c: 1 }, { a: 'prix', v: 'moyen', c: 1 }];
-        for (const at of attrs) await db.query(`INSERT INTO positionnement (company_id,acteur,attribut,valeur,count) VALUES ($1,$2,$3,$4,$5)`, [cid, acteur, at.a, at.v, at.c]);
+
+    // Helper : mappe ratio [0..1] vers 'fort' / 'moyen' / 'faible'
+    const ratioToValue = (ratio) => ratio >= 0.66 ? 'fort' : ratio >= 0.34 ? 'moyen' : 'faible';
+    // Helper : detection mots-cles dans content pour delai / innovation
+    const countKeywords = async (actor, keywords) => {
+      if (actor === 'Nous') {
+        const ors = keywords.map((_, i) => `s.content ILIKE $${i + 2}`).join(' OR ');
+        const params = [cid, ...keywords.map(k => `%${k}%`)];
+        const { rows } = await db.query(
+          `SELECT COUNT(*) as c FROM signals s WHERE s.company_id = $1 AND (s.competitor_name IS NULL OR s.competitor_name = '') AND (${ors})`,
+          params
+        );
+        return parseInt(rows[0].c);
       } else {
-        const { rows: px } = await db.query(`SELECT ecart_type, AVG(ecart_pct) as avg FROM prix_signals WHERE company_id = $1 AND concurrent_nom = $2 GROUP BY ecart_type`, [cid, acteur]);
-        const { rows: cs2 } = await db.query(`SELECT COUNT(*) as c FROM signals WHERE company_id = $1 AND competitor_name = $2`, [cid, acteur]);
-        const prixVal = px.length > 0 ? (px[0]?.ecart_type === 'inferieur' ? 'fort' : 'faible') : 'moyen';
-        const tm = parseInt(cs2[0]?.c || 0);
-        const attrs = [{ a: 'prix', v: prixVal, c: px.length||1 }, { a: 'qualite', v: tm>3?'fort':'moyen', c: tm }, { a: 'relation', v: 'moyen', c: 1 }];
-        for (const at of attrs) await db.query(`INSERT INTO positionnement (company_id,acteur,attribut,valeur,count) VALUES ($1,$2,$3,$4,$5)`, [cid, acteur, at.a, at.v, at.c]);
+        const ors = keywords.map((_, i) => `s.content ILIKE $${i + 3}`).join(' OR ');
+        const params = [cid, actor, ...keywords.map(k => `%${k}%`)];
+        const { rows } = await db.query(
+          `SELECT COUNT(*) as c FROM signals s WHERE s.company_id = $1 AND s.competitor_name = $2 AND (${ors})`,
+          params
+        );
+        return parseInt(rows[0].c);
+      }
+    };
+
+    for (const acteur of actors) {
+      // SAV : ratio signaux satisfaction vert / total satisfaction
+      let savVal, prixVal, relationVal, qualiteVal, delaiVal, innovationVal;
+      let savCount = 0, prixCount = 0, relationCount = 0, qualiteCount = 0, delaiCount = 0, innoCount = 0;
+
+      if (acteur === 'Nous') {
+        const { rows: sat } = await db.query(`
+          SELECT COUNT(*) FILTER (WHERE severity = 'vert') as v, COUNT(*) as t
+          FROM signals WHERE company_id = $1 AND type = 'satisfaction' AND (competitor_name IS NULL OR competitor_name = '')`, [cid]);
+        const satTot = parseInt(sat[0].t);
+        const satVert = parseInt(sat[0].v);
+        savCount = satTot;
+        savVal = satTot > 0 ? ratioToValue(satVert / satTot) : 'moyen';
+
+        const { rows: px } = await db.query(`
+          SELECT COUNT(*) FILTER (WHERE ecart_type = 'superieur') as sup, COUNT(*) as t
+          FROM prix_signals WHERE company_id = $1`, [cid]);
+        // Pour Nous : si nos prix sont percus comme inferieurs aux concurrents, on est 'fort' en prix
+        const pxTot = parseInt(px[0].t);
+        const pxSup = parseInt(px[0].sup);
+        prixCount = pxTot;
+        // Heuristique : plus il y a de signaux ou concurrents sont 'superieurs' en prix, plus on est 'fort'
+        prixVal = pxTot > 0 ? ratioToValue(pxSup / pxTot) : 'moyen';
+
+        const { rows: rel } = await db.query(`
+          SELECT COUNT(*) FILTER (WHERE severity = 'vert' AND type = 'satisfaction') as v, COUNT(*) as t
+          FROM signals WHERE company_id = $1 AND type IN ('satisfaction','opportunite') AND (competitor_name IS NULL OR competitor_name = '')`, [cid]);
+        relationCount = parseInt(rel[0].t);
+        relationVal = relationCount > 0 ? ratioToValue(parseInt(rel[0].v) / relationCount) : 'moyen';
+
+        const { rows: qu } = await db.query(`
+          SELECT COUNT(*) FILTER (WHERE severity = 'vert') as v, COUNT(*) as t
+          FROM signals WHERE company_id = $1 AND (competitor_name IS NULL OR competitor_name = '')`, [cid]);
+        qualiteCount = parseInt(qu[0].t);
+        qualiteVal = qualiteCount > 0 ? ratioToValue(parseInt(qu[0].v) / qualiteCount) : 'moyen';
+
+        // Delai : mots-cles delai/livraison/retard
+        const delaiTot = await countKeywords('Nous', ['delai','livraison','retard','planning']);
+        // Parmi ces mentions, combien sont vertes (positives) ?
+        const { rows: delaiV } = await db.query(`
+          SELECT COUNT(*) as v FROM signals s WHERE s.company_id = $1 AND (s.competitor_name IS NULL OR s.competitor_name = '') AND s.severity = 'vert' AND (s.content ILIKE '%delai%' OR s.content ILIKE '%livraison%' OR s.content ILIKE '%retard%' OR s.content ILIKE '%planning%')`, [cid]);
+        delaiCount = delaiTot;
+        delaiVal = delaiTot > 0 ? ratioToValue(parseInt(delaiV[0].v) / delaiTot) : 'moyen';
+
+        // Innovation : mots-cles innovation/nouveaute
+        const innoTot = await countKeywords('Nous', ['innovation','nouveaute','nouveau','breveté','rupture']);
+        const { rows: innoV } = await db.query(`
+          SELECT COUNT(*) as v FROM signals s WHERE s.company_id = $1 AND (s.competitor_name IS NULL OR s.competitor_name = '') AND s.severity IN ('vert','orange') AND (s.content ILIKE '%innovation%' OR s.content ILIKE '%nouveaute%' OR s.content ILIKE '%nouveau%')`, [cid]);
+        innoCount = innoTot;
+        innovationVal = innoTot > 0 ? ratioToValue(parseInt(innoV[0].v) / Math.max(1, innoTot)) : 'moyen';
+
+      } else {
+        // Concurrent : perception externe
+        const { rows: px } = await db.query(`
+          SELECT COUNT(*) FILTER (WHERE ecart_type = 'inferieur') as inf, COUNT(*) as t, AVG(ecart_pct) as avg_ecart
+          FROM prix_signals WHERE company_id = $1 AND concurrent_nom = $2`, [cid, acteur]);
+        const pxTot = parseInt(px[0].t);
+        const pxInf = parseInt(px[0].inf);
+        prixCount = Math.max(pxTot, 1);
+        // Si concurrent est 'inferieur' a nous sur les prix, il est 'fort' en prix (= moins cher)
+        prixVal = pxTot > 0 ? ratioToValue(pxInf / pxTot) : 'moyen';
+
+        const { rows: mentions } = await db.query(`SELECT COUNT(*) as c FROM signals WHERE company_id = $1 AND competitor_name = $2`, [cid, acteur]);
+        const tm = parseInt(mentions[0]?.c || 0);
+        qualiteCount = tm;
+        // Heuristique : si peu de mentions negatives, qualite elevee
+        const { rows: qualV } = await db.query(`SELECT COUNT(*) FILTER (WHERE severity = 'vert' OR severity = 'jaune') as v FROM signals WHERE company_id = $1 AND competitor_name = $2`, [cid, acteur]);
+        qualiteVal = tm > 0 ? ratioToValue(parseInt(qualV[0].v) / tm) : 'moyen';
+
+        // SAV concurrent : heuristique depuis mots-cles
+        const savTot = await countKeywords(acteur, ['sav','apres-vente','support','service']);
+        savCount = savTot;
+        savVal = savTot > 0 ? 'fort' : 'moyen';
+
+        relationCount = tm;
+        relationVal = tm >= 5 ? 'fort' : tm >= 2 ? 'moyen' : 'faible';
+
+        const delaiTot = await countKeywords(acteur, ['delai','livraison','retard','planning']);
+        delaiCount = delaiTot;
+        delaiVal = delaiTot > 0 ? 'moyen' : 'faible';
+
+        const innoTot = await countKeywords(acteur, ['innovation','nouveaute','nouveau','breveté','rupture']);
+        innoCount = innoTot;
+        innovationVal = innoTot > 0 ? 'fort' : 'faible';
+      }
+
+      const attrs = [
+        { a: 'prix', v: prixVal, c: Math.max(prixCount, 1) },
+        { a: 'qualite', v: qualiteVal, c: Math.max(qualiteCount, 1) },
+        { a: 'sav', v: savVal, c: Math.max(savCount, 1) },
+        { a: 'relation', v: relationVal, c: Math.max(relationCount, 1) },
+        { a: 'delai', v: delaiVal, c: Math.max(delaiCount, 1) },
+        { a: 'innovation', v: innovationVal, c: Math.max(innoCount, 1) },
+      ];
+      for (const at of attrs) {
+        await db.query(`INSERT INTO positionnement (company_id,acteur,attribut,valeur,count) VALUES ($1,$2,$3,$4,$5)`, [cid, acteur, at.a, at.v, at.c]);
       }
     }
-    console.log(`  positionnement: ${actors.length} actors`);
+    console.log(`  positionnement: ${actors.length} acteurs x 6 attributs`);
 
-    // --- offres_concurrentes ---
+    // --- T5 : offres_concurrentes (GROUP BY region, type_offre detecte, deals_impactes calcule, statut='active') ---
     await db.query(`DELETE FROM offres_concurrentes WHERE company_id = $1`, [cid]);
     const { rows: oc } = await db.query(`
-      SELECT s.competitor_name, s.content, MIN(r.visit_date) as d, COUNT(*) as c, s.source_report_id, COALESCE(NULLIF(r.client_name,''),'') as region
+      SELECT s.competitor_name, s.content, MIN(r.visit_date) as d, COUNT(*) as c, s.source_report_id,
+             COALESCE(NULLIF(s.region,''),'Non specifie') as region
       FROM signals s JOIN raw_visit_reports r ON r.id = s.source_report_id
       WHERE s.company_id = $1 AND s.competitor_name IS NOT NULL AND s.type IN ('concurrence','prix')
-      GROUP BY s.competitor_name, s.content, s.source_report_id, r.client_name`, [cid]);
-    for (const o of oc) await db.query(`INSERT INTO offres_concurrentes (company_id,concurrent_nom,type_offre,description,date_premiere_mention,count_mentions,deals_impactes,deals_perdus,deals_gagnes,region,secteur,statut,source_report_id) VALUES ($1,$2,'autre',$3,$4,$5,0,0,0,$6,'General','actif',$7)`,
-      [cid, o.competitor_name, o.content, o.d, parseInt(o.c), o.region, o.source_report_id]);
+      GROUP BY s.competitor_name, s.content, s.source_report_id, s.region`, [cid]);
+    for (const o of oc) {
+      const typeOffre = detectTypeOffreFromContent(o.content);
+      // deals_impactes / perdus / gagnes par join
+      const { rows: dealsImp } = await db.query(`
+        SELECT
+          COUNT(*) as total,
+          COUNT(*) FILTER (WHERE resultat = 'perdu') as perdus,
+          COUNT(*) FILTER (WHERE resultat = 'gagne') as gagnes
+        FROM deals_commerciaux WHERE company_id = $1 AND concurrent_nom = $2 AND source_report_id = $3`, [cid, o.competitor_name, o.source_report_id]);
+      // Secteur : depuis accounts si dispo
+      const { rows: sec } = await db.query(`
+        SELECT a.sector FROM accounts a JOIN deals_commerciaux d ON d.client_name = a.name
+        WHERE a.company_id = $1 AND d.concurrent_nom = $2 LIMIT 1`, [cid, o.competitor_name]);
+      const secteur = sec[0]?.sector || 'Autre';
+
+      await db.query(`INSERT INTO offres_concurrentes (company_id,concurrent_nom,type_offre,description,date_premiere_mention,count_mentions,deals_impactes,deals_perdus,deals_gagnes,region,secteur,statut,source_report_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'active',$12)`,
+        [cid, o.competitor_name, typeOffre, o.content, o.d, parseInt(o.c),
+         parseInt(dealsImp[0].total), parseInt(dealsImp[0].perdus), parseInt(dealsImp[0].gagnes),
+         o.region, secteur, o.source_report_id]);
+    }
     console.log(`  offres_concurrentes: ${oc.length}`);
 
-    // --- comm_concurrentes ---
+    // --- T5 : comm_concurrentes (type_action detecte, count_mentions = vrai GROUP BY) ---
     await db.query(`DELETE FROM comm_concurrentes WHERE company_id = $1`, [cid]);
     const { rows: cc } = await db.query(`
-      SELECT s.competitor_name, s.content, r.visit_date, COALESCE(NULLIF(r.client_name,''),'') as region, s.severity, s.source_report_id
-      FROM signals s JOIN raw_visit_reports r ON r.id = s.source_report_id WHERE s.company_id = $1 AND s.competitor_name IS NOT NULL AND s.type = 'concurrence'`, [cid]);
-    for (const c of cc) { const react = c.severity === 'rouge' ? 'negative' : c.severity === 'vert' ? 'positive' : 'neutre';
-      await db.query(`INSERT INTO comm_concurrentes (company_id,concurrent_nom,type_action,description,reaction_client,date,count_mentions,region,source_report_id) VALUES ($1,$2,'autre',$3,$4,$5,1,$6,$7)`,
-        [cid, c.competitor_name, c.content, react, c.visit_date, c.region, c.source_report_id]); }
+      SELECT s.competitor_name, s.content, MIN(r.visit_date) as visit_date,
+             COALESCE(NULLIF(s.region,''),'Non specifie') as region,
+             s.severity, s.source_report_id, COUNT(*) as c
+      FROM signals s JOIN raw_visit_reports r ON r.id = s.source_report_id
+      WHERE s.company_id = $1 AND s.competitor_name IS NOT NULL AND s.type = 'concurrence'
+      GROUP BY s.competitor_name, s.content, s.region, s.severity, s.source_report_id`, [cid]);
+    for (const c of cc) {
+      const react = c.severity === 'rouge' ? 'negative' : c.severity === 'vert' ? 'positive' : 'neutre';
+      const typeAction = detectTypeActionFromContent(c.content);
+      await db.query(`INSERT INTO comm_concurrentes (company_id,concurrent_nom,type_action,description,reaction_client,date,count_mentions,region,source_report_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+        [cid, c.competitor_name, typeAction, c.content, react, c.visit_date, parseInt(c.c), c.region, c.source_report_id]);
+    }
     console.log(`  comm_concurrentes: ${cc.length}`);
 
-    // --- recommandations_ia ---
+    // --- T5 : recommandations_ia (commercial_suggere = dernier commercial qui a visite le client) ---
     await db.query(`DELETE FROM recommandations_ia WHERE company_id = $1`, [cid]);
-    const { rows: coms } = await db.query(`SELECT name FROM commercials WHERE company_id = $1 LIMIT 1`, [cid]);
-    const comName = coms[0]?.name || 'Equipe';
     let prio = 1;
-    const { rows: rc } = await db.query(`SELECT r.client_name, COUNT(*) as c FROM signals s JOIN raw_visit_reports r ON r.id = s.source_report_id WHERE s.company_id = $1 AND s.severity = 'rouge' AND r.client_name IS NOT NULL GROUP BY r.client_name ORDER BY c DESC LIMIT 5`, [cid]);
-    for (const r of rc) await db.query(`INSERT INTO recommandations_ia (company_id,type,territoire,commercial_suggere,priorite,action_recommandee,statut,created_at) VALUES ($1,'risque',$2,$3,$4,$5,'nouvelle',NOW())`,
-      [cid, r.client_name, comName, prio++, `Attention: ${r.c} signaux critiques chez ${r.client_name}. Planifier visite de suivi urgente.`]);
-    const { rows: opc } = await db.query(`SELECT r.client_name, COUNT(*) as c FROM signals s JOIN raw_visit_reports r ON r.id = s.source_report_id WHERE s.company_id = $1 AND s.type = 'opportunite' AND r.client_name IS NOT NULL GROUP BY r.client_name ORDER BY c DESC LIMIT 5`, [cid]);
-    for (const o of opc) await db.query(`INSERT INTO recommandations_ia (company_id,type,territoire,commercial_suggere,priorite,action_recommandee,statut,created_at) VALUES ($1,'opportunite',$2,$3,$4,$5,'nouvelle',NOW())`,
-      [cid, o.client_name, comName, prio++, `Opportunite chez ${o.client_name}: ${o.c} signaux positifs. Preparer proposition commerciale.`]);
-    const { rows: lc } = await db.query(`SELECT r.client_name, COUNT(*) as total, COUNT(*) FILTER (WHERE o.resultat = 'non_atteint') as echecs FROM cr_objectifs o JOIN raw_visit_reports r ON r.id = o.source_report_id WHERE o.company_id = $1 AND r.client_name IS NOT NULL GROUP BY r.client_name HAVING COUNT(*) FILTER (WHERE o.resultat = 'non_atteint') > 0 ORDER BY echecs DESC LIMIT 3`, [cid]);
-    for (const l of lc) await db.query(`INSERT INTO recommandations_ia (company_id,type,territoire,commercial_suggere,priorite,action_recommandee,statut,created_at) VALUES ($1,'coaching',$2,$3,$4,$5,'nouvelle',NOW())`,
-      [cid, l.client_name, comName, prio++, `${l.echecs}/${l.total} objectifs non atteints chez ${l.client_name}. Revoir strategie.`]);
+
+    const suggestCommercialFor = async (clientName) => {
+      const { rows: c } = await db.query(`
+        SELECT commercial_name FROM raw_visit_reports
+        WHERE company_id = $1 AND client_name = $2 AND commercial_name IS NOT NULL AND commercial_name != ''
+        ORDER BY visit_date DESC LIMIT 1`, [cid, clientName]);
+      return c[0]?.commercial_name || 'Equipe';
+    };
+
+    const { rows: rc } = await db.query(`
+      SELECT r.client_name, COUNT(*) as c FROM signals s JOIN raw_visit_reports r ON r.id = s.source_report_id
+      WHERE s.company_id = $1 AND s.severity = 'rouge' AND r.client_name IS NOT NULL
+      GROUP BY r.client_name ORDER BY c DESC LIMIT 5`, [cid]);
+    for (const r of rc) {
+      const com = await suggestCommercialFor(r.client_name);
+      await db.query(`INSERT INTO recommandations_ia (company_id,type,territoire,commercial_suggere,priorite,action_recommandee,statut,created_at) VALUES ($1,'risque',$2,$3,$4,$5,'nouvelle',NOW())`,
+        [cid, r.client_name, com, prio++, `Attention: ${r.c} signaux critiques chez ${r.client_name}. Planifier visite de suivi urgente.`]);
+    }
+    const { rows: opc } = await db.query(`
+      SELECT r.client_name, COUNT(*) as c FROM signals s JOIN raw_visit_reports r ON r.id = s.source_report_id
+      WHERE s.company_id = $1 AND s.type = 'opportunite' AND r.client_name IS NOT NULL
+      GROUP BY r.client_name ORDER BY c DESC LIMIT 5`, [cid]);
+    for (const o of opc) {
+      const com = await suggestCommercialFor(o.client_name);
+      await db.query(`INSERT INTO recommandations_ia (company_id,type,territoire,commercial_suggere,priorite,action_recommandee,statut,created_at) VALUES ($1,'opportunite',$2,$3,$4,$5,'nouvelle',NOW())`,
+        [cid, o.client_name, com, prio++, `Opportunite chez ${o.client_name}: ${o.c} signaux positifs. Preparer proposition commerciale.`]);
+    }
+    const { rows: lc } = await db.query(`
+      SELECT r.client_name, COUNT(*) as total, COUNT(*) FILTER (WHERE o.resultat = 'non_atteint') as echecs
+      FROM cr_objectifs o JOIN raw_visit_reports r ON r.id = o.source_report_id
+      WHERE o.company_id = $1 AND r.client_name IS NOT NULL
+      GROUP BY r.client_name HAVING COUNT(*) FILTER (WHERE o.resultat = 'non_atteint') > 0
+      ORDER BY echecs DESC LIMIT 3`, [cid]);
+    for (const l of lc) {
+      const com = await suggestCommercialFor(l.client_name);
+      await db.query(`INSERT INTO recommandations_ia (company_id,type,territoire,commercial_suggere,priorite,action_recommandee,statut,created_at) VALUES ($1,'coaching',$2,$3,$4,$5,'nouvelle',NOW())`,
+        [cid, l.client_name, com, prio++, `${l.echecs}/${l.total} objectifs non atteints chez ${l.client_name}. Revoir strategie.`]);
+    }
     console.log(`  recommandations_ia: ${prio - 1}`);
 
     // --- deal_commercial_tendance ---
