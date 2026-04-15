@@ -93,6 +93,7 @@ export function useData() {
     dealsCommerciaux: [] as any[],
     dealCommercialTendance: [] as any[],
     motifsSentiment: [] as any[],
+    abbreviations: [] as any[],
   });
 
   const [loading, setLoading] = useState(false);
@@ -132,7 +133,7 @@ export function useData() {
         geoSectorData, crObjectifs, sentimentPeriodes, sentimentRegions,
         segmentSentiments, territoires, regionProfiles, geoPoints,
         recommandationsIA, dealsCommerciaux, dealCommercialTendance, motifsSentiment,
-        tendancePrix, dealTendance, segmentInsights,
+        tendancePrix, dealTendance, segmentInsights, abbreviations,
       ] = await Promise.all([
         fetchTable('signals', companyId, accessToken),
         fetchTable('accounts', companyId, accessToken),
@@ -160,6 +161,7 @@ export function useData() {
         fetchTable('tendance_prix', companyId, accessToken),
         fetchTable('deal_tendance', companyId, accessToken),
         fetchTable('segment_insights', companyId, accessToken),
+        fetchTable('abbreviations', companyId, accessToken),
       ]);
 
       const hasLiveData = signals.length > 0 || accounts.length > 0;
@@ -177,6 +179,7 @@ export function useData() {
         segmentInsights,
         territoires, regionProfiles, geoPoints,
         recommandationsIA, dealsCommerciaux, dealCommercialTendance, motifsSentiment,
+        abbreviations,
       });
 
       setIsLive(hasLiveData);
