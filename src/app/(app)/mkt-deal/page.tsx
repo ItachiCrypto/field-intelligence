@@ -20,13 +20,14 @@ import { Target, TrendingUp, TrendingDown, Percent, Plus, Pencil, Trash2, X } fr
 
 const supabase = createClient();
 
-type ResultatFilter = 'all' | 'gagne' | 'perdu';
+type ResultatFilter = 'all' | 'gagne' | 'perdu' | 'en_cours';
 type MotifFilter = 'all' | DealMotif;
 
 const RESULTAT_OPTIONS: { key: ResultatFilter; label: string }[] = [
   { key: 'all', label: 'Tous' },
   { key: 'gagne', label: 'Gagnes' },
   { key: 'perdu', label: 'Perdus' },
+  { key: 'en_cours', label: 'En cours' },
 ];
 
 const ALL_MOTIFS: DealMotif[] = ['prix', 'produit', 'offre', 'timing', 'concurrent', 'relation', 'budget', 'autre'];
@@ -52,7 +53,7 @@ export default function MktDealPage() {
   // CRUD state
   const [showModal, setShowModal] = useState(false);
   const [editingDeal, setEditingDeal] = useState<DealAnalyse | null>(null);
-  const [form, setForm] = useState(EMPTY_FORM);
+  const [form, setForm] = useState<typeof EMPTY_FORM & { resultat: 'gagne'|'perdu'|'en_cours' }>(EMPTY_FORM as any);
   const [saving, setSaving] = useState(false);
 
   function openCreate() {
@@ -519,9 +520,11 @@ export default function MktDealPage() {
                       'inline-flex px-2 py-0.5 rounded-full text-xs font-medium border',
                       d.resultat === 'gagne'
                         ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                        : 'bg-rose-50 text-rose-700 border-rose-200'
+                        : d.resultat === 'perdu'
+                        ? 'bg-rose-50 text-rose-700 border-rose-200'
+                        : 'bg-amber-50 text-amber-700 border-amber-200'
                     )}>
-                      {d.resultat === 'gagne' ? 'Gagne' : 'Perdu'}
+                      {d.resultat === 'gagne' ? 'Gagne' : d.resultat === 'perdu' ? 'Perdu' : 'En cours'}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-slate-700">{d.concurrent_nom || '--'}</td>
@@ -569,9 +572,10 @@ export default function MktDealPage() {
               </div>
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Resultat</label>
-                <select value={form.resultat} onChange={e => setForm({...form, resultat: e.target.value as 'gagne'|'perdu'})} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-300">
+                <select value={form.resultat} onChange={e => setForm({...form, resultat: e.target.value as 'gagne'|'perdu'|'en_cours'})} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-300">
                   <option value="gagne">Gagne</option>
                   <option value="perdu">Perdu</option>
+                  <option value="en_cours">En cours</option>
                 </select>
               </div>
               <div>

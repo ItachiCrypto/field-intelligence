@@ -25,12 +25,46 @@ function changePct(current: number, previous: number) {
 }
 
 export default function DirN1Page() {
-  const { sentimentPeriodes: SENTIMENT_PERIODES, sentimentActuelle: SENTIMENT_PERIODE_ACTUELLE, sentimentPrecedente: SENTIMENT_PERIODE_PRECEDENTE, sentimentRegions: SENTIMENT_REGIONS } = useAppData();
+  const { sentimentPeriodes: SENTIMENT_PERIODES, sentimentRegions: SENTIMENT_REGIONS } = useAppData();
   const [regionFilter, setRegionFilter] = useState<string>('Toutes');
   const [periodFilter, setPeriodFilter] = useState<string>('Mois');
 
-  const cur = SENTIMENT_PERIODE_ACTUELLE ?? { positif: 0, negatif: 0, neutre: 0, interesse: 0, total: 0, periode: '' };
-  const prev = SENTIMENT_PERIODE_PRECEDENTE ?? { positif: 0, negatif: 0, neutre: 0, interesse: 0, total: 0, periode: '' };
+  // --- Period slice ---
+  // Mois = 4 dernieres semaines, Trimestre = 12, Semestre = 24
+  const periodWeeks = useMemo(() => {
+    switch (periodFilter) {
+      case 'Trimestre': return 12;
+      case 'Semestre': return 24;
+      case 'Mois':
+      default: return 4;
+    }
+  }, [periodFilter]);
+
+  // Helper: agregation d'une liste de periodes
+  const aggregatePeriods = (periodes: any[]) => {
+    const acc = { positif: 0, negatif: 0, neutre: 0, interesse: 0, total: 0 };
+    for (const p of periodes) {
+      acc.positif += p.positif || 0;
+      acc.negatif += p.negatif || 0;
+      acc.neutre += p.neutre || 0;
+      acc.interesse += p.interesse || 0;
+      acc.total += p.total || 0;
+    }
+    return acc;
+  };
+
+  // Agregation periode actuelle et precedente dependant du filtre
+  // Si regionFilter != Toutes : on utilise SENTIMENT_REGIONS (pas de periode disponible cote region)
+  const { cur, prev } = useMemo(() => {
+    if (regionFilter !== 'Toutes') {
+      const r = SENTIMENT_REGIONS.find((x: any) => x.region === regionFilter);
+      const empty = { positif: 0, negatif: 0, neutre: 0, interesse: 0, total: 0 };
+      return { cur: r || empty, prev: empty };
+    }
+    const curSlice = SENTIMENT_PERIODES.slice(-periodWeeks);
+    const prevSlice = SENTIMENT_PERIODES.slice(-2 * periodWeeks, -periodWeeks);
+    return { cur: aggregatePeriods(curSlice), prev: aggregatePeriods(prevSlice) };
+  }, [SENTIMENT_PERIODES, SENTIMENT_REGIONS, regionFilter, periodWeeks]);
 
   // --- KPIs ---
   const kpis = useMemo(() => ({
@@ -62,20 +96,9 @@ export default function DirN1Page() {
     { category: 'Interesse', actuel: cur.interesse, precedent: prev.interesse },
   ], [cur, prev]);
 
-  // --- Line chart: positif % per week, filtre par periode ---
-  // Mois = 4 dernieres semaines, Trimestre = 12, Semestre = 24
-  const periodWeeks = useMemo(() => {
-    switch (periodFilter) {
-      case 'Trimestre': return 12;
-      case 'Semestre': return 24;
-      case 'Mois':
-      default: return 4;
-    }
-  }, [periodFilter]);
-
   const tendanceData = useMemo(() => {
     const slice = SENTIMENT_PERIODES.slice(-periodWeeks);
-    return slice.map((p) => ({
+    return slice.map((p: any) => ({
       semaine: p.periode,
       ratio: pct(p.positif, p.total),
     }));
@@ -203,7 +226,9 @@ export default function DirN1Page() {
         {/* Grouped bar chart */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
           <h2 className="text-base font-semibold text-slate-900 mb-4">
-            Comparaison mois actuel vs precedent
+            {regionFilter !== 'Toutes'
+              ? `Sentiment region ${regionFilter}`
+              : `Comparaison ${periodFilter.toLowerCase()} actuel vs precedent`}
           </h2>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">

@@ -19,12 +19,13 @@ const ALL_MOTIFS: MotifCommercial[] = [
   'relation_insuffisante', 'besoin_mal_identifie', 'suivi_insuffisant',
 ];
 
-type ResultatFilter = 'tous' | 'gagne' | 'perdu';
+type ResultatFilter = 'tous' | 'gagne' | 'perdu' | 'en_cours';
 
 const RESULTAT_OPTIONS: { key: ResultatFilter; label: string }[] = [
   { key: 'tous', label: 'Tous' },
   { key: 'gagne', label: 'Gagnes' },
   { key: 'perdu', label: 'Perdus' },
+  { key: 'en_cours', label: 'En cours' },
 ];
 
 export default function DirLostPage() {
@@ -340,9 +341,11 @@ export default function DirLostPage() {
                       'inline-flex px-2 py-0.5 rounded-full text-xs font-medium border',
                       d.resultat === 'gagne'
                         ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                        : 'bg-rose-50 text-rose-700 border-rose-200',
+                        : d.resultat === 'perdu'
+                        ? 'bg-rose-50 text-rose-700 border-rose-200'
+                        : 'bg-amber-50 text-amber-700 border-amber-200',
                     )}>
-                      {d.resultat === 'gagne' ? 'Gagne' : 'Perdu'}
+                      {d.resultat === 'gagne' ? 'Gagne' : d.resultat === 'perdu' ? 'Perdu' : 'En cours'}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-slate-700">{d.concurrent_nom || '--'}</td>

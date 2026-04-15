@@ -181,12 +181,17 @@ export default function DirSegPage() {
           <h2 className="text-sm font-semibold text-slate-700">Insights IA</h2>
         </div>
         <ul className="space-y-3">
-          {SEGMENT_INSIGHTS.map((insight, i) => (
-            <li key={i} className="flex items-start gap-3 text-sm text-slate-700">
+          {SEGMENT_INSIGHTS.map((item, i) => (
+            <li key={item.id || i} className="flex items-start gap-3 text-sm text-slate-700">
               <span className="flex items-center justify-center w-5 h-5 rounded-full bg-slate-100 text-slate-500 text-xs font-semibold shrink-0 mt-0.5">
                 {i + 1}
               </span>
-              {insight}
+              <span>
+                {item.segment && (
+                  <span className="font-semibold text-slate-900 capitalize">{item.segment} : </span>
+                )}
+                {item.insight}
+              </span>
             </li>
           ))}
         </ul>

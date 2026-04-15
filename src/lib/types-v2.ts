@@ -30,7 +30,7 @@ export type DealMotif = 'prix' | 'produit' | 'offre' | 'timing' | 'concurrent' |
 export interface DealAnalyse {
   id: string;
   motif_principal: DealMotif;
-  resultat: 'gagne' | 'perdu';
+  resultat: 'gagne' | 'perdu' | 'en_cours';
   concurrent_nom?: string;
   commercial_name: string;
   client_name: string;
@@ -128,7 +128,7 @@ export type MotifCommercial = 'prix_non_competitif' | 'timing_rate' | 'concurren
 export interface DealCommercial {
   id: string;
   motif: MotifCommercial;
-  resultat: 'gagne' | 'perdu';
+  resultat: 'gagne' | 'perdu' | 'en_cours';
   concurrent_nom?: string;
   commercial_name: string;
   client_name: string;

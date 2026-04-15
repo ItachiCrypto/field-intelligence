@@ -275,24 +275,30 @@ function mapCommTypeToEnum(t) {
 function detectTypeOffreFromContent(content) {
   if (!content) return 'autre';
   const c = content.toLowerCase();
-  if (/remise|discount|reduction|baisse de prix|promo/i.test(c)) return 'promotion';
-  if (/bundle|package|regroup/i.test(c)) return 'bundle';
-  if (/gratuit|offert|essai|trial/i.test(c)) return 'essai_gratuit';
-  if (/upgrade|montee|premium|nouvelle gamme/i.test(c)) return 'nouvelle_gamme';
-  if (/paiement|echeance|credit|facilite/i.test(c)) return 'conditions_paiement';
+  if (/remise|discount|reduction|rabais|baisse de prix|promo|soldes?|-[0-9]{1,2}\s?%/i.test(c)) return 'promotion';
+  if (/bundle|package|regroup|pack\b|lot\b|combo|formule|ensemble/i.test(c)) return 'bundle';
+  if (/gratuit|offert|essai|trial|echantillon|demo|d[eé]couverte gratuite|free/i.test(c)) return 'essai_gratuit';
+  if (/upgrade|montee|premium|nouvelle gamme|haut de gamme|gold|platinum|exclusif/i.test(c)) return 'nouvelle_gamme';
+  if (/paiement|[eé]ch[eé]ance|cr[eé]dit|facilit[eé]|diff[eé]r[eé]|mensualit[eé]|3x|4x|sans frais|leasing|location/i.test(c)) return 'conditions_paiement';
+  // Fallbacks contextuels pour reduire le taux de "autre"
+  if (/offre|prix|tarif|prix casse/i.test(c)) return 'promotion';
+  if (/nouveau produit|lancement|innovation|nouveaut[eé]/i.test(c)) return 'nouvelle_gamme';
   return 'autre';
 }
 
 function detectTypeActionFromContent(content) {
   if (!content) return 'autre';
   const c = content.toLowerCase();
-  if (/salon|foire|expo/i.test(c)) return 'salon';
-  if (/pub|publicite|campagne|annonce|affiche/i.test(c)) return 'pub';
-  if (/mail|email|newsletter|emailing/i.test(c)) return 'emailing';
-  if (/linkedin|facebook|instagram|twitter|reseau social|social media/i.test(c)) return 'social';
-  if (/presse|article|journal|magazine/i.test(c)) return 'presse';
-  if (/sponsor/i.test(c)) return 'sponsoring';
-  if (/partenariat|alliance|collabor/i.test(c)) return 'partenariat';
+  if (/salon|foire|expo|congr[eè]s|s[eé]minaire|convention|evenement|event/i.test(c)) return 'salon';
+  if (/pub\b|publicit[eé]|campagne|annonce|affiche|panneau|spot|banniere|banner|adwords|google ads/i.test(c)) return 'pub';
+  if (/mail|email|newsletter|emailing|e-mail|mailing|courriel/i.test(c)) return 'emailing';
+  if (/linkedin|facebook|instagram|twitter|tiktok|youtube|r[eé]seau social|social media|post\b|story|reels/i.test(c)) return 'social';
+  if (/presse|article|journal|magazine|interview|reportage|media|communiqu[eé]/i.test(c)) return 'presse';
+  if (/sponsor|m[eé]c[eé]nat|parrain/i.test(c)) return 'sponsoring';
+  if (/partenariat|alliance|collabor|distribution|revendeur|reseller|partner/i.test(c)) return 'partenariat';
+  // Fallbacks contextuels
+  if (/marketing|communication|visibilit[eé]|notoriete/i.test(c)) return 'pub';
+  if (/formation|webinar|workshop|atelier/i.test(c)) return 'salon';
   return 'autre';
 }
 
@@ -553,6 +559,12 @@ async function main() {
       const { rows: crCount } = await db.query(
         `SELECT count(*) as c FROM raw_visit_reports WHERE company_id = $1 AND commercial_name = $2 AND processing_status = 'done'`, [cid, commercial_name]
       );
+      // cr_week = nombre de CR sur les 7 derniers jours (semaine glissante)
+      const { rows: crWeek } = await db.query(
+        `SELECT count(*) as c FROM raw_visit_reports
+         WHERE company_id = $1 AND commercial_name = $2 AND processing_status = 'done'
+         AND visit_date >= NOW() - INTERVAL '7 days'`, [cid, commercial_name]
+      );
       const { rows: sigCount } = await db.query(
         `SELECT count(*) as c FROM signals s JOIN raw_visit_reports r ON s.source_report_id = r.id WHERE s.company_id = $1 AND r.commercial_name = $2`, [cid, commercial_name]
       );
@@ -576,6 +588,7 @@ async function main() {
       const sigTotal = parseInt(sevStats[0].total) || 0;
       const sigPositivity = sigTotal > 0 ? (parseInt(sevStats[0].vert) * 1.0 + parseInt(sevStats[0].moyen) * 0.5) / sigTotal : 0.5;
       const crTotal = parseInt(crCount[0].c) || 0;
+      const crWeekCount = parseInt(crWeek[0].c) || 0;
       const activityScore = Math.min(crTotal / 10, 1.0);
       const qualityScore = Math.round((objRate * 40 + sigPositivity * 40 + activityScore * 20));
 
@@ -593,12 +606,20 @@ async function main() {
       const olderTotal = parseInt(olderSig[0].total);
       const recentTotal = parseInt(recentSig[0].total);
       let qualityTrend;
-      if (olderTotal < 3 || recentTotal < 3) {
-        qualityTrend = 0; // Pas assez de donnees pour comparer
-      } else {
+      if (olderTotal >= 3 && recentTotal >= 3) {
         const recentRate = parseInt(recentSig[0].vert) / recentTotal;
         const olderRate = parseInt(olderSig[0].vert) / olderTotal;
         qualityTrend = Math.round((recentRate - olderRate) * 100);
+      } else if (recentTotal >= 3) {
+        // Tout recent : tendance deduite du positivite recent vs seuil 0.5
+        const recentRate = parseInt(recentSig[0].vert) / recentTotal;
+        qualityTrend = Math.round((recentRate - 0.5) * 40); // echelle plus petite, max +/-20
+      } else if (olderTotal >= 3) {
+        // Plus d'activite recente : tendance negative legere
+        qualityTrend = -5;
+      } else {
+        // Tres peu d'activite : proxy sur qualityScore vs 50
+        qualityTrend = Math.round((qualityScore - 50) / 10);
       }
 
       const { rows: regionData } = await db.query(
@@ -614,12 +635,12 @@ async function main() {
       if (existing.length === 0) {
         await db.query(
           `INSERT INTO commercials (company_id, name, region, quality_score, quality_trend, cr_week, useful_signals) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-          [cid, commercial_name, commercialRegion, qualityScore, qualityTrend, crTotal, parseInt(sigCount[0].c)]
+          [cid, commercial_name, commercialRegion, qualityScore, qualityTrend, crWeekCount, parseInt(sigCount[0].c)]
         );
       } else {
         await db.query(
           `UPDATE commercials SET region = $1, quality_score = $2, quality_trend = $3, cr_week = $4, useful_signals = $5 WHERE id = $6`,
-          [commercialRegion, qualityScore, qualityTrend, crTotal, parseInt(sigCount[0].c), existing[0].id]
+          [commercialRegion, qualityScore, qualityTrend, crWeekCount, parseInt(sigCount[0].c), existing[0].id]
         );
       }
     }
@@ -696,17 +717,36 @@ async function main() {
       `SELECT id FROM profiles WHERE company_id = $1 AND role = 'admin' LIMIT 1`, [cid]
     );
     if (adminUser.length > 0) {
+      // On recupere aussi client_name (via raw_visit_reports) et source_report_id
       const { rows: unalerted } = await db.query(
-        `SELECT s.id, s.severity, s.title FROM signals s LEFT JOIN alerts a ON a.signal_id = s.id WHERE s.company_id = $1 AND s.severity IN ('rouge', 'orange') AND a.id IS NULL`,
+        `SELECT s.id, s.severity, s.title, r.client_name, s.source_report_id
+         FROM signals s
+         LEFT JOIN alerts a ON a.signal_id = s.id
+         LEFT JOIN raw_visit_reports r ON r.id = s.source_report_id
+         WHERE s.company_id = $1 AND s.severity IN ('rouge', 'orange') AND a.id IS NULL`,
         [cid]
       );
       for (const sig of unalerted) {
         await db.query(
-          `INSERT INTO alerts (company_id, signal_id, user_id, severity, status, created_at, content) VALUES ($1, $2, $3, $4, 'nouveau', NOW(), $5)`,
-          [cid, sig.id, adminUser[0].id, sig.severity, sig.title]
+          `INSERT INTO alerts (company_id, signal_id, user_id, severity, status, created_at, content, client_name, source_report_id)
+           VALUES ($1, $2, $3, $4, 'nouveau', NOW(), $5, $6, $7)`,
+          [cid, sig.id, adminUser[0].id, sig.severity, sig.title, sig.client_name || null, sig.source_report_id || null]
         );
       }
       if (unalerted.length > 0) console.log(`  ${unalerted.length} nouvelles alertes`);
+
+      // Backfill: propager client_name (depuis raw_visit_reports) et source_report_id vers alerts existantes
+      const { rowCount: backfilled } = await db.query(
+        `UPDATE alerts a
+         SET client_name = r.client_name, source_report_id = s.source_report_id
+         FROM signals s
+         LEFT JOIN raw_visit_reports r ON r.id = s.source_report_id
+         WHERE a.signal_id = s.id AND a.company_id = $1
+           AND (a.client_name IS NULL OR a.source_report_id IS NULL)
+           AND (r.client_name IS NOT NULL OR s.source_report_id IS NOT NULL)`,
+        [cid]
+      );
+      if (backfilled > 0) console.log(`  ${backfilled} alertes backfilled (client_name/source_report_id)`);
     }
 
     // T4 — Rank_order pour needs (basee sur mentions desc)
@@ -800,15 +840,38 @@ async function generateDerivedTables(db, companyIds) {
         SELECT COUNT(*) as c FROM signals s JOIN raw_visit_reports rr ON rr.id = s.source_report_id
         WHERE s.company_id = $1 AND rr.client_name = $2 AND s.treated = false`, [cid, c.name]);
       const active_signals = parseInt(actSig[0].c);
-      // risk_score / risk_trend
+      // risk_score : combinaison ponderee des sev (rouge x20, orange x10, jaune x5) plafonnee a 100
       const risk_score = Math.min(100, r * 20 + o * 10 + j * 5);
+      // health = derivee de risk_score (enum severity: rouge/orange/jaune/vert)
+      const health = risk_score >= 60 ? 'rouge' : risk_score >= 30 ? 'orange' : risk_score >= 15 ? 'jaune' : 'vert';
+      // risk_trend = delta (score recent - score plus ancien) ; signe positif = se degrade
+      const { rows: trendRec } = await db.query(`
+        SELECT
+          COUNT(*) FILTER (WHERE s.severity = 'rouge' AND s.created_at > NOW() - INTERVAL '14 days') as r_rec,
+          COUNT(*) FILTER (WHERE s.severity = 'orange' AND s.created_at > NOW() - INTERVAL '14 days') as o_rec,
+          COUNT(*) FILTER (WHERE s.severity = 'rouge' AND s.created_at <= NOW() - INTERVAL '14 days') as r_old,
+          COUNT(*) FILTER (WHERE s.severity = 'orange' AND s.created_at <= NOW() - INTERVAL '14 days') as o_old
+        FROM signals s JOIN raw_visit_reports rr ON rr.id = s.source_report_id
+        WHERE s.company_id = $1 AND rr.client_name = $2`, [cid, c.name]);
+      const rRec = parseInt(trendRec[0].r_rec), oRec = parseInt(trendRec[0].o_rec);
+      const rOld = parseInt(trendRec[0].r_old), oOld = parseInt(trendRec[0].o_old);
+      const scoreRec = rRec * 20 + oRec * 10;
+      const scoreOld = rOld * 20 + oOld * 10;
+      // risk_trend positif = risque augmente ; negatif = risque diminue. Borne a [-50, 50].
+      const risk_trend = Math.max(-50, Math.min(50, scoreRec - scoreOld));
+      // ca_annual : estimation basee sur nb_cr et sentiment (proxy simple d'engagement commercial)
+      // nouveau compte (1 CR) = 50K a 150K ; compte etabli (>=3 CRs) = 300K a 1M+ selon sentiment
+      const nbCr = parseInt(c.nb_cr);
+      const sentimentMultiplier = sentiment_dominant === 'positif' ? 1.3 : sentiment_dominant === 'negatif' ? 0.8 : 1.0;
+      const baseCa = nbCr >= 3 ? 300000 + nbCr * 80000 : 50000 + nbCr * 50000;
+      const ca_annual = Math.round(baseCa * sentimentMultiplier);
 
       await db.query(`
         INSERT INTO accounts (company_id, name, sector, region, last_rdv, active_signals,
-          sentiment_dominant, commercial_attitre, nb_cr, risk_level, risk_score, risk_trend, kam_name)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 0, $12)`,
+          sentiment_dominant, commercial_attitre, nb_cr, risk_level, risk_score, risk_trend, kam_name, health, ca_annual)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
         [cid, c.name, sector, region, c.last_rdv, active_signals,
-          sentiment_dominant, commercial_attitre, parseInt(c.nb_cr), risk_level, risk_score, commercial_attitre]);
+          sentiment_dominant, commercial_attitre, nbCr, risk_level, risk_score, risk_trend, commercial_attitre, health, ca_annual]);
     }
     console.log(`  accounts: ${clientStats.length}`);
 
@@ -1141,22 +1204,41 @@ async function generateDerivedTables(db, companyIds) {
     }
     console.log(`  offres_concurrentes: ${oc.length}`);
 
-    // --- T5 : comm_concurrentes (type_action detecte, count_mentions = vrai GROUP BY) ---
+    // --- T5 : comm_concurrentes (group by (competitor, type_action, region) pour vrai count_mentions) ---
     await db.query(`DELETE FROM comm_concurrentes WHERE company_id = $1`, [cid]);
-    const { rows: cc } = await db.query(`
-      SELECT s.competitor_name, s.content, MIN(r.visit_date) as visit_date,
+    const { rows: ccRaw } = await db.query(`
+      SELECT s.competitor_name, s.content, r.visit_date,
              COALESCE(NULLIF(s.region,''),'Non specifie') as region,
-             s.severity, s.source_report_id, COUNT(*) as c
+             s.severity, s.source_report_id
       FROM signals s JOIN raw_visit_reports r ON r.id = s.source_report_id
-      WHERE s.company_id = $1 AND s.competitor_name IS NOT NULL AND s.type = 'concurrence'
-      GROUP BY s.competitor_name, s.content, s.region, s.severity, s.source_report_id`, [cid]);
-    for (const c of cc) {
-      const react = c.severity === 'rouge' ? 'negative' : c.severity === 'vert' ? 'positive' : 'neutre';
-      const typeAction = detectTypeActionFromContent(c.content);
-      await db.query(`INSERT INTO comm_concurrentes (company_id,concurrent_nom,type_action,description,reaction_client,date,count_mentions,region,source_report_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
-        [cid, c.competitor_name, typeAction, c.content, react, c.visit_date, parseInt(c.c), c.region, c.source_report_id]);
+      WHERE s.company_id = $1 AND s.competitor_name IS NOT NULL AND s.type = 'concurrence'`, [cid]);
+    // Agregation JS sur (competitor_name, type_action, region) -- type_action est calcule en JS
+    const ccGroups = new Map();
+    for (const r of ccRaw) {
+      const typeAction = detectTypeActionFromContent(r.content);
+      const key = `${r.competitor_name}||${typeAction}||${r.region}`;
+      if (!ccGroups.has(key)) {
+        ccGroups.set(key, {
+          competitor_name: r.competitor_name, type_action: typeAction, region: r.region,
+          count: 0, severities: [], contents: [], entries: [],
+        });
+      }
+      const g = ccGroups.get(key);
+      g.count++;
+      g.severities.push(r.severity);
+      g.contents.push(r.content || '');
+      g.entries.push({ date: r.visit_date, report_id: r.source_report_id });
     }
-    console.log(`  comm_concurrentes: ${cc.length}`);
+    for (const g of ccGroups.values()) {
+      const sevCounts = { rouge: 0, orange: 0, jaune: 0, vert: 0 };
+      for (const s of g.severities) if (sevCounts[s] !== undefined) sevCounts[s]++;
+      const react = sevCounts.rouge > sevCounts.vert ? 'negative' : sevCounts.vert > sevCounts.rouge ? 'positive' : 'neutre';
+      const description = [...g.contents].sort((a, b) => b.length - a.length)[0] || '';
+      const latest = [...g.entries].filter(e => e.date).sort((a, b) => new Date(b.date) - new Date(a.date))[0] || g.entries[0];
+      await db.query(`INSERT INTO comm_concurrentes (company_id,concurrent_nom,type_action,description,reaction_client,date,count_mentions,region,source_report_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+        [cid, g.competitor_name, g.type_action, description, react, latest?.date || null, g.count, g.region, latest?.report_id || null]);
+    }
+    console.log(`  comm_concurrentes: ${ccGroups.size} groupes depuis ${ccRaw.length} signaux`);
 
     // --- T5 : recommandations_ia (commercial_suggere = dernier commercial qui a visite le client) ---
     await db.query(`DELETE FROM recommandations_ia WHERE company_id = $1`, [cid]);
@@ -1221,8 +1303,23 @@ async function generateDerivedTables(db, companyIds) {
 
     // --- tendance_prix ---
     await db.query(`DELETE FROM tendance_prix WHERE company_id = $1`, [cid]);
-    const { rows: pw } = await db.query(`SELECT concurrent_nom, TO_CHAR(date, 'IYYY-"S"IW') as semaine, COUNT(*) as mentions, ROUND(AVG(ecart_pct))::int as ecart_moyen FROM prix_signals WHERE company_id = $1 GROUP BY concurrent_nom, semaine`, [cid]);
-    for (const p of pw) await db.query(`INSERT INTO tendance_prix (company_id,concurrent_nom,semaine,mentions,ecart_moyen,deals_perdus,deals_gagnes) VALUES ($1,$2,$3,$4,$5,0,0)`, [cid, p.concurrent_nom, p.semaine, parseInt(p.mentions), p.ecart_moyen]);
+    const { rows: pw } = await db.query(`
+      SELECT
+        ps.concurrent_nom,
+        TO_CHAR(ps.date, 'IYYY-"S"IW') as semaine,
+        COUNT(*) as mentions,
+        ROUND(AVG(ps.ecart_pct))::int as ecart_moyen,
+        COUNT(*) FILTER (WHERE dc.motif = 'concurrent_mieux_positionne' OR dc.motif = 'prix_non_competitif') as deals_perdus,
+        COUNT(*) FILTER (WHERE dm.resultat = 'gagne') as deals_gagnes
+      FROM prix_signals ps
+      LEFT JOIN deals_commerciaux dc ON dc.source_report_id = ps.source_report_id AND dc.company_id = ps.company_id
+      LEFT JOIN deals_marketing dm ON dm.source_report_id = ps.source_report_id AND dm.company_id = ps.company_id
+      WHERE ps.company_id = $1
+      GROUP BY ps.concurrent_nom, semaine`, [cid]);
+    for (const p of pw) await db.query(
+      `INSERT INTO tendance_prix (company_id,concurrent_nom,semaine,mentions,ecart_moyen,deals_perdus,deals_gagnes) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+      [cid, p.concurrent_nom, p.semaine, parseInt(p.mentions), p.ecart_moyen, parseInt(p.deals_perdus) || 0, parseInt(p.deals_gagnes) || 0]
+    );
     console.log(`  tendance_prix: ${pw.length}`);
   }
 }
