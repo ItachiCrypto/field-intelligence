@@ -215,7 +215,7 @@ export default function DirClosPage() {
       {/* KPIs */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <KpiCard
-          label="Total CR"
+          label="Objectifs analyses"
           value={kpis.total}
           icon={<FileText className="w-5 h-5" />}
           iconColor="text-indigo-600 bg-indigo-50"

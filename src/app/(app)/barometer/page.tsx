@@ -19,8 +19,8 @@ type ClientFilter = 'all' | 'nouveau' | 'etabli';
 
 const FILTER_OPTIONS: { key: ClientFilter; label: string; hint: string }[] = [
   { key: 'all', label: 'Tous', hint: 'Tous besoins confondus' },
-  { key: 'nouveau', label: 'Nouveaux clients', hint: 'Clients apparus 1x seulement dans les CR' },
-  { key: 'etabli', label: 'Clients etablis', hint: 'Clients avec au moins 2 remontees' },
+  { key: 'nouveau', label: 'Nouveaux clients', hint: 'Clients avec 1 seul besoin exprime' },
+  { key: 'etabli', label: 'Clients etablis', hint: 'Clients avec au moins 2 besoins exprimes' },
 ];
 
 // Palette utilisee pour le nuage de mots : du plus intense (indigo fonce) au plus clair.
@@ -37,11 +37,12 @@ export default function BarometerPage() {
   const { needs: NEEDS, signals: SIGNALS } = useAppData();
   const [clientFilter, setClientFilter] = useState<ClientFilter>('all');
 
-  // Classification des clients : nouveau (1 signal total) vs etabli (>=2 signals).
-  // On se base sur tous les signaux confondus, pas seulement les 'besoin'.
+  // Classification des clients : nouveau (1 besoin) vs etabli (>=2 besoins).
+  // On compte uniquement les signaux de type 'besoin' pour etre coherent avec le filtre affiche.
   const clientStatus = useMemo(() => {
     const counts = new Map<string, number>();
     for (const s of SIGNALS || []) {
+      if (s.type !== 'besoin') continue;
       if (!s.client_id) continue;
       counts.set(s.client_id, (counts.get(s.client_id) || 0) + 1);
     }

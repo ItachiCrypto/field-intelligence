@@ -13,7 +13,7 @@ import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/lib/auth-context';
 import { Users, ChevronUp, ChevronDown, AlertTriangle, ArrowUpRight, ArrowDownRight, Minus, GraduationCap, Plus, Pencil, Trash2 } from 'lucide-react';
 
-type SortKey = 'name' | 'region' | 'cr_week' | 'quality_score' | 'useful_signals' | 'quality_trend';
+type SortKey = 'name' | 'region' | 'cr_week' | 'cr_total' | 'quality_score' | 'useful_signals' | 'quality_trend';
 type SortDir = 'asc' | 'desc';
 
 export default function TeamPage() {
@@ -119,7 +119,8 @@ export default function TeamPage() {
   }, [COMMERCIALS, sortKey, sortDir]);
 
   const avgScore = COMMERCIALS.length > 0 ? Math.round(COMMERCIALS.reduce((s, c) => s + c.quality_score, 0) / COMMERCIALS.length) : 0;
-  const totalCR = COMMERCIALS.reduce((s, c) => s + (c.cr_week || 0), 0);
+  const totalCRAllTime = COMMERCIALS.reduce((s, c) => s + (c.cr_total || 0), 0);
+  const totalCRWeek = COMMERCIALS.reduce((s, c) => s + (c.cr_week || 0), 0);
   const coachingCount = COMMERCIALS.filter((c) => c.quality_trend < -5).length;
 
   const SortIcon = ({ col }: { col: SortKey }) => {
@@ -182,8 +183,9 @@ export default function TeamPage() {
           suffix="%"
         />
         <KpiCard
-          label="CR / semaine (total)"
-          value={totalCR}
+          label="CR analyses (total)"
+          value={totalCRAllTime}
+          suffix={totalCRWeek > 0 ? ` (${totalCRWeek} sem.)` : ''}
         />
         <KpiCard
           label="Coaching recommande"
@@ -201,7 +203,8 @@ export default function TeamPage() {
               <tr className="bg-slate-50/60 border-b border-slate-100">
                 <ColHeader col="name" label="Nom" />
                 <ColHeader col="region" label="Region" />
-                <ColHeader col="cr_week" label="CR / semaine" align="center" />
+                <ColHeader col="cr_total" label="CR total" align="center" />
+                <ColHeader col="cr_week" label="CR semaine" align="center" />
                 <ColHeader col="quality_score" label="Score qualite" align="center" />
                 <ColHeader col="useful_signals" label="Signaux utiles" align="center" />
                 <ColHeader col="quality_trend" label="Tendance" align="center" />
@@ -230,7 +233,8 @@ export default function TeamPage() {
                       </div>
                     </td>
                     <td className="px-4 py-3 text-slate-600">{c.region}</td>
-                    <td className="px-4 py-3 text-center text-slate-900 tabular-nums font-medium">{c.cr_week || 0}</td>
+                    <td className="px-4 py-3 text-center text-slate-900 tabular-nums font-semibold">{c.cr_total || 0}</td>
+                    <td className="px-4 py-3 text-center text-slate-700 tabular-nums">{c.cr_week || 0}</td>
                     <td className="px-4 py-3 text-center">
                       <span className={cn(
                         'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold tabular-nums border',

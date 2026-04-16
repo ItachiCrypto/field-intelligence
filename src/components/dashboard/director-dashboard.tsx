@@ -38,25 +38,27 @@ function scoreTextColor(score: number): string {
 }
 
 export function DirectorDashboard() {
-  const { signals: SIGNALS, alerts: ALERTS, commercials: COMMERCIALS } = useAppData();
-  const totalCR = COMMERCIALS.reduce((s, c) => s + (c.cr_week || 0), 0);
+  const { signals: SIGNALS, alerts: ALERTS, commercials: COMMERCIALS } = useAppData() as any;
+  // CR total analyses (champ stocke par le pipeline) et CR semaine glissante
+  const totalCRAllTime = COMMERCIALS.reduce((s: number, c: any) => s + (c.cr_total || 0), 0);
+  const totalCRWeek = COMMERCIALS.reduce((s: number, c: any) => s + (c.cr_week || 0), 0);
   const criticalAlerts = ALERTS.filter(
-    (a) => a.severity === 'rouge' && a.status === 'nouveau'
+    (a: any) => a.severity === 'rouge' && a.status === 'nouveau'
   );
   const avgQuality = COMMERCIALS.length > 0
-    ? Math.round(COMMERCIALS.reduce((s, c) => s + c.quality_score, 0) / COMMERCIALS.length)
+    ? Math.round(COMMERCIALS.reduce((s: number, c: any) => s + c.quality_score, 0) / COMMERCIALS.length)
     : 0;
   // Nombre de commerciaux "actifs" cette semaine (au moins 1 CR remonte)
-  const activeCount = COMMERCIALS.filter((c) => (c.cr_week || 0) > 0).length;
+  const activeCount = COMMERCIALS.filter((c: any) => (c.cr_week || 0) > 0).length;
 
   const top10ByCR = useMemo(
     () =>
       [...COMMERCIALS]
-        .sort((a, b) => (b.cr_week || 0) - (a.cr_week || 0))
+        .sort((a: any, b: any) => (b.cr_total || b.cr_week || 0) - (a.cr_total || a.cr_week || 0))
         .slice(0, 10)
-        .map((c) => ({
+        .map((c: any) => ({
           name: c.name,
-          cr: c.cr_week || 0,
+          cr: c.cr_total || 0,
           quality: c.quality_score,
         })),
     [COMMERCIALS]
@@ -65,12 +67,12 @@ export function DirectorDashboard() {
   const top5ByQuality = useMemo(
     () =>
       [...COMMERCIALS]
-        .sort((a, b) => b.quality_score - a.quality_score)
+        .sort((a: any, b: any) => b.quality_score - a.quality_score)
         .slice(0, 5),
     [COMMERCIALS]
   );
 
-  const criticalSignals = SIGNALS.filter((s) => s.severity === 'rouge');
+  const criticalSignals = SIGNALS.filter((s: any) => s.severity === 'rouge');
 
   return (
     <div className="space-y-6">
@@ -89,8 +91,9 @@ export function DirectorDashboard() {
       {/* KPIs */}
       <div className="grid grid-cols-4 gap-4">
         <KpiCard
-          label="CR analyses"
-          value={totalCR}
+          label="CR analyses (total)"
+          value={totalCRAllTime}
+          suffix={totalCRWeek > 0 ? ` (${totalCRWeek} sem.)` : ''}
           icon={<FileText className="w-5 h-5" />}
           iconColor="text-indigo-600 bg-indigo-50"
         />
@@ -127,7 +130,7 @@ export function DirectorDashboard() {
             </span>
           </div>
           <div className="space-y-3">
-            {criticalSignals.slice(0, 4).map((signal) => (
+            {criticalSignals.slice(0, 4).map((signal: any) => (
               <SignalCard key={signal.id} signal={signal} compact />
             ))}
           </div>
@@ -139,7 +142,7 @@ export function DirectorDashboard() {
         {/* Bar chart — CR by commercial */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
           <h3 className="text-sm font-semibold text-slate-900 mb-4">
-            CR par commercial (top 10)
+            CR analyses par commercial (total)
           </h3>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
@@ -171,11 +174,11 @@ export function DirectorDashboard() {
                   // eslint-disable-next-line @typescript-eslint/no-explicit-any
                   formatter={((value: any, name: any) => [
                     String(value),
-                    name === 'cr' ? 'CR cette semaine' : String(name),
+                    name === 'cr' ? 'CR analyses (total)' : String(name),
                   ]) as any}
                 />
                 <Bar dataKey="cr" radius={[4, 4, 0, 0]} name="cr">
-                  {top10ByCR.map((entry, index) => (
+                  {top10ByCR.map((entry: any, index: number) => (
                     <Cell key={index} fill={barColor(entry.quality)} />
                   ))}
                 </Bar>
@@ -190,7 +193,7 @@ export function DirectorDashboard() {
             Top commerciaux
           </h3>
           <div className="space-y-1">
-            {top5ByQuality.map((com, i) => (
+            {top5ByQuality.map((com: any, i: number) => (
               <div
                 key={com.id}
                 className="flex items-center gap-4 py-3 border-b border-slate-100 last:border-b-0"
@@ -213,9 +216,9 @@ export function DirectorDashboard() {
                     {com.quality_score}/100
                   </span>
                 </div>
-                <div className="text-right shrink-0 w-14">
-                  <span className="text-xs text-slate-500">
-                    {com.cr_week || 0} CR
+                <div className="text-right shrink-0 w-20">
+                  <span className="text-xs text-slate-500 tabular-nums">
+                    {com.cr_total || 0} CR ({com.cr_week || 0} sem.)
                   </span>
                 </div>
                 <div className="shrink-0 w-14 text-right">
@@ -246,7 +249,7 @@ export function DirectorDashboard() {
       </div>
 
       {/* Signal highlight — only shown when there are signals */}
-      {SIGNALS.length > 0 && (
+      {SIGNALS.length > 0 && SIGNALS[0] && (
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-5">
           <div className="flex items-start gap-3">
             <TrendingUp className="w-5 h-5 text-amber-600 mt-0.5 shrink-0" />

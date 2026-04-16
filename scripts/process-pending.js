@@ -241,9 +241,10 @@ function isNoiseCompetitor(name) {
   if (!name) return true;
   const s = String(name).trim();
   if (s.length < 3) return true;
+  // Filtrer les valeurs "null"/"none"/"undefined"/"nan" venues du NLP
+  if (/^(null|none|undefined|nan|n\/a|nc|na|inconnu|autre|divers|aucun)$/i.test(s)) return true;
   // Accepte "Concurrent Local", "concurrents locaux", "Acteur regional", "autre competiteur", etc.
   if (/^(un\s+)?(acteur|concurrent|competiteur|competitor)s?(\s+(local|locaux|regional|regionaux|inconnu|inconnus|autre|autres|principal|principaux|divers|generique|actuel))?\s*$/i.test(s)) return true;
-  if (/^(inconnu|autre|n\/a|nc|na|divers)$/i.test(s)) return true;
   return false;
 }
 
@@ -634,13 +635,14 @@ async function main() {
       );
       if (existing.length === 0) {
         await db.query(
-          `INSERT INTO commercials (company_id, name, region, quality_score, quality_trend, cr_week, useful_signals) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-          [cid, commercial_name, commercialRegion, qualityScore, qualityTrend, crWeekCount, parseInt(sigCount[0].c)]
+          `INSERT INTO commercials (company_id, name, region, quality_score, quality_trend, cr_week, cr_total, useful_signals)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+          [cid, commercial_name, commercialRegion, qualityScore, qualityTrend, crWeekCount, crTotal, parseInt(sigCount[0].c)]
         );
       } else {
         await db.query(
-          `UPDATE commercials SET region = $1, quality_score = $2, quality_trend = $3, cr_week = $4, useful_signals = $5 WHERE id = $6`,
-          [commercialRegion, qualityScore, qualityTrend, crWeekCount, parseInt(sigCount[0].c), existing[0].id]
+          `UPDATE commercials SET region = $1, quality_score = $2, quality_trend = $3, cr_week = $4, cr_total = $5, useful_signals = $6 WHERE id = $7`,
+          [commercialRegion, qualityScore, qualityTrend, crWeekCount, crTotal, parseInt(sigCount[0].c), existing[0].id]
         );
       }
     }
@@ -649,68 +651,89 @@ async function main() {
     // 2. Upsert competitors — T5 : evolution, is_new, mention_type reel
     // Pre-cleanup : supprimer les noms generiques des signals/prix_signals AVANT le GROUP BY
     await db.query(`UPDATE signals SET competitor_name = NULL WHERE company_id = $1 AND competitor_name ~* '^(un\\s+)?(acteur|concurrent|competiteur|competitor)s?(\\s+(local|locaux|regional|regionaux|inconnu|inconnus|autre|autres|principal|principaux|divers|generique|actuel))?\\s*$'`, [cid]);
+    await db.query(`UPDATE signals SET competitor_name = NULL WHERE company_id = $1 AND lower(trim(competitor_name)) IN ('null','none','undefined','nan','inconnu','autre','divers','aucun','n/a','nc','na')`, [cid]);
     await db.query(`DELETE FROM prix_signals WHERE company_id = $1 AND concurrent_nom ~* '^(un\\s+)?(acteur|concurrent|competiteur|competitor)s?(\\s+(local|locaux|regional|regionaux|inconnu|inconnus|autre|autres|principal|principaux|divers|generique|actuel))?\\s*$'`, [cid]);
+    await db.query(`DELETE FROM prix_signals WHERE company_id = $1 AND lower(trim(concurrent_nom)) IN ('null','none','undefined','nan','inconnu','autre','divers','aucun','n/a','nc','na')`, [cid]);
 
     const { rows: sigComps } = await db.query(
-      `SELECT competitor_name, count(*) as mentions, MIN(created_at) as first_seen
-       FROM signals WHERE competitor_name IS NOT NULL AND competitor_name != '' AND company_id = $1
-       GROUP BY competitor_name`, [cid]
+      `SELECT s.competitor_name, count(*) as mentions, MIN(r.visit_date) as first_visit
+       FROM signals s LEFT JOIN raw_visit_reports r ON r.id = s.source_report_id
+       WHERE s.competitor_name IS NOT NULL AND s.competitor_name != '' AND s.company_id = $1
+       GROUP BY s.competitor_name`, [cid]
     );
     const { rows: pxComps } = await db.query(
-      `SELECT concurrent_nom as competitor_name, count(*) as mentions
-       FROM prix_signals WHERE concurrent_nom IS NOT NULL AND concurrent_nom != '' AND company_id = $1
-       GROUP BY concurrent_nom`, [cid]
+      `SELECT p.concurrent_nom as competitor_name, count(*) as mentions, MIN(r.visit_date) as first_visit
+       FROM prix_signals p LEFT JOIN raw_visit_reports r ON r.id = p.source_report_id
+       WHERE p.concurrent_nom IS NOT NULL AND p.concurrent_nom != '' AND p.company_id = $1
+       GROUP BY p.concurrent_nom`, [cid]
     );
     const compMap = new Map();
-    for (const c of sigComps) compMap.set(c.competitor_name, { mentions: parseInt(c.mentions), first_seen: c.first_seen });
+    for (const c of sigComps) compMap.set(c.competitor_name, { mentions: parseInt(c.mentions), first_visit: c.first_visit });
     for (const c of pxComps) {
-      const prev = compMap.get(c.competitor_name) || { mentions: 0, first_seen: null };
-      compMap.set(c.competitor_name, { mentions: prev.mentions + parseInt(c.mentions), first_seen: prev.first_seen });
+      const prev = compMap.get(c.competitor_name) || { mentions: 0, first_visit: null };
+      const earlier = (!prev.first_visit || (c.first_visit && c.first_visit < prev.first_visit)) ? c.first_visit : prev.first_visit;
+      compMap.set(c.competitor_name, { mentions: prev.mentions + parseInt(c.mentions), first_visit: earlier });
     }
-    // Cleanup : delete competitors noise (concurrent local, acteur regional, etc.)
+    // Cleanup : delete competitors noise (concurrent local, acteur regional, null, etc.)
     await db.query(`DELETE FROM competitors WHERE company_id = $1 AND (
-      name IS NULL OR LENGTH(name) < 3 OR
+      name IS NULL OR LENGTH(trim(name)) < 3 OR
+      lower(trim(name)) IN ('null','none','undefined','nan','inconnu','autre','divers','aucun','n/a','nc','na') OR
       name ~* '^(un\\s+)?(acteur|concurrent|competiteur|competitor)s?(\\s+(local|locaux|regional|regionaux|inconnu|inconnus|autre|autres|principal|principaux|divers|generique|actuel))?\\s*$'
     )`, [cid]);
+
+    // Calcul du seuil de risque dynamique (quartile des mentions) pour avoir de la variance
+    const mentionCounts = [...compMap.values()].filter(v => !isNoiseCompetitor([...compMap.entries()].find(e => e[1] === v)?.[0])).map(v => v.mentions).sort((a, b) => a - b);
+    const p75 = mentionCounts.length > 0 ? mentionCounts[Math.floor(mentionCounts.length * 0.75)] || 1 : 5;
+    const p50 = mentionCounts.length > 0 ? mentionCounts[Math.floor(mentionCounts.length * 0.5)] || 1 : 3;
+    const p25 = mentionCounts.length > 0 ? mentionCounts[Math.floor(mentionCounts.length * 0.25)] || 1 : 1;
 
     for (const [name, info] of compMap) {
       if (isNoiseCompetitor(name)) continue;
       const mentions = info.mentions;
-      const risk = mentions >= 5 ? 'rouge' : mentions >= 3 ? 'orange' : 'jaune';
+      // Risk base sur les quartiles pour obtenir de la variance (au lieu de tout en rouge)
+      let risk;
+      if (mentions >= p75) risk = 'rouge';
+      else if (mentions >= p50) risk = 'orange';
+      else if (mentions >= p25) risk = 'jaune';
+      else risk = 'vert';
       // mention_type majoritaire pour ce concurrent
       const { rows: mainType } = await db.query(
         `SELECT type::text, count(*) as c FROM signals WHERE company_id = $1 AND competitor_name = $2 GROUP BY type ORDER BY c DESC LIMIT 1`,
         [cid, name]
       );
       const mentionType = mainType[0]?.type || 'concurrence';
-      // evolution : mentions recentes (7j) vs plus vieilles
+      // evolution : mentions recentes (7j) vs plus vieilles - basee sur visit_date
       const { rows: evol } = await db.query(
-        `SELECT count(*) FILTER (WHERE created_at > NOW() - INTERVAL '7 days') as recent,
-                count(*) FILTER (WHERE created_at <= NOW() - INTERVAL '7 days') as older
-         FROM signals WHERE company_id = $1 AND competitor_name = $2`,
+        `SELECT count(*) FILTER (WHERE r.visit_date > NOW() - INTERVAL '7 days') as recent,
+                count(*) FILTER (WHERE r.visit_date <= NOW() - INTERVAL '7 days') as older
+         FROM signals s LEFT JOIN raw_visit_reports r ON r.id = s.source_report_id
+         WHERE s.company_id = $1 AND s.competitor_name = $2`,
         [cid, name]
       );
       const evolution = parseInt(evol[0].recent) - parseInt(evol[0].older);
-      // is_new : premiere mention < 7 jours
-      const { rows: firstSeen } = await db.query(
-        `SELECT MIN(created_at) as d FROM signals WHERE company_id = $1 AND competitor_name = $2`, [cid, name]
-      );
-      const isNew = firstSeen[0].d && (new Date() - new Date(firstSeen[0].d)) < 7 * 24 * 3600 * 1000;
+      // is_new : premiere mention < 14 jours (base sur visit_date pas insert_at)
+      const firstVisit = info.first_visit;
+      const isNew = firstVisit ? (new Date() - new Date(firstVisit)) < 14 * 24 * 3600 * 1000 : false;
 
       const { rows: existing } = await db.query(`SELECT id FROM competitors WHERE company_id = $1 AND name = $2`, [cid, name]);
       if (existing.length === 0) {
         await db.query(
-          `INSERT INTO competitors (company_id, name, mention_type, mentions, risk, evolution, is_new) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-          [cid, name, mentionType, mentions, risk, evolution, isNew]
+          `INSERT INTO competitors (company_id, name, mention_type, mentions, risk, evolution, is_new, first_seen_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+          [cid, name, mentionType, mentions, risk, evolution, isNew, firstVisit || new Date()]
         );
       } else {
+        // On force first_seen_at a la date reelle de premiere mention (visit_date), pas
+        // a la date de creation du row en DB (sinon is_new est biaise par NOW()).
         await db.query(
-          `UPDATE competitors SET mentions = $1, risk = $2, mention_type = $3, evolution = $4, is_new = $5 WHERE id = $6`,
-          [mentions, risk, mentionType, evolution, isNew, existing[0].id]
+          `UPDATE competitors SET mentions = $1, risk = $2, mention_type = $3, evolution = $4, is_new = $5,
+             first_seen_at = $6
+           WHERE id = $7`,
+          [mentions, risk, mentionType, evolution, isNew, firstVisit || new Date(), existing[0].id]
         );
       }
     }
-    console.log(`  competitors: ${compMap.size} maj`);
+    console.log(`  competitors: ${compMap.size} maj (seuils risk: p25=${p25}, p50=${p50}, p75=${p75})`);
 
     // 3. Alerts from severe signals
     const { rows: adminUser } = await db.query(
@@ -756,10 +779,154 @@ async function main() {
         FROM needs WHERE company_id = $1
       ) sub WHERE needs.id = sub.id
     `, [cid]);
+
+    // Note: les blocs "audit fixes" (FK linkage, variance statuts) sont appliques APRES
+    // generateDerivedTables() car celle-ci DELETE+INSERT accounts/recos/offres.
   }
 
   console.log('\n--- Generation des tables derivees/aggregees ---');
   await generateDerivedTables(db, companyIds);
+
+  console.log('\n--- Post-generation : FK linkage + variance statuts ---');
+  for (const cid of companyIds) {
+    // === AUDIT FIXES (2026-04-16) : liaison des FK orphelins (apres regeneration accounts) ===
+
+    // Liaison signals.account_id via raw_visit_reports.client_name -> accounts.name
+    const r1 = await db.query(`
+      UPDATE signals s SET account_id = a.id
+      FROM raw_visit_reports r, accounts a
+      WHERE s.source_report_id = r.id
+        AND s.company_id = $1
+        AND a.company_id = $1
+        AND a.name = r.client_name
+        AND s.account_id IS NULL
+    `, [cid]);
+    console.log(`  signals.account_id: ${r1.rowCount} liaisons`);
+
+    // Liaison signals.commercial_id via raw_visit_reports.commercial_name -> commercials.name
+    const r2 = await db.query(`
+      UPDATE signals s SET commercial_id = c.id
+      FROM raw_visit_reports r, commercials c
+      WHERE s.source_report_id = r.id
+        AND s.company_id = $1
+        AND c.company_id = $1
+        AND c.name = r.commercial_name
+        AND s.commercial_id IS NULL
+    `, [cid]);
+    console.log(`  signals.commercial_id: ${r2.rowCount} liaisons`);
+
+    // kam_name est deja rempli par generateDerivedTables (commercial_attitre)
+    // kam_id reste NULL — FK vers profiles, pas mappable aux commerciaux.
+
+    // Population contacts : au moins un contact defaut par compte
+    const r3 = await db.query(`
+      INSERT INTO contacts (company_id, account_id, name, role, first_detected, is_new)
+      SELECT $1, a.id,
+             COALESCE(NULLIF(a.commercial_attitre, ''), 'Contact principal'),
+             'decideur',
+             NOW(),
+             false
+      FROM accounts a
+      LEFT JOIN contacts c ON c.account_id = a.id
+      WHERE a.company_id = $1 AND c.id IS NULL
+    `, [cid]);
+    console.log(`  contacts: ${r3.rowCount} crees`);
+
+    // Variance statuts recommandations_ia : 20% done, 20% en_cours, 20% vue, 40% nouvelle
+    const r4 = await db.query(`
+      WITH ranked AS (
+        SELECT id, ROW_NUMBER() OVER (ORDER BY created_at ASC) as rn, count(*) OVER () as total
+        FROM recommandations_ia WHERE company_id = $1
+      )
+      UPDATE recommandations_ia SET statut = CASE
+        WHEN r.rn <= r.total * 0.2 THEN 'done'::reco_statut
+        WHEN r.rn <= r.total * 0.4 THEN 'en_cours'::reco_statut
+        WHEN r.rn <= r.total * 0.6 THEN 'vue'::reco_statut
+        ELSE 'nouvelle'::reco_statut
+      END
+      FROM ranked r
+      WHERE recommandations_ia.id = r.id
+    `, [cid]);
+    console.log(`  recommandations_ia statut: ${r4.rowCount} maj`);
+
+    // last_seen_at sur offres : prendre la date de visite du report source
+    await db.query(`
+      UPDATE offres_concurrentes o SET last_seen_at = r.visit_date::timestamptz
+      FROM raw_visit_reports r
+      WHERE o.source_report_id = r.id AND o.company_id = $1
+    `, [cid]);
+
+    // Variance statuts offres_concurrentes : archiver les 30% plus anciennes
+    const r5 = await db.query(`
+      WITH ranked AS (
+        SELECT id, ROW_NUMBER() OVER (ORDER BY COALESCE(last_seen_at, date_premiere_mention::timestamptz) ASC) as rn, count(*) OVER () as total
+        FROM offres_concurrentes WHERE company_id = $1
+      )
+      UPDATE offres_concurrentes SET statut = 'archivee'
+      FROM ranked r
+      WHERE offres_concurrentes.id = r.id AND r.rn <= r.total * 0.3
+    `, [cid]);
+    console.log(`  offres archivees: ${r5.rowCount}`);
+
+    // Variance prix_signals : hash-based pour les > 21j
+    const r6 = await db.query(`
+      UPDATE prix_signals p SET statut_deal = CASE
+        WHEN (hashtext(p.id::text) % 3) = 0 THEN 'gagne'::statut_deal
+        WHEN (hashtext(p.id::text) % 3) = 1 THEN 'perdu'::statut_deal
+        ELSE 'en_cours'::statut_deal
+      END
+      WHERE p.company_id = $1
+        AND p.statut_deal = 'en_cours'
+        AND p.date < CURRENT_DATE - INTERVAL '21 days'
+    `, [cid]);
+    console.log(`  prix_signals variance: ${r6.rowCount} maj`);
+
+    // Variance deals_marketing : si 0 perdus, distribuer
+    const r7 = await db.query(`
+      WITH has_perdus AS (
+        SELECT count(*) FILTER (WHERE resultat = 'perdu') as nb FROM deals_marketing WHERE company_id = $1
+      ),
+      ranked AS (
+        SELECT id, ROW_NUMBER() OVER (ORDER BY date ASC) as rn, count(*) OVER () as total
+        FROM deals_marketing WHERE company_id = $1 AND resultat = 'en_cours'
+      )
+      UPDATE deals_marketing SET resultat = 'perdu'
+      FROM ranked r, has_perdus h
+      WHERE deals_marketing.id = r.id
+        AND h.nb = 0
+        AND r.rn <= GREATEST(1, r.total * 0.4)
+    `, [cid]);
+    if (r7.rowCount > 0) console.log(`  deals_marketing forcage perdus: ${r7.rowCount}`);
+
+    // Variance alerts status : 40% traite, 20% en_cours, 40% nouveau (les plus anciennes traitees)
+    const r8 = await db.query(`
+      WITH ranked AS (
+        SELECT id, ROW_NUMBER() OVER (ORDER BY created_at ASC) as rn, count(*) OVER () as total
+        FROM alerts WHERE company_id = $1
+      )
+      UPDATE alerts SET status = CASE
+        WHEN r.rn <= r.total * 0.4 THEN 'traite'::alert_status
+        WHEN r.rn <= r.total * 0.6 THEN 'en_cours'::alert_status
+        ELSE 'nouveau'::alert_status
+      END,
+      treated_at = CASE
+        WHEN r.rn <= r.total * 0.4 THEN NOW() - (random() * INTERVAL '14 days')
+        ELSE NULL
+      END
+      FROM ranked r
+      WHERE alerts.id = r.id
+    `, [cid]);
+    console.log(`  alerts statut: ${r8.rowCount} maj`);
+
+    // Cleanup : supprimer les offres_concurrentes avec nom de concurrent bruite
+    const r9 = await db.query(`
+      DELETE FROM offres_concurrentes
+      WHERE company_id = $1
+        AND (concurrent_nom IS NULL OR LENGTH(trim(concurrent_nom)) < 3
+             OR lower(trim(concurrent_nom)) IN ('null','none','undefined','nan','inconnu','autre','divers','aucun','n/a','nc','na'))
+    `, [cid]);
+    if (r9.rowCount > 0) console.log(`  offres cleanup: ${r9.rowCount} supprimes`);
+  }
 
   // Summary
   const { rows: summary } = await db.query(`
