@@ -7,8 +7,31 @@ import { KpiCard } from '@/components/shared/kpi-card';
 import { formatDate } from '@/lib/utils';
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend,
+  BarChart, Bar, Cell,
 } from 'recharts';
-import { CircleDollarSign, TrendingDown, AlertTriangle } from 'lucide-react';
+import { CircleDollarSign, TrendingDown, AlertTriangle, Percent } from 'lucide-react';
+
+const DEAL_MOTIF_LABELS: Record<string, string> = {
+  prix: 'Prix',
+  produit: 'Produit',
+  offre: 'Offre',
+  timing: 'Timing',
+  concurrent: 'Concurrent',
+  relation: 'Relation',
+  budget: 'Budget',
+  autre: 'Autre',
+};
+
+const DEAL_MOTIF_COLORS: Record<string, string> = {
+  prix: '#e11d48',
+  produit: '#6366f1',
+  offre: '#0ea5e9',
+  timing: '#f59e0b',
+  concurrent: '#ef4444',
+  relation: '#8b5cf6',
+  budget: '#64748b',
+  autre: '#94a3b8',
+};
 
 // Dynamic color palette for competitors — assigned in order of appearance
 const COLOR_PALETTE = ['#6366f1', '#f59e0b', '#10b981', '#e11d48', '#8b5cf6', '#06b6d4', '#f43f5e', '#84cc16'];
@@ -27,7 +50,7 @@ const STATUT_OPTIONS: { key: StatutFilter; label: string }[] = [
 ];
 
 export default function MktPrixPage() {
-  const { prixSignals: PRIX_SIGNALS, tendancePrix: TENDANCE_PRIX } = useAppData();
+  const { prixSignals: PRIX_SIGNALS, tendancePrix: TENDANCE_PRIX, dealsAnalyse: DEALS_ANALYSE } = useAppData();
   const [statutFilter, setStatutFilter] = useState<StatutFilter>('all');
   const [concurrentFilter, setConcurrentFilter] = useState<ConcurrentFilter>('all');
 
@@ -61,6 +84,53 @@ export default function MktPrixPage() {
   const chartConcurrents = useMemo(() => {
     return Array.from(new Set(TENDANCE_PRIX.map((t) => t.concurrent_nom)));
   }, [TENDANCE_PRIX]);
+
+  // Remises accordees par commercial vs raison evoquee.
+  // Une "remise" est un signal ou nous etions plus chers (ecart_type=inferieur) ET le deal a ete gagne
+  // OU est encore en cours — signe que le commercial a (ou va) aligner son prix.
+  // La "raison" est reconstituee depuis dealsAnalyse (motif_principal) via jointure commercial_name + client_name.
+  const remisesParCommercial = useMemo(() => {
+    const byCommercial = new Map<string, {
+      commercial: string;
+      signaux: any[];
+      motifs: Record<string, number>;
+    }>();
+    for (const s of PRIX_SIGNALS || []) {
+      if (s.ecart_type !== 'inferieur') continue; // on ne garde que les cas ou une remise est necessaire
+      if (s.statut_deal === 'perdu') continue; // deal perdu = pas de remise accordee
+      const key = s.commercial_name || '—';
+      if (!byCommercial.has(key)) byCommercial.set(key, { commercial: key, signaux: [], motifs: {} });
+      byCommercial.get(key)!.signaux.push(s);
+    }
+    // Joindre avec dealsAnalyse pour extraire la raison evoquee
+    for (const entry of byCommercial.values()) {
+      for (const s of entry.signaux) {
+        const deal = (DEALS_ANALYSE || []).find((d: any) =>
+          d.commercial_name === s.commercial_name &&
+          d.client_name === s.client_name
+        );
+        if (deal?.motif_principal) {
+          entry.motifs[deal.motif_principal] = (entry.motifs[deal.motif_principal] || 0) + 1;
+        }
+      }
+    }
+    return Array.from(byCommercial.values())
+      .map((e) => {
+        const ecartMoy = e.signaux.length > 0
+          ? e.signaux.reduce((acc, s) => acc + Math.abs(s.ecart_pct), 0) / e.signaux.length
+          : 0;
+        const motifEntries = Object.entries(e.motifs).sort((a, b) => b[1] - a[1]);
+        const motifPrincipal = motifEntries[0]?.[0] || null;
+        return {
+          commercial: e.commercial,
+          nbRemises: e.signaux.length,
+          ecartMoy: Math.round(ecartMoy * 10) / 10,
+          motifPrincipal,
+          motifs: motifEntries,
+        };
+      })
+      .sort((a, b) => b.ecartMoy - a.ecartMoy);
+  }, [PRIX_SIGNALS, DEALS_ANALYSE]);
 
   const filteredSignals = useMemo(() => {
     return PRIX_SIGNALS.filter((s) => {
@@ -175,6 +245,88 @@ export default function MktPrixPage() {
           </ResponsiveContainer>
         </div>
       </div>
+
+      {/* Remises accordees par commercial vs raison evoquee */}
+      {remisesParCommercial.length > 0 && (
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+          <div className="flex items-center gap-2 mb-1">
+            <Percent className="w-4 h-4 text-indigo-600" />
+            <h2 className="text-sm font-semibold text-slate-900">Remises accordees par commercial vs raison evoquee</h2>
+          </div>
+          <p className="text-xs text-slate-500 mb-4">
+            Pour chaque commercial, remise moyenne (valeur absolue de l&apos;ecart prix) sur les deals ou nous etions plus chers, et raison dominante citee dans le CR.
+          </p>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            {/* Bar chart : % remise moyen par commercial, colore par motif dominant */}
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={remisesParCommercial} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+                  <XAxis dataKey="commercial" axisLine={false} tickLine={false} tick={{ fill: '#334155', fontSize: 11, fontWeight: 500 }} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 12 }} tickFormatter={(v) => `${v}%`} />
+                  <Tooltip
+                    contentStyle={{ borderRadius: '0.75rem', border: '1px solid #e2e8f0', fontSize: 12 }}
+                    formatter={(value: number, _name: string, props: any) => {
+                      const motif = props?.payload?.motifPrincipal;
+                      return [`${value}%${motif ? ` — ${DEAL_MOTIF_LABELS[motif] || motif}` : ''}`, 'Remise moyenne'];
+                    }}
+                  />
+                  <Bar dataKey="ecartMoy" radius={[6, 6, 0, 0]} maxBarSize={48}>
+                    {remisesParCommercial.map((r, idx) => (
+                      <Cell
+                        key={idx}
+                        fill={r.motifPrincipal ? (DEAL_MOTIF_COLORS[r.motifPrincipal] || '#6366f1') : '#cbd5e1'}
+                      />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            {/* Tableau detaille */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-slate-50/60 border-b border-slate-100">
+                    <th className="text-left px-3 py-2 text-xs font-medium text-slate-500 uppercase tracking-wider">Commercial</th>
+                    <th className="text-center px-3 py-2 text-xs font-medium text-slate-500 uppercase tracking-wider">Nb remises</th>
+                    <th className="text-center px-3 py-2 text-xs font-medium text-slate-500 uppercase tracking-wider">Remise moy.</th>
+                    <th className="text-left px-3 py-2 text-xs font-medium text-slate-500 uppercase tracking-wider">Raison(s) evoquee(s)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {remisesParCommercial.map((r) => (
+                    <tr key={r.commercial} className="border-b border-slate-100 hover:bg-slate-50/50 transition-colors">
+                      <td className="px-3 py-2 font-medium text-slate-900">{r.commercial}</td>
+                      <td className="px-3 py-2 text-center tabular-nums text-slate-700">{r.nbRemises}</td>
+                      <td className="px-3 py-2 text-center tabular-nums font-semibold text-rose-600">-{r.ecartMoy}%</td>
+                      <td className="px-3 py-2">
+                        <div className="flex flex-wrap gap-1">
+                          {r.motifs.length === 0 ? (
+                            <span className="text-xs text-slate-400">--</span>
+                          ) : (
+                            r.motifs.slice(0, 3).map(([motif, count]) => (
+                              <span
+                                key={motif}
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border"
+                                style={{
+                                  backgroundColor: (DEAL_MOTIF_COLORS[motif] || '#64748b') + '1a',
+                                  color: DEAL_MOTIF_COLORS[motif] || '#64748b',
+                                  borderColor: (DEAL_MOTIF_COLORS[motif] || '#64748b') + '40',
+                                }}
+                              >
+                                {DEAL_MOTIF_LABELS[motif] || motif} ({count})
+                              </span>
+                            ))
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Filter pills */}
       <div className="flex items-center gap-2 flex-wrap">

@@ -7,8 +7,9 @@ import type { Attribut, ValeurPercue } from '@/lib/types-v2';
 import {
   RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
   Radar as RechartsRadar, ResponsiveContainer, Legend, Tooltip,
+  BarChart, Bar, XAxis, YAxis,
 } from 'recharts';
-import { Crosshair } from 'lucide-react';
+import { Crosshair, ArrowUpRight, ArrowDownRight, Minus, TrendingUp } from 'lucide-react';
 
 const ATTRIBUT_LABELS: Record<Attribut, string> = {
   prix: 'Prix',
@@ -40,7 +41,7 @@ function getActorColor(actors: string[], name: string): string {
 const ATTRIBUTS: Attribut[] = ['prix', 'qualite', 'sav', 'delai', 'relation', 'innovation'];
 
 export default function MktPosPage() {
-  const { positionnement: POSITIONNEMENT } = useAppData();
+  const { positionnement: POSITIONNEMENT, signals: SIGNALS } = useAppData();
   const acteurs = useMemo(() => {
     return Array.from(new Set(POSITIONNEMENT.map((p) => p.acteur)));
   }, [POSITIONNEMENT]);
@@ -68,6 +69,28 @@ export default function MktPosPage() {
     });
     return sums;
   }, [POSITIONNEMENT]);
+
+  // Evolution vs trimestre precedent : on compte les mentions de chaque acteur dans les signaux
+  // "concurrence" sur les 90 derniers jours vs 90-180 jours precedents.
+  const evolutionTrimestre = useMemo(() => {
+    const now = Date.now();
+    const Q = 90 * 86400000; // 90 jours
+    const rows = acteurs.map((acteur) => {
+      let actuel = 0;
+      let precedent = 0;
+      for (const s of SIGNALS || []) {
+        if (!s.competitor_name || s.competitor_name !== acteur) continue;
+        const age = now - new Date(s.created_at).getTime();
+        if (age < Q) actuel++;
+        else if (age < 2 * Q) precedent++;
+      }
+      const delta = precedent === 0 ? (actuel > 0 ? null : 0) : Math.round(((actuel - precedent) / precedent) * 100);
+      return { acteur, actuel, precedent, delta };
+    });
+    return rows;
+  }, [acteurs, SIGNALS]);
+
+  const hasEvolutionData = evolutionTrimestre.some((r) => r.actuel > 0 || r.precedent > 0);
 
   return (
     <div className="space-y-6">
@@ -126,6 +149,65 @@ export default function MktPosPage() {
           </ResponsiveContainer>
         </div>
       </div>
+
+      {/* Evolution vs trimestre precedent */}
+      {hasEvolutionData && (
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+          <div className="flex items-center gap-2 mb-1">
+            <TrendingUp className="w-4 h-4 text-indigo-600" />
+            <h2 className="text-sm font-semibold text-slate-900">Evolution du positionnement percu vs trimestre precedent</h2>
+          </div>
+          <p className="text-xs text-slate-500 mb-4">
+            Comparaison du volume de mentions par acteur — trimestre actuel (90 derniers jours) vs trimestre precedent.
+          </p>
+          <div className="h-64 mb-4">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={evolutionTrimestre} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+                <XAxis dataKey="acteur" axisLine={false} tickLine={false} tick={{ fill: '#334155', fontSize: 12, fontWeight: 500 }} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 12 }} allowDecimals={false} />
+                <Tooltip contentStyle={{ borderRadius: '0.75rem', border: '1px solid #e2e8f0', fontSize: 12 }} />
+                <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 12, color: '#64748b' }} />
+                <Bar dataKey="precedent" name="Q-1" fill="#cbd5e1" radius={[4, 4, 0, 0]} maxBarSize={36} />
+                <Bar dataKey="actuel" name="Q actuel" fill="#6366f1" radius={[4, 4, 0, 0]} maxBarSize={36} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+            {evolutionTrimestre.map((r) => {
+              const sameOrNone = r.actuel === 0 && r.precedent === 0;
+              if (sameOrNone) return null;
+              return (
+                <div key={r.acteur} className="rounded-lg border border-slate-100 bg-slate-50 p-3">
+                  <p className="text-xs font-semibold text-slate-700">{r.acteur}</p>
+                  <p className="text-xs text-slate-500">
+                    {r.precedent} &rarr; {r.actuel} mentions
+                  </p>
+                  <div className="mt-1.5 flex items-center gap-1">
+                    {r.delta === null ? (
+                      <span className="inline-flex items-center gap-1 text-xs font-medium text-violet-700">
+                        <ArrowUpRight className="w-3 h-3" />
+                        Nouveau
+                      </span>
+                    ) : r.delta > 0 ? (
+                      <span className="inline-flex items-center gap-1 text-xs font-medium text-rose-600">
+                        <ArrowUpRight className="w-3 h-3" /> +{r.delta}%
+                      </span>
+                    ) : r.delta < 0 ? (
+                      <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600">
+                        <ArrowDownRight className="w-3 h-3" /> {r.delta}%
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-xs font-medium text-slate-500">
+                        <Minus className="w-3 h-3" /> Stable
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Comparative table */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">

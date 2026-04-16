@@ -1,7 +1,7 @@
 // @ts-nocheck
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useAppData } from '@/lib/data';
 import { useAuth } from '@/lib/auth-context';
 import { createClient } from '@/lib/supabase/client';
@@ -11,7 +11,8 @@ import { Modal } from '@/components/shared/modal';
 import { ConfirmDialog } from '@/components/shared/confirm-dialog';
 import { SignalForm } from '@/components/forms/signal-form';
 import { SignalType } from '@/lib/types';
-import { Activity, Plus, Pencil, Trash2 } from 'lucide-react';
+import { formatDate } from '@/lib/utils';
+import { Activity, Plus, Pencil, Trash2, Share2, FileText, Mail, Loader2 } from 'lucide-react';
 
 type PeriodFilter = 'all' | 'today' | 'week' | 'month';
 
@@ -73,6 +74,8 @@ export default function SignalsPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deletingSignal, setDeletingSignal] = useState<any>(null);
   const [crudLoading, setCrudLoading] = useState(false);
+  const [sharingSignal, setSharingSignal] = useState<any>(null);
+  const [viewingSourceOf, setViewingSourceOf] = useState<any>(null);
 
   const handleCreate = async (data: any) => {
     setCrudLoading(true);
@@ -217,6 +220,22 @@ export default function SignalsPage() {
                   <div key={signal.id} className="group relative">
                     <SignalCard signal={signal} />
                     <div className="absolute top-3 right-3 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      {signal.source_report_id && (
+                        <button
+                          onClick={() => setViewingSourceOf(signal)}
+                          className="p-1.5 rounded-lg bg-white border border-slate-200 text-slate-400 hover:text-teal-600 hover:border-teal-200 transition-colors shadow-sm"
+                          title="Voir le CR source"
+                        >
+                          <FileText className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                      <button
+                        onClick={() => setSharingSignal(signal)}
+                        className="p-1.5 rounded-lg bg-white border border-slate-200 text-slate-400 hover:text-sky-600 hover:border-sky-200 transition-colors shadow-sm"
+                        title="Partager avec un collegue"
+                      >
+                        <Share2 className="w-3.5 h-3.5" />
+                      </button>
                       <button
                         onClick={() => { setEditingSignal(signal); setShowEditModal(true); }}
                         className="p-1.5 rounded-lg bg-white border border-slate-200 text-slate-400 hover:text-indigo-600 hover:border-indigo-200 transition-colors shadow-sm"
@@ -275,6 +294,175 @@ export default function SignalsPage() {
         message={`Voulez-vous vraiment supprimer le signal "${deletingSignal?.title}" ? Cette action est irreversible.`}
         loading={crudLoading}
       />
+
+      {/* Share signal */}
+      <Modal
+        open={!!sharingSignal}
+        onClose={() => setSharingSignal(null)}
+        title="Partager ce signal"
+        maxWidth="max-w-lg"
+      >
+        {sharingSignal && <ShareSignalForm signal={sharingSignal} onClose={() => setSharingSignal(null)} />}
+      </Modal>
+
+      {/* View source CR */}
+      <Modal
+        open={!!viewingSourceOf}
+        onClose={() => setViewingSourceOf(null)}
+        title="Compte rendu source"
+        maxWidth="max-w-3xl"
+      >
+        {viewingSourceOf && <SourceReportView sourceReportId={viewingSourceOf.source_report_id} />}
+      </Modal>
+    </div>
+  );
+}
+
+function ShareSignalForm({ signal, onClose }: { signal: any; onClose: () => void }) {
+  const [email, setEmail] = useState('');
+  const [note, setNote] = useState('');
+  const [error, setError] = useState('');
+
+  const signalSummary = [
+    `Type : ${signal.type}`,
+    signal.severity ? `Severite : ${signal.severity}` : null,
+    signal.client_name ? `Client : ${signal.client_name}` : null,
+    signal.region ? `Region : ${signal.region}` : null,
+    signal.competitor_name ? `Concurrent : ${signal.competitor_name}` : null,
+    '',
+    signal.title ? `Titre : ${signal.title}` : null,
+    signal.content ? `\nContenu :\n${signal.content}` : null,
+  ].filter(Boolean).join('\n');
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRe.test(email)) {
+      setError('Email invalide');
+      return;
+    }
+    const subject = `Signal terrain${signal.client_name ? ' - ' + signal.client_name : ''}`;
+    const body = [
+      note ? note + '\n\n---\n' : '',
+      signalSummary,
+      '\n---\nPartage depuis Field Intelligence',
+    ].join('');
+    const mailto = `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    window.location.href = mailto;
+    onClose();
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div>
+        <label className="block text-sm font-medium text-slate-700 mb-1">Email du collegue</label>
+        <div className="relative">
+          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <input
+            type="email"
+            required
+            value={email}
+            onChange={(e) => { setEmail(e.target.value); setError(''); }}
+            placeholder="collegue@entreprise.com"
+            className="w-full pl-10 pr-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200"
+          />
+        </div>
+        {error && <p className="mt-1 text-xs text-rose-600">{error}</p>}
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-slate-700 mb-1">Note (optionnelle)</label>
+        <textarea
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          rows={3}
+          placeholder="Quelques mots pour contextualiser l'envoi..."
+          className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200"
+        />
+      </div>
+      <div className="rounded-lg bg-slate-50 border border-slate-100 p-3 text-xs text-slate-600 whitespace-pre-wrap max-h-48 overflow-auto">
+        {signalSummary}
+      </div>
+      <div className="flex justify-end gap-2">
+        <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-slate-600 hover:text-slate-800">Annuler</button>
+        <button type="submit" className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700">
+          <Mail className="w-4 h-4" />
+          Partager par email
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function SourceReportView({ sourceReportId }: { sourceReportId: string }) {
+  const supabase = createClient();
+  const [report, setReport] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      setLoading(true);
+      const { data, error: err } = await supabase
+        .from('raw_visit_reports')
+        .select('id, external_id, subject, content_text, commercial_name, commercial_email, client_name, visit_date, synced_at')
+        .eq('id', sourceReportId)
+        .single();
+      if (!mounted) return;
+      if (err) setError(err.message);
+      else setReport(data);
+      setLoading(false);
+    })();
+    return () => { mounted = false; };
+  }, [sourceReportId]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-8 text-slate-400">
+        <Loader2 className="w-5 h-5 animate-spin mr-2" />
+        Chargement du CR source...
+      </div>
+    );
+  }
+  if (error) {
+    return <p className="text-sm text-rose-600">Erreur : {error}</p>;
+  }
+  if (!report) {
+    return <p className="text-sm text-slate-500 italic">CR source introuvable.</p>;
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-3 text-xs">
+        <div>
+          <p className="text-slate-500 uppercase tracking-wider font-medium">Client</p>
+          <p className="text-slate-800 font-medium">{report.client_name || '--'}</p>
+        </div>
+        <div>
+          <p className="text-slate-500 uppercase tracking-wider font-medium">Commercial</p>
+          <p className="text-slate-800 font-medium">{report.commercial_name || '--'}</p>
+        </div>
+        <div>
+          <p className="text-slate-500 uppercase tracking-wider font-medium">Date visite</p>
+          <p className="text-slate-800 tabular-nums">{report.visit_date ? formatDate(report.visit_date) : '--'}</p>
+        </div>
+        <div>
+          <p className="text-slate-500 uppercase tracking-wider font-medium">Source externe</p>
+          <p className="text-slate-800 font-mono text-[11px]">{report.external_id || '--'}</p>
+        </div>
+      </div>
+      {report.subject && (
+        <div>
+          <p className="text-xs text-slate-500 uppercase tracking-wider font-medium mb-1">Sujet</p>
+          <p className="text-sm text-slate-800 font-medium">{report.subject}</p>
+        </div>
+      )}
+      <div>
+        <p className="text-xs text-slate-500 uppercase tracking-wider font-medium mb-1">Contenu du CR</p>
+        <div className="rounded-lg bg-slate-50 border border-slate-100 p-4 text-sm text-slate-700 whitespace-pre-wrap leading-relaxed max-h-96 overflow-auto">
+          {report.content_text || <span className="italic text-slate-400">Aucun contenu.</span>}
+        </div>
+      </div>
     </div>
   );
 }

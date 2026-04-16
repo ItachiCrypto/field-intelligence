@@ -1205,6 +1205,10 @@ async function generateDerivedTables(db, companyIds) {
     console.log(`  offres_concurrentes: ${oc.length}`);
 
     // --- T5 : comm_concurrentes (group by (competitor, type_action, region) pour vrai count_mentions) ---
+    // NOTE : on ne garde QUE les actions de vraie communication (salon/pub/emailing/social/presse/sponsoring).
+    // 'partenariat' et 'autre' sont des activites commerciales/marketing, pas de la communication externe,
+    // et polluent le tableau de bord comm — on les exclut a la source.
+    const COMM_ACTION_WHITELIST = new Set(['salon', 'pub', 'emailing', 'social', 'presse', 'sponsoring']);
     await db.query(`DELETE FROM comm_concurrentes WHERE company_id = $1`, [cid]);
     const { rows: ccRaw } = await db.query(`
       SELECT s.competitor_name, s.content, r.visit_date,
@@ -1214,8 +1218,10 @@ async function generateDerivedTables(db, companyIds) {
       WHERE s.company_id = $1 AND s.competitor_name IS NOT NULL AND s.type = 'concurrence'`, [cid]);
     // Agregation JS sur (competitor_name, type_action, region) -- type_action est calcule en JS
     const ccGroups = new Map();
+    let ccSkipped = 0;
     for (const r of ccRaw) {
       const typeAction = detectTypeActionFromContent(r.content);
+      if (!COMM_ACTION_WHITELIST.has(typeAction)) { ccSkipped++; continue; }
       const key = `${r.competitor_name}||${typeAction}||${r.region}`;
       if (!ccGroups.has(key)) {
         ccGroups.set(key, {
@@ -1238,7 +1244,7 @@ async function generateDerivedTables(db, companyIds) {
       await db.query(`INSERT INTO comm_concurrentes (company_id,concurrent_nom,type_action,description,reaction_client,date,count_mentions,region,source_report_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
         [cid, g.competitor_name, g.type_action, description, react, latest?.date || null, g.count, g.region, latest?.report_id || null]);
     }
-    console.log(`  comm_concurrentes: ${ccGroups.size} groupes depuis ${ccRaw.length} signaux`);
+    console.log(`  comm_concurrentes: ${ccGroups.size} groupes depuis ${ccRaw.length - ccSkipped} signaux comm (${ccSkipped} ignores car non-communication)`);
 
     // --- T5 : recommandations_ia (commercial_suggere = dernier commercial qui a visite le client) ---
     await db.query(`DELETE FROM recommandations_ia WHERE company_id = $1`, [cid]);

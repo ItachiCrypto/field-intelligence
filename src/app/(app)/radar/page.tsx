@@ -12,7 +12,6 @@ import { ConfirmDialog } from '@/components/shared/confirm-dialog';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/lib/auth-context';
 import { formatTrend } from '@/lib/utils';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { Radar, TrendingUp, TrendingDown, Minus, Plus, Pencil, Trash2 } from 'lucide-react';
 
 const SEVERITY_OPTIONS = ['vert', 'jaune', 'orange', 'rouge'] as const;
@@ -24,8 +23,6 @@ const PERIOD_OPTIONS: { key: PeriodFilter; label: string }[] = [
   { key: 'week', label: 'Cette semaine' },
   { key: 'month', label: 'Ce mois' },
 ];
-
-const BAR_COLORS = ['#e11d48', '#f59e0b', '#6366f1', '#10b981'];
 
 export default function RadarPage() {
   const { competitors: COMPETITORS, signals: SIGNALS, refresh } = useAppData();
@@ -109,10 +106,6 @@ export default function RadarPage() {
     setDeletingCompetitor(null);
     refresh();
   };
-
-  const chartData = useMemo(() => {
-    return COMPETITORS.map((c) => ({ name: c.name, mentions: c.mentions }));
-  }, [COMPETITORS]);
 
   const competitorSignals = useMemo(() => {
     if (!selectedCompetitor) return [];
@@ -276,28 +269,6 @@ export default function RadarPage() {
               })}
             </tbody>
           </table>
-        </div>
-      </div>
-
-      {/* Bar chart */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-        <h2 className="text-sm font-semibold text-slate-900 mb-4">Mentions par concurrent</h2>
-        <div className="h-56">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData} layout="vertical" margin={{ top: 0, right: 20, bottom: 0, left: 0 }}>
-              <XAxis type="number" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 12 }} />
-              <YAxis type="category" dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#334155', fontSize: 13, fontWeight: 500 }} width={80} />
-              <Tooltip
-                contentStyle={{ borderRadius: '0.75rem', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}
-                formatter={(value) => [`${value}`, 'Mentions']}
-              />
-              <Bar dataKey="mentions" radius={[0, 6, 6, 0]} barSize={24}>
-                {chartData.map((_, index) => (
-                  <Cell key={index} fill={BAR_COLORS[index % BAR_COLORS.length]} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
         </div>
       </div>
 

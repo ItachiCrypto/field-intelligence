@@ -15,6 +15,8 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   Minus,
+  Sparkles,
+  Gauge,
 } from 'lucide-react';
 import {
   LineChart,
@@ -36,17 +38,54 @@ const SEVERITY_BAR_COLORS: Record<string, string> = {
   vert: '#10b981',
 };
 
+function pctChange(curr: number, prev: number): number | undefined {
+  if (prev === 0 && curr === 0) return 0;
+  if (prev === 0) return undefined; // cannot compute % from 0
+  return Math.round(((curr - prev) / prev) * 100);
+}
+
 export function MarketingDashboard() {
-  const { signals: SIGNALS, competitors: COMPETITORS, needs: NEEDS } = useAppData();
-  const concurrenceCount = SIGNALS.filter((s) => s.type === 'concurrence').length;
-  const besoinsCount = SIGNALS.filter((s) => s.type === 'besoin').length;
-  const criticalSignals = SIGNALS.filter((s) => s.severity === 'rouge');
+  const { signals: SIGNALS, competitors: COMPETITORS, needs: NEEDS, commercials: COMMERCIALS } = useAppData() as any;
+  const concurrenceCount = SIGNALS.filter((s: any) => s.type === 'concurrence').length;
+  const besoinsCount = SIGNALS.filter((s: any) => s.type === 'besoin').length;
+  const criticalSignals = SIGNALS.filter((s: any) => s.severity === 'rouge');
+
+  // Tendances hebdo : 7 derniers jours vs 7 jours precedents
+  const trends = useMemo(() => {
+    const now = Date.now();
+    const DAY = 86400000;
+    const sliceRecent = (s: any) => (now - new Date(s.created_at).getTime()) < 7 * DAY;
+    const slicePrev = (s: any) => {
+      const age = now - new Date(s.created_at).getTime();
+      return age >= 7 * DAY && age < 14 * DAY;
+    };
+    const countType = (arr: any[], t: string) => arr.filter((s: any) => s.type === t).length;
+    const recent = SIGNALS.filter(sliceRecent);
+    const prev = SIGNALS.filter(slicePrev);
+    return {
+      concurrence: pctChange(countType(recent, 'concurrence'), countType(prev, 'concurrence')),
+      besoins: pctChange(countType(recent, 'besoin'), countType(prev, 'besoin')),
+      total: pctChange(recent.length, prev.length),
+    };
+  }, [SIGNALS]);
+
+  // Nouveaux concurrents detectes (flag is_new sur table competitors — rempli par process-pending.js
+  // quand un competitor apparait pour la premiere fois)
+  const nouveauxConcurrents = COMPETITORS.filter((c: any) => c.is_new).length;
+
+  // Score qualite moyen des CR : moyenne des quality_score par commercial
+  const qualiteMoyenneCR = useMemo(() => {
+    if (!COMMERCIALS || COMMERCIALS.length === 0) return 0;
+    const scores = COMMERCIALS.map((c: any) => c.quality_score ?? 0).filter((s: number) => s > 0);
+    if (scores.length === 0) return 0;
+    return Math.round(scores.reduce((a: number, b: number) => a + b, 0) / scores.length);
+  }, [COMMERCIALS]);
 
   // Build weekly chart data from real signals
   const weeklyData = useMemo(() => {
     if (SIGNALS.length === 0) return [];
     const weeks: Record<string, { concurrence: number; besoins: number; prix: number }> = {};
-    SIGNALS.forEach((s) => {
+    SIGNALS.forEach((s: any) => {
       const d = new Date(s.created_at);
       const weekNum = getISOWeekNumber(d);
       const key = `S${weekNum}`;
@@ -64,13 +103,13 @@ export function MarketingDashboard() {
   const competitorData = useMemo(
     () =>
       [...COMPETITORS]
-        .sort((a, b) => b.mentions - a.mentions)
-        .map((c) => ({ name: c.name, mentions: c.mentions, risk: c.risk })),
+        .sort((a: any, b: any) => b.mentions - a.mentions)
+        .map((c: any) => ({ name: c.name, mentions: c.mentions, risk: c.risk })),
     [COMPETITORS]
   );
 
-  const topCompetitors = COMPETITORS.slice().sort((a, b) => b.mentions - a.mentions);
-  const topNeeds = NEEDS.slice(0, 6).map((n, i) => ({ ...n, rank: n.rank ?? n.rank_order ?? i + 1 }));
+  const topCompetitors = COMPETITORS.slice().sort((a: any, b: any) => b.mentions - a.mentions);
+  const topNeeds = NEEDS.slice(0, 6).map((n: any, i: number) => ({ ...n, rank: n.rank ?? n.rank_order ?? i + 1 }));
 
   return (
     <div className="space-y-6">
@@ -81,16 +120,19 @@ export function MarketingDashboard() {
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-3 gap-4">
         <KpiCard
           label="Signaux concurrence"
           value={concurrenceCount}
+          change={trends.concurrence}
+          invertChange
           icon={<Crosshair className="w-5 h-5" />}
           iconColor="text-rose-600 bg-rose-50"
         />
         <KpiCard
           label="Besoins identifies"
           value={besoinsCount}
+          change={trends.besoins}
           icon={<Lightbulb className="w-5 h-5" />}
           iconColor="text-sky-600 bg-sky-50"
         />
@@ -101,10 +143,25 @@ export function MarketingDashboard() {
           iconColor="text-violet-600 bg-violet-50"
         />
         <KpiCard
+          label="Nouveaux concurrents detectes"
+          value={nouveauxConcurrents}
+          invertChange
+          icon={<Sparkles className="w-5 h-5" />}
+          iconColor="text-amber-600 bg-amber-50"
+        />
+        <KpiCard
           label="Remontees terrain totales"
           value={SIGNALS.length}
+          change={trends.total}
           icon={<Radio className="w-5 h-5" />}
           iconColor="text-indigo-600 bg-indigo-50"
+        />
+        <KpiCard
+          label="Score qualite moyen CR"
+          value={qualiteMoyenneCR}
+          suffix="/100"
+          icon={<Gauge className="w-5 h-5" />}
+          iconColor="text-emerald-600 bg-emerald-50"
         />
       </div>
 
@@ -120,7 +177,7 @@ export function MarketingDashboard() {
             </span>
           </div>
           <div className="space-y-3">
-            {criticalSignals.map((signal) => (
+            {criticalSignals.map((signal: any) => (
               <SignalCard key={signal.id} signal={signal} compact />
             ))}
           </div>
@@ -240,7 +297,7 @@ export function MarketingDashboard() {
             Top concurrents
           </h3>
           <div className="space-y-3">
-            {topCompetitors.map((c) => (
+            {topCompetitors.map((c: any) => (
               <div
                 key={c.id}
                 className="flex items-center justify-between py-2 border-b border-slate-100 last:border-b-0"
@@ -286,7 +343,7 @@ export function MarketingDashboard() {
             Top besoins du mois
           </h3>
           <div className="space-y-3">
-            {topNeeds.map((need) => (
+            {topNeeds.map((need: any) => (
               <div
                 key={need.rank}
                 className="flex items-center justify-between py-2 border-b border-slate-100 last:border-b-0"

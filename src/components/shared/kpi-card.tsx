@@ -5,12 +5,15 @@ interface KpiCardProps {
   label: string;
   value: string | number;
   change?: number;
+  /** when true, a positive change is bad (rose) and negative is good (emerald) */
+  invertChange?: boolean;
   suffix?: string;
   icon?: React.ReactNode;
   iconColor?: string;
 }
 
-export function KpiCard({ label, value, change, suffix, icon, iconColor = 'text-slate-600 bg-slate-50' }: KpiCardProps) {
+export function KpiCard({ label, value, change, invertChange, suffix, icon, iconColor = 'text-slate-600 bg-slate-50' }: KpiCardProps) {
+  const goodUp = !invertChange;
   return (
     <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm hover:shadow-md transition-shadow">
       <div className="flex items-start justify-between mb-4">
@@ -35,8 +38,8 @@ export function KpiCard({ label, value, change, suffix, icon, iconColor = 'text-
           <span
             className={cn(
               'inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-xs font-medium mb-0.5',
-              change > 0 && 'text-emerald-700 bg-emerald-50',
-              change < 0 && 'text-rose-700 bg-rose-50',
+              change > 0 && (goodUp ? 'text-emerald-700 bg-emerald-50' : 'text-rose-700 bg-rose-50'),
+              change < 0 && (goodUp ? 'text-rose-700 bg-rose-50' : 'text-emerald-700 bg-emerald-50'),
               change === 0 && 'text-slate-500 bg-slate-50'
             )}
           >

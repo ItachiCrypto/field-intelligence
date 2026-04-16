@@ -180,16 +180,36 @@ export default function MktSegPage() {
           </div>
           <h2 className="text-sm font-semibold text-slate-700">Insights IA</h2>
         </div>
-        <ul className="space-y-3">
-          {SEGMENT_INSIGHTS.map((insight, i) => (
-            <li key={i} className="flex items-start gap-3 text-sm text-slate-700">
-              <span className="flex items-center justify-center w-5 h-5 rounded-full bg-slate-100 text-slate-500 text-xs font-semibold shrink-0 mt-0.5">
-                {i + 1}
-              </span>
-              {insight}
-            </li>
-          ))}
-        </ul>
+        {SEGMENT_INSIGHTS.length === 0 ? (
+          <p className="text-sm text-slate-400 italic">Aucun insight disponible pour le moment.</p>
+        ) : (
+          <ul className="space-y-3">
+            {[...SEGMENT_INSIGHTS]
+              .sort((a, b) => (a.priorite ?? 0) - (b.priorite ?? 0))
+              .map((row, i) => {
+                const text = typeof row === 'string' ? row : row?.insight ?? '';
+                const seg = typeof row === 'object' ? row?.segment : null;
+                return (
+                  <li key={row?.id ?? i} className="flex items-start gap-3 text-sm text-slate-700">
+                    <span className="flex items-center justify-center w-5 h-5 rounded-full bg-slate-100 text-slate-500 text-xs font-semibold shrink-0 mt-0.5">
+                      {i + 1}
+                    </span>
+                    <div className="flex-1">
+                      {seg && (
+                        <span className={cn(
+                          'inline-block mr-2 px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider',
+                          seg === 'nouveau' ? 'bg-indigo-50 text-indigo-700' : 'bg-teal-50 text-teal-700'
+                        )}>
+                          {seg}
+                        </span>
+                      )}
+                      {text}
+                    </div>
+                  </li>
+                );
+              })}
+          </ul>
+        )}
       </div>
     </div>
   );
