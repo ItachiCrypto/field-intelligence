@@ -3,12 +3,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { processReport } from '@/lib/crm/process-report';
 import type { RawVisitReport } from '@/lib/crm/types';
+import { verifyCronBearer, verifyCronHeader } from '@/lib/auth/cron';
 
 export async function POST(request: NextRequest) {
   try {
-    const cronSecret = request.headers.get('x-cron-secret');
-    const isCron =
-      cronSecret && cronSecret === process.env.CRON_SECRET;
+    const isCron = verifyCronHeader(request.headers.get('x-cron-secret'));
 
     if (!isCron) {
       // Verify auth + admin role
@@ -81,21 +80,16 @@ export async function POST(request: NextRequest) {
       errors: errorCount,
     });
   } catch (error) {
-    console.error('Process error:', error);
-    return NextResponse.json(
-      {
-        error: 'Processing failed',
-        message: error instanceof Error ? error.message : 'Unknown error',
-      },
-      { status: 500 }
-    );
+    // Log full detail server-side; return a generic message to the client to
+    // avoid leaking DB error text, API-provider error bodies, stack traces.
+    console.error('[process] error:', error instanceof Error ? error.message : 'unknown');
+    return NextResponse.json({ error: 'Processing failed' }, { status: 500 });
   }
 }
 
 // GET handler for Vercel Cron
 export async function GET(request: NextRequest) {
-  const authHeader = request.headers.get('authorization');
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!verifyCronBearer(request.headers.get('authorization'))) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

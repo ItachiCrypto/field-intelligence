@@ -20,6 +20,15 @@ export async function processReport(report: RawVisitReport): Promise<{ success: 
       return { success: true };
     }
 
+    // Cap the CR text we send to the LLM. 32k chars is well over typical
+    // French visit-report length; anything longer is almost certainly a
+    // pathological input (or an attempt to force an expensive prompt).
+    const MAX_CR_BYTES = 32_000;
+    const truncatedContent =
+      report.content_text.length > MAX_CR_BYTES
+        ? report.content_text.slice(0, MAX_CR_BYTES)
+        : report.content_text;
+
     // Fetch company context
     const { data: competitors } = await supabase
       .from('competitors' as any).select('name').eq('company_id', report.company_id);
@@ -27,7 +36,7 @@ export async function processReport(report: RawVisitReport): Promise<{ success: 
       .from('abbreviations' as any).select('short, "full"').eq('company_id', report.company_id);
 
     const prompt = buildExtractionPrompt(
-      report.content_text,
+      truncatedContent,
       (competitors ?? []).map(c => c.name),
       (abbreviations ?? []).map(a => ({ short: a.short, full: a.full })),
     );
@@ -60,7 +69,9 @@ export async function processReport(report: RawVisitReport): Promise<{ success: 
       });
 
       if (!anthropicRes.ok) {
-        throw new Error(`Anthropic API error: ${anthropicRes.status} ${await anthropicRes.text()}`);
+        // Do not include the provider's response body — it can contain
+        // echoes of our key or quota detail. Status is enough for triage.
+        throw new Error(`Anthropic API error: ${anthropicRes.status}`);
       }
 
       const anthropicData = await anthropicRes.json();
@@ -87,7 +98,7 @@ export async function processReport(report: RawVisitReport): Promise<{ success: 
       });
 
       if (!openaiRes.ok) {
-        throw new Error(`OpenAI API error: ${openaiRes.status} ${await openaiRes.text()}`);
+        throw new Error(`OpenAI API error: ${openaiRes.status}`);
       }
 
       const openaiData = await openaiRes.json();

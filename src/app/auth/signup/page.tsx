@@ -28,6 +28,11 @@ export default function SignupPage() {
 
     setLoading(true);
 
+    // NOTE: we deliberately do NOT send `role` or `company_id` in metadata.
+    // The server-side handle_new_user() trigger assigns role='admin' only
+    // for signups that create a new company (no invitation_token), and
+    // enforces the role from the invitation row otherwise. Any client-
+    // supplied role would be ignored by the trigger anyway.
     const { error: authError } = await supabase.auth.signUp({
       email,
       password,
@@ -35,7 +40,6 @@ export default function SignupPage() {
         data: {
           company_name: companyName,
           name: fullName,
-          role: 'admin',
         },
         emailRedirectTo: window.location.origin + '/auth/callback',
       },

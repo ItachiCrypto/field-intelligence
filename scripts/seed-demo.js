@@ -6,17 +6,35 @@
  * Requires: pg, @supabase/supabase-js (already installed)
  */
 
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '../.env.local') });
+
 const { Client } = require('pg');
 const { createClient } = require('@supabase/supabase-js');
 
 // ---------------------------------------------------------------------------
-// Config
+// Config (all secrets read from environment)
 // ---------------------------------------------------------------------------
-const PG_CONNECTION = 'postgresql://postgres:FmYIOCDbBnzB0mpH@db.cbcjiszrajsqtrhpgsqf.supabase.co:5432/postgres';
-const SUPABASE_URL = 'https://cbcjiszrajsqtrhpgsqf.supabase.co';
-const SUPABASE_SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNiY2ppc3pyYWpzcXRyaHBnc3FmIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NTc3ODU5MSwiZXhwIjoyMDkxMzU0NTkxfQ.Bdrhy2BlhUm4fZ9hH4qzPPtX-U19FZ4B8Lp-3Vkldec';
+const PG_CONNECTION = process.env.PG_CONNECTION;
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const COMPANY_ID = process.env.DEMO_COMPANY_ID || 'a0000000-0000-0000-0000-000000000001';
 
-const COMPANY_ID = 'a0000000-0000-0000-0000-000000000001';
+const missing = [];
+if (!PG_CONNECTION) missing.push('PG_CONNECTION');
+if (!SUPABASE_URL) missing.push('NEXT_PUBLIC_SUPABASE_URL');
+if (!SUPABASE_SERVICE_KEY) missing.push('SUPABASE_SERVICE_ROLE_KEY');
+if (missing.length > 0) {
+  console.error('[FATAL] Missing required environment variables:', missing.join(', '));
+  console.error('        Copy .env.example -> .env.local and fill the values.');
+  process.exit(1);
+}
+
+// Basic UUID shape validation for the demo company id (defense in depth).
+if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(COMPANY_ID)) {
+  console.error('[FATAL] DEMO_COMPANY_ID is not a valid UUID:', COMPANY_ID);
+  process.exit(1);
+}
 
 // ---------------------------------------------------------------------------
 // Helpers

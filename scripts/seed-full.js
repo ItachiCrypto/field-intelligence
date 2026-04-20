@@ -8,13 +8,25 @@
  * then re-inserts everything fresh.
  */
 
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '../.env.local') });
+
 const { Client } = require('pg');
 
 // ---------------------------------------------------------------------------
-// Config
+// Config (all secrets read from environment)
 // ---------------------------------------------------------------------------
-const PG_CONNECTION = 'postgresql://postgres:FmYIOCDbBnzB0mpH@db.cbcjiszrajsqtrhpgsqf.supabase.co:5432/postgres';
-const COMPANY_ID = 'a0000000-0000-0000-0000-000000000001';
+const PG_CONNECTION = process.env.PG_CONNECTION;
+const COMPANY_ID = process.env.DEMO_COMPANY_ID || 'a0000000-0000-0000-0000-000000000001';
+
+if (!PG_CONNECTION) {
+  console.error('[FATAL] PG_CONNECTION is not set. Copy .env.example -> .env.local and fill the values.');
+  process.exit(1);
+}
+if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(COMPANY_ID)) {
+  console.error('[FATAL] DEMO_COMPANY_ID is not a valid UUID:', COMPANY_ID);
+  process.exit(1);
+}
 
 // ---------------------------------------------------------------------------
 // Helpers

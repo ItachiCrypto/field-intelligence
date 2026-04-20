@@ -101,24 +101,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Get current session
     supabase.auth.getSession().then(async ({ data: { session }, error: sessionError }) => {
       if (!mounted) return;
-      console.log('[auth] getSession result:', session ? `user=${session.user.email}` : 'no session', sessionError?.message ?? '');
-
+      // Do NOT log user email — this is a browser console, PII leaks to
+      // browser extensions / screen-recordings / shared support sessions.
+      if (sessionError) {
+        console.warn('[auth] getSession error');
+      }
       if (session?.user) {
         setUser(session.user);
-        console.log('[auth] Fetching profile for', session.user.id);
         const result = await fetchProfileData(session.user.id);
-        console.log('[auth] Profile result:', result ? `role=${result.profile.role}` : 'null');
         if (mounted && result) {
           setProfile(result.profile);
           setCompany(result.company);
         }
       }
       if (mounted) {
-        console.log('[auth] Setting loading=false');
         setLoading(false);
       }
-    }).catch((err) => {
-      console.error('[auth] getSession error:', err);
+    }).catch(() => {
+      console.error('[auth] getSession failed');
       if (mounted) setLoading(false);
     });
 

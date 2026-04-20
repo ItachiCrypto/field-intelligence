@@ -1,13 +1,27 @@
 // @ts-nocheck
 // Prompt d'extraction enrichi (audit 2026-04-15) : region, secteur, type_offre,
 // type_action_communication, equilibrage marketing/commercial et positif/negatif.
+import { z } from 'zod';
 import type { ExtractedCRData } from './types';
+
+// ---------------------------------------------------------------------------
+// Input cap. A single CR of more than this many characters is almost
+// certainly either a test payload or an attempt to exhaust tokens. Truncate
+// silently to keep costs bounded.
+// ---------------------------------------------------------------------------
+const MAX_CR_INPUT_CHARS = 32_000;
 
 export function buildExtractionPrompt(
   crText: string,
   knownCompetitors: string[],
   knownAbbreviations: { short: string; full: string }[],
 ): string {
+  const safeCr =
+    typeof crText === 'string'
+      ? crText.length > MAX_CR_INPUT_CHARS
+        ? crText.slice(0, MAX_CR_INPUT_CHARS) + '\n[... tronque]'
+        : crText
+      : '';
   const competitorsList = knownCompetitors.length > 0
     ? `Concurrents connus de cette entreprise : ${knownCompetitors.join(', ')}`
     : 'Aucun concurrent connu.';
@@ -24,7 +38,7 @@ ${abbrList}
 
 COMPTE-RENDU:
 """
-${crText}
+${safeCr}
 """
 
 Extrayez en JSON strict (pas de texte avant/apres, uniquement le JSON) :
@@ -111,11 +125,91 @@ TYPE_OFFRE (sur chaque deal) : remise | bundle | gratuit | upgrade | sav | autre
 TYPE_ACTION_COMMUNICATION (sur chaque competitor_mention) : remise | campagne | event | partenariat | autre.`;
 }
 
+// ---------------------------------------------------------------------------
+// Strict Zod schema for the LLM output. The model is a third party that we
+// don't trust: before any field lands in the DB it must pass this schema.
+// Unknown fields are stripped, out-of-range enums reject the whole payload.
+// ---------------------------------------------------------------------------
+const SHORT_TEXT = z.string().max(500);
+const MEDIUM_TEXT = z.string().max(4000);
+const CAP_LIST = <T extends z.ZodTypeAny>(item: T) => z.array(item).max(50);
+
+const SignalSchema = z.object({
+  type: z.enum(['concurrence', 'besoin', 'prix', 'satisfaction', 'opportunite']),
+  severity: z.enum(['rouge', 'orange', 'jaune', 'vert']),
+  title: SHORT_TEXT,
+  content: MEDIUM_TEXT,
+  competitor_name: SHORT_TEXT.nullable().optional(),
+  price_delta: z.union([z.number().finite(), z.null()]).optional(),
+  region: SHORT_TEXT.optional(),
+}).passthrough();
+
+const DealSchema = z.object({
+  view: z.enum(['marketing', 'commercial']),
+  motif: z.enum(['prix', 'produit', 'offre', 'timing', 'concurrent', 'relation', 'budget', 'autre']),
+  resultat: z.enum(['gagne', 'perdu', 'en_cours']),
+  concurrent_nom: SHORT_TEXT.nullable().optional(),
+  type_offre: z.enum(['remise', 'bundle', 'gratuit', 'upgrade', 'sav', 'autre']).optional(),
+  verbatim: MEDIUM_TEXT,
+  region: SHORT_TEXT.optional(),
+}).passthrough();
+
+const PrixSignalSchema = z.object({
+  concurrent_nom: SHORT_TEXT,
+  ecart_pct: z.number().finite().min(-100).max(1000),
+  ecart_type: z.enum(['inferieur', 'superieur']),
+  verbatim: MEDIUM_TEXT,
+  region: SHORT_TEXT.optional(),
+}).passthrough();
+
+const ObjectifSchema = z.object({
+  type: z.enum(['signature', 'sell_out', 'sell_in', 'formation', 'decouverte', 'fidelisation']),
+  resultat: z.enum(['atteint', 'non_atteint']),
+  cause_echec: SHORT_TEXT.nullable().optional(),
+  facteur_reussite: SHORT_TEXT.nullable().optional(),
+}).passthrough();
+
+const NeedSchema = z.object({
+  label: SHORT_TEXT,
+  trend: z.enum(['up', 'down', 'stable', 'new']),
+  region: SHORT_TEXT.optional(),
+}).passthrough();
+
+const CompetitorMentionSchema = z.object({
+  name: SHORT_TEXT,
+  mention_type: SHORT_TEXT.optional(),
+  type_action_communication: z.enum(['remise', 'campagne', 'event', 'partenariat', 'autre']).optional(),
+}).passthrough();
+
+const ExtractedCRSchema = z.object({
+  region: SHORT_TEXT.nullable().optional(),
+  secteur: SHORT_TEXT.optional(),
+  signals: CAP_LIST(SignalSchema).default([]),
+  deals: CAP_LIST(DealSchema).default([]),
+  prix_signals: CAP_LIST(PrixSignalSchema).default([]),
+  objectifs: CAP_LIST(ObjectifSchema).default([]),
+  sentiment: z.enum(['positif', 'negatif', 'neutre', 'interesse']).optional(),
+  needs: CAP_LIST(NeedSchema).default([]),
+  competitors_mentioned: CAP_LIST(CompetitorMentionSchema).default([]),
+}).passthrough();
+
 export function parseExtractionResponse(responseText: string): ExtractedCRData | null {
+  if (typeof responseText !== 'string') return null;
   try {
     const jsonMatch = responseText.match(/\{[\s\S]*\}/);
     if (!jsonMatch) return null;
-    return JSON.parse(jsonMatch[0]) as ExtractedCRData;
+    const raw = JSON.parse(jsonMatch[0]);
+    const result = ExtractedCRSchema.safeParse(raw);
+    if (!result.success) {
+      // Log the validation error paths only — never echo the raw LLM content,
+      // which may include injected prompts from the source CR.
+      console.warn(
+        '[extraction] schema validation failed:',
+        result.error.issues.slice(0, 5).map((i) => i.path.join('.'))
+      );
+      return null;
+    }
+    return result.data as ExtractedCRData;
   } catch {
     return null;
   }

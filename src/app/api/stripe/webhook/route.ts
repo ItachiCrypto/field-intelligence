@@ -1,53 +1,140 @@
 // @ts-nocheck
 import { NextRequest, NextResponse } from 'next/server';
+import type Stripe from 'stripe';
 import { createServiceClient } from '@/lib/supabase/server';
 import { stripe } from '@/lib/stripe/client';
 import { getPlanByStripePriceId } from '@/lib/stripe/plans';
 
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
 
+/**
+ * Helper: load the company row that this Stripe customer belongs to. Since
+ * `stripe_customer_id` is unique at the DB layer (see migration 00006), this
+ * returns at most one row.
+ */
+async function findCompanyByCustomer(
+  serviceClient: ReturnType<typeof createServiceClient>,
+  customerId: string
+) {
+  const { data } = await serviceClient
+    .from('companies')
+    .select('id')
+    .eq('stripe_customer_id', customerId)
+    .single();
+  return data;
+}
+
+/**
+ * Helper: idempotency check. Stripe retries webhooks on 5xx responses, so we
+ * record every event id we've already processed in a dedicated table. If the
+ * table write fails with a unique-constraint violation, we short-circuit.
+ *
+ * Returns `true` if this event is NEW and should be processed, `false` if we
+ * have already handled it.
+ */
+async function markEventProcessed(
+  serviceClient: ReturnType<typeof createServiceClient>,
+  event: Stripe.Event
+): Promise<boolean> {
+  const { error } = await serviceClient
+    .from('stripe_webhook_events')
+    .insert({
+      event_id: event.id,
+      event_type: event.type,
+    });
+
+  if (error) {
+    // 23505 = unique_violation in Postgres. That means Stripe retried an
+    // event we've already recorded — acknowledge but do nothing else.
+    if ((error as { code?: string }).code === '23505') return false;
+    // Any other DB error is a real problem — surface it by throwing.
+    throw error;
+  }
+  return true;
+}
+
 export async function POST(request: NextRequest) {
+  const body = await request.text();
+  const signature = request.headers.get('stripe-signature');
+  if (!signature) {
+    return NextResponse.json(
+      { error: 'Missing stripe-signature header' },
+      { status: 400 }
+    );
+  }
+
+  let event: Stripe.Event;
   try {
-    const body = await request.text();
-    const signature = request.headers.get('stripe-signature');
+    event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
+  } catch (err) {
+    // Never log the signature or raw payload in error paths.
+    console.error(
+      '[stripe-webhook] signature verification failed:',
+      err instanceof Error ? err.message : 'unknown'
+    );
+    return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
+  }
 
-    if (!signature) {
-      return NextResponse.json({ error: 'Missing stripe-signature header' }, { status: 400 });
+  const serviceClient = createServiceClient();
+
+  // ---------------------------------------------------------------------
+  // Idempotency: de-duplicate retried deliveries of the same event id.
+  // ---------------------------------------------------------------------
+  try {
+    const isNew = await markEventProcessed(serviceClient, event);
+    if (!isNew) {
+      return NextResponse.json({ received: true, duplicate: true });
     }
+  } catch (err) {
+    console.error(
+      '[stripe-webhook] idempotency record failed:',
+      err instanceof Error ? err.message : 'unknown'
+    );
+    // Fail closed: if we can't record the event, better to let Stripe retry
+    // than to double-process a payment mutation.
+    return NextResponse.json(
+      { error: 'Idempotency store unavailable' },
+      { status: 500 }
+    );
+  }
 
-    let event;
-    try {
-      event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
-    } catch (err) {
-      console.error('Webhook signature verification failed:', err);
-      return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
-    }
-
-    const serviceClient = createServiceClient();
-
+  try {
     switch (event.type) {
       case 'checkout.session.completed': {
-        const session = event.data.object;
-        const companyId = session.metadata?.company_id;
+        const session = event.data.object as Stripe.Checkout.Session;
+        const companyId =
+          session.metadata?.company_id ||
+          session.client_reference_id ||
+          null;
+        if (!companyId) break;
 
-        if (!companyId) {
-          console.error('No company_id in checkout session metadata');
-          break;
-        }
+        const subscriptionId = session.subscription as string | null;
+        if (!subscriptionId) break;
 
-        const subscriptionId = session.subscription as string;
         const subscription = await stripe.subscriptions.retrieve(subscriptionId);
-        const priceId = subscription.items.data[0]?.price?.id;
+        const priceId = subscription.items.data[0]?.price?.id ?? null;
+        const plan = priceId ? getPlanByStripePriceId(priceId) : null;
+        if (!plan) break;
 
-        if (!priceId) {
-          console.error('No price ID found in subscription');
-          break;
-        }
-
-        const plan = getPlanByStripePriceId(priceId);
-
-        if (!plan) {
-          console.error('Unknown price ID:', priceId);
+        // Defense in depth: confirm the Stripe customer on this subscription
+        // matches the one we have on file for this company. Prevents a
+        // spoofed/rehomed customer from forcing a plan upgrade on someone
+        // else's company_id by putting it in metadata.
+        const customerId = subscription.customer as string;
+        const { data: company } = await serviceClient
+          .from('companies')
+          .select('id, stripe_customer_id')
+          .eq('id', companyId)
+          .single();
+        if (!company) break;
+        if (
+          company.stripe_customer_id &&
+          company.stripe_customer_id !== customerId
+        ) {
+          console.error(
+            '[stripe-webhook] customer mismatch for company',
+            companyId
+          );
           break;
         }
 
@@ -56,64 +143,42 @@ export async function POST(request: NextRequest) {
           .update({
             plan: plan.id,
             plan_user_limit: plan.userLimit,
+            stripe_customer_id: customerId,
             stripe_subscription_id: subscriptionId,
             subscription_status: 'active',
           })
           .eq('id', companyId);
-
         break;
       }
 
       case 'customer.subscription.updated': {
-        const subscription = event.data.object;
+        const subscription = event.data.object as Stripe.Subscription;
         const customerId = subscription.customer as string;
-        const priceId = subscription.items.data[0]?.price?.id;
+        const priceId = subscription.items.data[0]?.price?.id ?? null;
 
-        const { data: company } = await serviceClient
-          .from('companies')
-          .select('id')
-          .eq('stripe_customer_id', customerId)
-          .single();
-
-        if (!company) {
-          console.error('No company found for customer:', customerId);
-          break;
-        }
+        const company = await findCompanyByCustomer(serviceClient, customerId);
+        if (!company) break;
 
         const plan = priceId ? getPlanByStripePriceId(priceId) : null;
-
         const updateData: Record<string, unknown> = {
           subscription_status: subscription.status,
         };
-
         if (plan) {
           updateData.plan = plan.id;
           updateData.plan_user_limit = plan.userLimit;
         }
-
         await serviceClient
           .from('companies')
           .update(updateData)
           .eq('id', company.id);
-
         break;
       }
 
       case 'customer.subscription.deleted': {
-        const subscription = event.data.object;
+        const subscription = event.data.object as Stripe.Subscription;
         const customerId = subscription.customer as string;
-
-        const { data: company } = await serviceClient
-          .from('companies')
-          .select('id')
-          .eq('stripe_customer_id', customerId)
-          .single();
-
-        if (!company) {
-          console.error('No company found for customer:', customerId);
-          break;
-        }
-
+        const company = await findCompanyByCustomer(serviceClient, customerId);
+        if (!company) break;
         await serviceClient
           .from('companies')
           .update({
@@ -122,41 +187,42 @@ export async function POST(request: NextRequest) {
             subscription_status: 'canceled',
           })
           .eq('id', company.id);
-
         break;
       }
 
       case 'invoice.payment_failed': {
-        const invoice = event.data.object;
+        const invoice = event.data.object as Stripe.Invoice;
         const customerId = invoice.customer as string;
-
-        const { data: company } = await serviceClient
-          .from('companies')
-          .select('id')
-          .eq('stripe_customer_id', customerId)
-          .single();
-
-        if (!company) {
-          console.error('No company found for customer:', customerId);
-          break;
-        }
-
+        const company = await findCompanyByCustomer(serviceClient, customerId);
+        if (!company) break;
         await serviceClient
           .from('companies')
           .update({ subscription_status: 'past_due' })
           .eq('id', company.id);
-
         break;
       }
 
       default:
-        // Unhandled event type — ignore silently
+        // Unhandled event type — acknowledge silently.
         break;
     }
 
     return NextResponse.json({ received: true });
   } catch (error) {
-    console.error('Webhook error:', error);
-    return NextResponse.json({ error: 'Webhook handler failed' }, { status: 500 });
+    console.error(
+      '[stripe-webhook] handler error:',
+      error instanceof Error ? error.message : 'unknown'
+    );
+    // Return 500 so Stripe will retry. Because we store idempotency marker
+    // before processing, we need to clean up to allow retries to re-process
+    // the mutation safely.
+    await serviceClient
+      .from('stripe_webhook_events')
+      .delete()
+      .eq('event_id', event.id);
+    return NextResponse.json(
+      { error: 'Webhook handler failed' },
+      { status: 500 }
+    );
   }
 }

@@ -7,25 +7,31 @@ import {
 } from '@/lib/crm/salesforce';
 import { decrypt, encrypt } from '@/lib/crm/encryption';
 import type { SalesforceTask } from '@/lib/crm/types';
+import {
+  isUuid,
+  verifyCronBearer,
+  verifyCronHeader,
+} from '@/lib/auth/cron';
 
 export async function POST(request: NextRequest) {
   try {
-    const cronSecret = request.headers.get('x-cron-secret');
-    const isCron =
-      cronSecret && cronSecret === process.env.CRON_SECRET;
+    const isCron = verifyCronHeader(request.headers.get('x-cron-secret'));
 
     let companyId: string;
 
     if (isCron) {
-      // Cron mode: get company_id from request body
-      const body = await request.json();
-      companyId = body.company_id;
-      if (!companyId) {
+      // Cron mode: company_id comes from the request body. We validate it as
+      // a strict UUID so a bogus scheduler call cannot pivot through the
+      // rest of the handler with a SQL-unfriendly value.
+      const body = await request.json().catch(() => null);
+      const candidate = body && typeof body === 'object' ? body.company_id : null;
+      if (!isUuid(candidate)) {
         return NextResponse.json(
-          { error: 'company_id required for cron sync' },
+          { error: 'company_id (UUID) required for cron sync' },
           { status: 400 }
         );
       }
+      companyId = candidate;
     } else {
       // Manual mode: verify auth
       const supabase = await createClient();
@@ -161,21 +167,14 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, synced: syncedCount });
   } catch (error) {
-    console.error('Sync error:', error);
-    return NextResponse.json(
-      {
-        error: 'Sync failed',
-        message: error instanceof Error ? error.message : 'Unknown error',
-      },
-      { status: 500 }
-    );
+    console.error('[sync] error:', error instanceof Error ? error.message : 'unknown');
+    return NextResponse.json({ error: 'Sync failed' }, { status: 500 });
   }
 }
 
 // GET handler for Vercel Cron
 export async function GET(request: NextRequest) {
-  const authHeader = request.headers.get('authorization');
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!verifyCronBearer(request.headers.get('authorization'))) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
