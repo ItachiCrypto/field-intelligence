@@ -158,29 +158,55 @@ export default function DirClosPage() {
     }));
   }, [CR_OBJECTIFS]);
 
-  // Causes de non-atteinte
+  // Cle de dedup : strip ponctuation terminale + accents + lowercase.
+  // Permet de regrouper "SAV sous-dimensionne en region" et "SAV sous-dimensionné en région."
+  const dedupKey = (s: string): string =>
+    s.trim()
+      .replace(/[\s.,;:!?]+$/g, '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase();
+
+  // Causes de non-atteinte (dedup par cle canonique, affichage = variante la plus longue/complete)
   const causesData = useMemo(() => {
-    const counts: Record<string, number> = {};
+    const buckets: Record<string, { display: string; count: number }> = {};
     for (const cr of CR_OBJECTIFS) {
-      if (cr.resultat === 'non_atteint' && cr.cause_echec) {
-        counts[cr.cause_echec] = (counts[cr.cause_echec] || 0) + 1;
+      if (cr.resultat !== 'non_atteint' || !cr.cause_echec) continue;
+      const key = dedupKey(cr.cause_echec);
+      if (!key) continue;
+      if (!buckets[key]) {
+        buckets[key] = { display: cr.cause_echec.trim(), count: 1 };
+      } else {
+        buckets[key].count += 1;
+        // Garde la variante la plus longue (plus susceptible d'etre correctement ponctuee/accentuee)
+        if (cr.cause_echec.length > buckets[key].display.length) {
+          buckets[key].display = cr.cause_echec.trim();
+        }
       }
     }
-    return Object.entries(counts)
-      .map(([cause, count]) => ({ name: cause, count }))
+    return Object.values(buckets)
+      .map(b => ({ name: b.display, count: b.count }))
       .sort((a, b) => b.count - a.count);
   }, [CR_OBJECTIFS]);
 
-  // Facteurs de reussite
+  // Facteurs de reussite (meme logique de dedup)
   const facteursData = useMemo(() => {
-    const counts: Record<string, number> = {};
+    const buckets: Record<string, { display: string; count: number }> = {};
     for (const cr of CR_OBJECTIFS) {
-      if (cr.resultat === 'atteint' && cr.facteur_reussite) {
-        counts[cr.facteur_reussite] = (counts[cr.facteur_reussite] || 0) + 1;
+      if (cr.resultat !== 'atteint' || !cr.facteur_reussite) continue;
+      const key = dedupKey(cr.facteur_reussite);
+      if (!key) continue;
+      if (!buckets[key]) {
+        buckets[key] = { display: cr.facteur_reussite.trim(), count: 1 };
+      } else {
+        buckets[key].count += 1;
+        if (cr.facteur_reussite.length > buckets[key].display.length) {
+          buckets[key].display = cr.facteur_reussite.trim();
+        }
       }
     }
-    return Object.entries(counts)
-      .map(([facteur, count]) => ({ name: facteur, count }))
+    return Object.values(buckets)
+      .map(b => ({ name: b.display, count: b.count }))
       .sort((a, b) => b.count - a.count);
   }, [CR_OBJECTIFS]);
 

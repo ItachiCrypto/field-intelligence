@@ -248,6 +248,36 @@ function isNoiseCompetitor(name) {
   return false;
 }
 
+// Normalise un texte libre extrait par LLM : trim, strip ponctuation terminale,
+// filtre les valeurs poubelle. Retourne null si invalide ou vide.
+// Conserve les accents et la casse d'origine pour l'affichage, mais retourne la version canonique.
+function normalizeFreeText(raw) {
+  if (raw == null) return null;
+  let s = String(raw).trim();
+  if (!s) return null;
+  // Strip ponctuation terminale (. , ; : ! ?) et espaces
+  s = s.replace(/[\s.,;:!?]+$/g, '').trim();
+  if (!s) return null;
+  // Filtre les valeurs poubelle (insensible accents et casse)
+  const canonical = s
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+  if (/^(null|none|undefined|nan|n\/?a|nc|na|inconnu|aucun|aucune|rien|vide|tbd|a determiner|a definir|non specifie|non specifiee|non specifiees|non specifies|non renseigne|non renseignee|non applicable|pas de cause|pas de facteur)$/i.test(canonical)) {
+    return null;
+  }
+  return s;
+}
+
+// Retourne une cle de dedup stable : strip accents + lowercase + strip ponctuation terminale.
+// Utilisee par les requetes GROUP BY dans les agregations.
+function dedupKey(s) {
+  if (!s) return null;
+  return String(s).trim()
+    .replace(/[\s.,;:!?]+$/g, '')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+}
+
 // Mapping des enums type_offre et comm_type
 // enum DB offre_type = {bundle, promotion, nouvelle_gamme, conditions_paiement, essai_gratuit, autre}
 function mapTypeOffreToEnum(t) {
@@ -485,12 +515,12 @@ async function main() {
         signalsCreated++;
       }
 
-      // Insert objectifs (T1 : propage region)
+      // Insert objectifs (T1 : propage region + normalise cause_echec/facteur_reussite)
       for (const obj of (extracted.objectifs || [])) {
         await db.query(
           `INSERT INTO cr_objectifs (company_id, commercial_name, client_name, objectif_type, resultat, cause_echec, facteur_reussite, date, region, source_report_id)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-          [report.company_id, report.commercial_name || '', clientName, mapObjType(obj.type), mapObjResultat(obj.resultat), obj.cause_echec || null, obj.facteur_reussite || null, visitDate, rootRegion, report.id]
+          [report.company_id, report.commercial_name || '', clientName, mapObjType(obj.type), mapObjResultat(obj.resultat), normalizeFreeText(obj.cause_echec), normalizeFreeText(obj.facteur_reussite), visitDate, rootRegion, report.id]
         );
         signalsCreated++;
       }
@@ -926,6 +956,33 @@ async function main() {
              OR lower(trim(concurrent_nom)) IN ('null','none','undefined','nan','inconnu','autre','divers','aucun','n/a','nc','na'))
     `, [cid]);
     if (r9.rowCount > 0) console.log(`  offres cleanup: ${r9.rowCount} supprimes`);
+
+    // Cleanup cr_objectifs : NULL-out les valeurs poubelle et strip ponctuation terminale.
+    // Couvre les CR traites avant le fix de la normalisation a l'ingestion.
+    // translate() strip les accents (couvre les principaux caracteres francais).
+    const r10 = await db.query(`
+      UPDATE cr_objectifs SET
+        cause_echec = CASE
+          WHEN cause_echec IS NULL THEN NULL
+          WHEN lower(translate(regexp_replace(cause_echec, '[[:space:].,;:!?]+$', '', 'g'),
+                               'ÀÁÂÃÄÅàáâãäåÈÉÊËèéêëÌÍÎÏìíîïÒÓÔÕÖØòóôõöøÙÚÛÜùúûüÇçÑñŸÿ',
+                               'AAAAAAaaaaaaEEEEeeeeIIIIiiiiOOOOOOooooooUUUUuuuuCcNnYy'))
+               IN ('','null','none','undefined','nan','n/a','na','nc','inconnu','aucun','aucune','rien','vide','tbd','non specifie','non specifiee','non renseigne','non renseignee','non applicable','pas de cause','pas de facteur')
+            THEN NULL
+          ELSE regexp_replace(cause_echec, '[[:space:].,;:!?]+$', '', 'g')
+        END,
+        facteur_reussite = CASE
+          WHEN facteur_reussite IS NULL THEN NULL
+          WHEN lower(translate(regexp_replace(facteur_reussite, '[[:space:].,;:!?]+$', '', 'g'),
+                               'ÀÁÂÃÄÅàáâãäåÈÉÊËèéêëÌÍÎÏìíîïÒÓÔÕÖØòóôõöøÙÚÛÜùúûüÇçÑñŸÿ',
+                               'AAAAAAaaaaaaEEEEeeeeIIIIiiiiOOOOOOooooooUUUUuuuuCcNnYy'))
+               IN ('','null','none','undefined','nan','n/a','na','nc','inconnu','aucun','aucune','rien','vide','tbd','non specifie','non specifiee','non renseigne','non renseignee','non applicable','pas de cause','pas de facteur')
+            THEN NULL
+          ELSE regexp_replace(facteur_reussite, '[[:space:].,;:!?]+$', '', 'g')
+        END
+      WHERE company_id = $1
+    `, [cid]);
+    if (r10.rowCount > 0) console.log(`  cr_objectifs normalises: ${r10.rowCount}`);
   }
 
   // Summary
@@ -1011,15 +1068,17 @@ async function generateDerivedTables(db, companyIds) {
       const risk_score = Math.min(100, r * 20 + o * 10 + j * 5);
       // health = derivee de risk_score (enum severity: rouge/orange/jaune/vert)
       const health = risk_score >= 60 ? 'rouge' : risk_score >= 30 ? 'orange' : risk_score >= 15 ? 'jaune' : 'vert';
-      // risk_trend = delta (score recent - score plus ancien) ; signe positif = se degrade
+      // risk_trend = delta (score recent - score plus ancien) ; signe positif = se degrade.
+      // Fenetre de 14j basee sur rr.visit_date (date reelle du CR) et non s.created_at (= date d'ingestion).
+      // Sinon tous les signaux fraichement sync'es sont classes "recent" et risk_trend est systematiquement cape a +50.
       const { rows: trendRec } = await db.query(`
         SELECT
-          COUNT(*) FILTER (WHERE s.severity = 'rouge' AND s.created_at > NOW() - INTERVAL '14 days') as r_rec,
-          COUNT(*) FILTER (WHERE s.severity = 'orange' AND s.created_at > NOW() - INTERVAL '14 days') as o_rec,
-          COUNT(*) FILTER (WHERE s.severity = 'rouge' AND s.created_at <= NOW() - INTERVAL '14 days') as r_old,
-          COUNT(*) FILTER (WHERE s.severity = 'orange' AND s.created_at <= NOW() - INTERVAL '14 days') as o_old
+          COUNT(*) FILTER (WHERE s.severity = 'rouge' AND rr.visit_date > CURRENT_DATE - INTERVAL '14 days') as r_rec,
+          COUNT(*) FILTER (WHERE s.severity = 'orange' AND rr.visit_date > CURRENT_DATE - INTERVAL '14 days') as o_rec,
+          COUNT(*) FILTER (WHERE s.severity = 'rouge' AND rr.visit_date <= CURRENT_DATE - INTERVAL '14 days') as r_old,
+          COUNT(*) FILTER (WHERE s.severity = 'orange' AND rr.visit_date <= CURRENT_DATE - INTERVAL '14 days') as o_old
         FROM signals s JOIN raw_visit_reports rr ON rr.id = s.source_report_id
-        WHERE s.company_id = $1 AND rr.client_name = $2`, [cid, c.name]);
+        WHERE s.company_id = $1 AND rr.client_name = $2 AND rr.visit_date IS NOT NULL`, [cid, c.name]);
       const rRec = parseInt(trendRec[0].r_rec), oRec = parseInt(trendRec[0].o_rec);
       const rOld = parseInt(trendRec[0].r_old), oOld = parseInt(trendRec[0].o_old);
       const scoreRec = rRec * 20 + oRec * 10;
