@@ -9,7 +9,10 @@ import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend,
   BarChart, Bar, Cell,
 } from 'recharts';
-import { CircleDollarSign, TrendingDown, AlertTriangle, Percent } from 'lucide-react';
+import {
+  CircleDollarSign, TrendingDown, AlertTriangle, Percent,
+  ChevronDown, TrendingUp as TUp,
+} from 'lucide-react';
 
 const DEAL_MOTIF_LABELS: Record<string, string> = {
   prix: 'Prix',
@@ -53,6 +56,7 @@ export default function MktPrixPage() {
   const { prixSignals: PRIX_SIGNALS, tendancePrix: TENDANCE_PRIX, dealsAnalyse: DEALS_ANALYSE } = useAppData();
   const [statutFilter, setStatutFilter] = useState<StatutFilter>('all');
   const [concurrentFilter, setConcurrentFilter] = useState<ConcurrentFilter>('all');
+  const [expanded, setExpanded] = useState<string | null>(null);
 
   const concurrents = useMemo(() => {
     const set = new Set(PRIX_SIGNALS.map((s) => s.concurrent_nom));
@@ -139,6 +143,68 @@ export default function MktPrixPage() {
       return true;
     }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [PRIX_SIGNALS, statutFilter, concurrentFilter]);
+
+  // Regroupement des signaux filtres par concurrent : un vrai visuel par
+  // concurrent (ecart moyen, repartition gagne/perdu, type inferieur/superieur,
+  // top commerciaux/regions).
+  const competitorCards = useMemo(() => {
+    type Card = {
+      concurrent_nom: string;
+      signaux: typeof PRIX_SIGNALS;
+      ecartMoyAbs: number;
+      nbInferieur: number;
+      nbSuperieur: number;
+      nbGagne: number;
+      nbPerdu: number;
+      nbEnCours: number;
+      topCommerciaux: [string, number][];
+      topRegions: [string, number][];
+    };
+    const map = new Map<string, Card>();
+    for (const s of filteredSignals) {
+      if (!map.has(s.concurrent_nom)) {
+        map.set(s.concurrent_nom, {
+          concurrent_nom: s.concurrent_nom,
+          signaux: [],
+          ecartMoyAbs: 0,
+          nbInferieur: 0,
+          nbSuperieur: 0,
+          nbGagne: 0,
+          nbPerdu: 0,
+          nbEnCours: 0,
+          topCommerciaux: [],
+          topRegions: [],
+        });
+      }
+      const c = map.get(s.concurrent_nom)!;
+      c.signaux.push(s);
+      if (s.ecart_type === 'inferieur') c.nbInferieur++;
+      else c.nbSuperieur++;
+      if (s.statut_deal === 'gagne') c.nbGagne++;
+      else if (s.statut_deal === 'perdu') c.nbPerdu++;
+      else c.nbEnCours++;
+    }
+    for (const c of map.values()) {
+      // Ecart moyen absolu : magnitude de l'ecart quel que soit le sens.
+      c.ecartMoyAbs =
+        c.signaux.reduce((acc, s) => acc + Math.abs(s.ecart_pct), 0) /
+        (c.signaux.length || 1);
+      const commCount = new Map<string, number>();
+      const regCount = new Map<string, number>();
+      for (const s of c.signaux) {
+        if (s.commercial_name)
+          commCount.set(s.commercial_name, (commCount.get(s.commercial_name) || 0) + 1);
+        if (s.region) regCount.set(s.region, (regCount.get(s.region) || 0) + 1);
+      }
+      c.topCommerciaux = Array.from(commCount.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 3);
+      c.topRegions = Array.from(regCount.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 3);
+    }
+    return Array.from(map.values()).sort((a, b) => b.signaux.length - a.signaux.length);
+  }, [filteredSignals]);
 
   const statutBadge = (statut: string) => {
     const config: Record<string, string> = {
@@ -371,48 +437,167 @@ export default function MktPrixPage() {
         ))}
       </div>
 
-      {/* Table */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-slate-50/60 border-b border-slate-100">
-                <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Concurrent</th>
-                <th className="text-center px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Ecart</th>
-                <th className="text-center px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Type</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Client</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Commercial</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Region</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Date</th>
-                <th className="text-center px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Statut deal</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredSignals.map((s) => (
-                <tr key={s.id} className="border-b border-slate-100 hover:bg-slate-50/50 transition-colors">
-                  <td className="px-4 py-3 font-medium text-slate-900">{s.concurrent_nom}</td>
-                  <td className="px-4 py-3 text-center">{ecartBadge(s.ecart_pct, s.ecart_type)}</td>
-                  <td className="px-4 py-3 text-center">
-                    <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium border ${
-                      s.ecart_type === 'inferieur'
-                        ? 'bg-rose-50 text-rose-700 border-rose-200'
-                        : 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                    }`}>
-                      {s.ecart_type === 'inferieur' ? 'Inferieur' : 'Superieur'}
+      {/* Cards par concurrent */}
+      <div className="space-y-3">
+        <h2 className="text-sm font-semibold text-slate-900">Signaux par concurrent</h2>
+        {competitorCards.length === 0 ? (
+          <div className="bg-white rounded-xl border border-slate-200 p-8 text-center text-slate-500 text-sm">
+            Aucun signal pour les filtres selectionnes.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {competitorCards.map((c) => {
+              const isOpen = expanded === c.concurrent_nom;
+              const total = c.signaux.length;
+              const pct = (n: number) => (total > 0 ? Math.round((n / total) * 100) : 0);
+              return (
+                <div
+                  key={c.concurrent_nom}
+                  className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col"
+                >
+                  {/* Header */}
+                  <div className="px-5 pt-4 pb-3 border-b border-slate-100 flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <h3 className="font-semibold text-slate-900 truncate">{c.concurrent_nom}</h3>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        {total} signal{total > 1 ? 'aux' : ''}
+                      </p>
+                    </div>
+                    <span
+                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border ${
+                        c.ecartMoyAbs >= 10
+                          ? 'bg-rose-50 text-rose-700 border-rose-200'
+                          : 'bg-amber-50 text-amber-700 border-amber-200'
+                      }`}
+                    >
+                      <TUp className="w-3 h-3" />
+                      Ecart moy. {c.ecartMoyAbs.toFixed(1)}%
                     </span>
-                  </td>
-                  <td className="px-4 py-3 text-slate-700">{s.client_name}</td>
-                  <td className="px-4 py-3 text-slate-700">{s.commercial_name}</td>
-                  <td className="px-4 py-3 text-slate-600">{s.region}</td>
-                  <td className="px-4 py-3 text-slate-600 tabular-nums">{formatDate(s.date)}</td>
-                  <td className="px-4 py-3 text-center">{statutBadge(s.statut_deal)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        {filteredSignals.length === 0 && (
-          <div className="p-8 text-center text-slate-500">Aucun signal pour les filtres selectionnes.</div>
+                  </div>
+
+                  {/* Inferieur / Superieur split */}
+                  <div className="px-5 pt-3 pb-3">
+                    <div className="text-[11px] text-slate-500 uppercase tracking-wider mb-1.5">
+                      Positionnement prix
+                    </div>
+                    <div className="h-2 w-full rounded-full overflow-hidden bg-slate-100 flex">
+                      {c.nbInferieur > 0 && (
+                        <div
+                          className="bg-rose-500 h-full"
+                          style={{ width: `${pct(c.nbInferieur)}%` }}
+                          title={`Nous plus chers : ${c.nbInferieur}`}
+                        />
+                      )}
+                      {c.nbSuperieur > 0 && (
+                        <div
+                          className="bg-emerald-500 h-full"
+                          style={{ width: `${pct(c.nbSuperieur)}%` }}
+                          title={`Nous moins chers : ${c.nbSuperieur}`}
+                        />
+                      )}
+                    </div>
+                    <div className="flex items-center justify-between mt-1.5 text-[11px]">
+                      <span className="text-rose-700 tabular-nums">
+                        Nous chers : {c.nbInferieur}
+                      </span>
+                      <span className="text-emerald-700 tabular-nums">
+                        Nous -chers : {c.nbSuperieur}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Deals split */}
+                  <div className="grid grid-cols-3 divide-x divide-slate-100 border-t border-slate-100 text-center">
+                    <div className="py-3">
+                      <div className="text-lg font-bold text-emerald-700 tabular-nums">{c.nbGagne}</div>
+                      <div className="text-[11px] text-slate-500 uppercase tracking-wider">Gagnes</div>
+                    </div>
+                    <div className="py-3">
+                      <div className="text-lg font-bold text-amber-700 tabular-nums">{c.nbEnCours}</div>
+                      <div className="text-[11px] text-slate-500 uppercase tracking-wider">En cours</div>
+                    </div>
+                    <div className="py-3">
+                      <div className="text-lg font-bold text-rose-700 tabular-nums">{c.nbPerdu}</div>
+                      <div className="text-[11px] text-slate-500 uppercase tracking-wider">Perdus</div>
+                    </div>
+                  </div>
+
+                  {/* Top commerciaux / regions */}
+                  <div className="px-5 py-3 border-t border-slate-100 space-y-2">
+                    {c.topCommerciaux.length > 0 && (
+                      <div>
+                        <div className="text-[11px] text-slate-500 uppercase tracking-wider mb-1.5">
+                          Commerciaux exposes
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {c.topCommerciaux.map(([name, n]) => (
+                            <span
+                              key={name}
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-200"
+                            >
+                              {name}
+                              <span className="text-[10px] opacity-70 tabular-nums">×{n}</span>
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {c.topRegions.length > 0 && (
+                      <div>
+                        <div className="text-[11px] text-slate-500 uppercase tracking-wider mb-1.5">
+                          Regions
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {c.topRegions.map(([region, n]) => (
+                            <span
+                              key={region}
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-slate-50 text-slate-700 border border-slate-200"
+                            >
+                              {region}
+                              <span className="text-[10px] opacity-70 tabular-nums">×{n}</span>
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setExpanded(isOpen ? null : c.concurrent_nom)}
+                    className="mt-auto px-5 py-2.5 border-t border-slate-100 text-xs font-medium text-indigo-600 hover:bg-indigo-50/50 transition-colors flex items-center justify-center gap-1"
+                  >
+                    {isOpen ? 'Masquer le detail' : `Voir les ${total} signal${total > 1 ? 'aux' : ''}`}
+                    <ChevronDown
+                      className={`w-3.5 h-3.5 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+                    />
+                  </button>
+
+                  {isOpen && (
+                    <div className="border-t border-slate-100 divide-y divide-slate-100">
+                      {c.signaux.map((s) => (
+                        <div key={s.id} className="px-5 py-3 space-y-1">
+                          <div className="flex items-start justify-between gap-2">
+                            {ecartBadge(s.ecart_pct, s.ecart_type)}
+                            {statutBadge(s.statut_deal)}
+                          </div>
+                          <div className="text-sm text-slate-700">
+                            {s.client_name}{' '}
+                            <span className="text-slate-400">—</span>{' '}
+                            <span className="text-slate-600">{s.commercial_name}</span>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-500">
+                            <span>{s.region}</span>
+                            <span className="tabular-nums">{formatDate(s.date)}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         )}
       </div>
     </div>

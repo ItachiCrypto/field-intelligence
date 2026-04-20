@@ -12,7 +12,7 @@ import {
   PieChart, Pie, Cell, LineChart, Line, XAxis, YAxis,
   Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
-import { Target, TrendingUp, TrendingDown, Percent } from 'lucide-react';
+import { Target, TrendingUp, TrendingDown, Percent, ChevronDown } from 'lucide-react';
 
 const ALL_MOTIFS: MotifCommercial[] = [
   'prix_non_competitif', 'timing_rate', 'concurrent_mieux_positionne',
@@ -31,6 +31,7 @@ const RESULTAT_OPTIONS: { key: ResultatFilter; label: string }[] = [
 export default function DirLostPage() {
   const { dealsCommerciaux: DEALS_COMMERCIAUX, dealCommercialTendance: DEAL_COMMERCIAL_TENDANCE } = useAppData();
   const [resultatFilter, setResultatFilter] = useState<ResultatFilter>('tous');
+  const [expandedMotif, setExpandedMotif] = useState<string | null>(null);
 
   const totalDeals = DEALS_COMMERCIAUX.length;
   const gagnes = useMemo(() => DEALS_COMMERCIAUX.filter(d => d.resultat === 'gagne'), [DEALS_COMMERCIAUX]);
@@ -118,6 +119,30 @@ export default function DirLostPage() {
       .filter(d => resultatFilter === 'tous' || d.resultat === resultatFilter)
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [DEALS_COMMERCIAUX, resultatFilter]);
+
+  // Regroupement par motif : un bloc par motif avec compteurs gagne/perdu/en_cours
+  // et la liste detaillee des deals correspondants. On trie par nombre de deals
+  // pour que les motifs dominants apparaissent en premier.
+  const groupedByMotif = useMemo(() => {
+    const map = new Map<MotifCommercial, {
+      motif: MotifCommercial;
+      deals: typeof filteredDeals;
+      gagne: number;
+      perdu: number;
+      enCours: number;
+    }>();
+    for (const d of filteredDeals) {
+      if (!map.has(d.motif)) {
+        map.set(d.motif, { motif: d.motif, deals: [], gagne: 0, perdu: 0, enCours: 0 });
+      }
+      const g = map.get(d.motif)!;
+      g.deals.push(d);
+      if (d.resultat === 'gagne') g.gagne++;
+      else if (d.resultat === 'perdu') g.perdu++;
+      else g.enCours++;
+    }
+    return Array.from(map.values()).sort((a, b) => b.deals.length - a.deals.length);
+  }, [filteredDeals]);
 
   return (
     <div className="space-y-6">
@@ -306,63 +331,125 @@ export default function DirLostPage() {
         ))}
       </div>
 
-      {/* Table */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-slate-50/60 border-b border-slate-100">
-                <th className="text-center px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Motif</th>
-                <th className="text-center px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Resultat</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Concurrent</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Client</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Commercial</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Region</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Date</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Verbatim</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredDeals.map(d => (
-                <tr key={d.id} className="border-b border-slate-100 hover:bg-slate-50/50 transition-colors">
-                  <td className="px-4 py-3 text-center">
+      {/* Deals regroupes par motif */}
+      <div className="space-y-3">
+        {groupedByMotif.length === 0 ? (
+          <div className="bg-white rounded-xl border border-slate-200 p-8 text-center text-slate-500 text-sm">
+            Aucun deal pour ce filtre.
+          </div>
+        ) : (
+          groupedByMotif.map(g => {
+            const isOpen = expandedMotif === g.motif;
+            const color = MOTIF_COMMERCIAL_COLORS[g.motif];
+            const total = g.deals.length;
+            const conv = g.gagne + g.perdu > 0
+              ? Math.round((g.gagne / (g.gagne + g.perdu)) * 100)
+              : null;
+            return (
+              <div
+                key={g.motif}
+                className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden"
+              >
+                <button
+                  type="button"
+                  onClick={() => setExpandedMotif(isOpen ? null : g.motif)}
+                  className="w-full px-5 py-4 flex items-center justify-between gap-4 hover:bg-slate-50/50 transition-colors text-left"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
                     <span
-                      className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium"
-                      style={{
-                        backgroundColor: `${MOTIF_COMMERCIAL_COLORS[d.motif]}15`,
-                        color: MOTIF_COMMERCIAL_COLORS[d.motif],
-                      }}
-                    >
-                      {MOTIF_COMMERCIAL_LABELS[d.motif]}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <span className={cn(
-                      'inline-flex px-2 py-0.5 rounded-full text-xs font-medium border',
-                      d.resultat === 'gagne'
-                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                        : d.resultat === 'perdu'
-                        ? 'bg-rose-50 text-rose-700 border-rose-200'
-                        : 'bg-amber-50 text-amber-700 border-amber-200',
-                    )}>
-                      {d.resultat === 'gagne' ? 'Gagne' : d.resultat === 'perdu' ? 'Perdu' : 'En cours'}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-slate-700">{d.concurrent_nom || '--'}</td>
-                  <td className="px-4 py-3 text-slate-700">{d.client_name}</td>
-                  <td className="px-4 py-3 text-slate-700">{d.commercial_name}</td>
-                  <td className="px-4 py-3 text-slate-600">{d.region}</td>
-                  <td className="px-4 py-3 text-slate-600 tabular-nums">{formatDate(d.date)}</td>
-                  <td className="px-4 py-3 text-slate-600 max-w-xs">
-                    <AbbreviationHighlight text={d.verbatim} className="text-sm" />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        {filteredDeals.length === 0 && (
-          <div className="p-8 text-center text-slate-500">Aucun deal pour ce filtre.</div>
+                      className="w-2.5 h-2.5 rounded-full shrink-0"
+                      style={{ backgroundColor: color }}
+                    />
+                    <div className="min-w-0">
+                      <div className="font-semibold text-slate-900 truncate">
+                        {MOTIF_COMMERCIAL_LABELS[g.motif]}
+                      </div>
+                      <div className="text-xs text-slate-500 mt-0.5">
+                        {total} deal{total > 1 ? 's' : ''}
+                        {conv !== null && (
+                          <span className="ml-2">
+                            • Conversion{' '}
+                            <span className={cn(
+                              'font-medium',
+                              conv >= 50 ? 'text-emerald-700' : 'text-rose-700',
+                            )}>
+                              {conv}%
+                            </span>
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 shrink-0">
+                    {g.gagne > 0 && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 tabular-nums">
+                        {g.gagne} gagnes
+                      </span>
+                    )}
+                    {g.perdu > 0 && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200 tabular-nums">
+                        {g.perdu} perdus
+                      </span>
+                    )}
+                    {g.enCours > 0 && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200 tabular-nums">
+                        {g.enCours} en cours
+                      </span>
+                    )}
+                    <ChevronDown
+                      className={cn(
+                        'w-4 h-4 text-slate-400 transition-transform',
+                        isOpen && 'rotate-180',
+                      )}
+                    />
+                  </div>
+                </button>
+                {isOpen && (
+                  <div className="border-t border-slate-100 overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="bg-slate-50/60 border-b border-slate-100">
+                          <th className="text-center px-4 py-2 text-xs font-medium text-slate-500 uppercase tracking-wider">Resultat</th>
+                          <th className="text-left px-4 py-2 text-xs font-medium text-slate-500 uppercase tracking-wider">Concurrent</th>
+                          <th className="text-left px-4 py-2 text-xs font-medium text-slate-500 uppercase tracking-wider">Client</th>
+                          <th className="text-left px-4 py-2 text-xs font-medium text-slate-500 uppercase tracking-wider">Commercial</th>
+                          <th className="text-left px-4 py-2 text-xs font-medium text-slate-500 uppercase tracking-wider">Region</th>
+                          <th className="text-left px-4 py-2 text-xs font-medium text-slate-500 uppercase tracking-wider">Date</th>
+                          <th className="text-left px-4 py-2 text-xs font-medium text-slate-500 uppercase tracking-wider">Verbatim</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {g.deals.map(d => (
+                          <tr key={d.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/50 transition-colors">
+                            <td className="px-4 py-3 text-center">
+                              <span className={cn(
+                                'inline-flex px-2 py-0.5 rounded-full text-xs font-medium border',
+                                d.resultat === 'gagne'
+                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                  : d.resultat === 'perdu'
+                                  ? 'bg-rose-50 text-rose-700 border-rose-200'
+                                  : 'bg-amber-50 text-amber-700 border-amber-200',
+                              )}>
+                                {d.resultat === 'gagne' ? 'Gagne' : d.resultat === 'perdu' ? 'Perdu' : 'En cours'}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-slate-700">{d.concurrent_nom || '--'}</td>
+                            <td className="px-4 py-3 text-slate-700">{d.client_name}</td>
+                            <td className="px-4 py-3 text-slate-700">{d.commercial_name}</td>
+                            <td className="px-4 py-3 text-slate-600">{d.region}</td>
+                            <td className="px-4 py-3 text-slate-600 tabular-nums">{formatDate(d.date)}</td>
+                            <td className="px-4 py-3 text-slate-600 max-w-xs">
+                              <AbbreviationHighlight text={d.verbatim} className="text-sm" />
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            );
+          })
         )}
       </div>
     </div>
