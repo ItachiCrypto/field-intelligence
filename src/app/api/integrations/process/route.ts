@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { processReport } from '@/lib/crm/process-report';
+import { recomputeAnalytics } from '@/lib/analytics/recompute';
 import type { RawVisitReport } from '@/lib/crm/types';
 import { verifyCronBearer, verifyCronHeader } from '@/lib/auth/cron';
 
@@ -108,6 +109,15 @@ export async function POST(request: NextRequest) {
       CONCURRENCY,
     );
 
+    // Recompute analytics tables after processing
+    if (processedCount > 0 && companyFilter) {
+      try {
+        await recomputeAnalytics(companyFilter);
+      } catch (analyticsErr: any) {
+        console.warn('[process] analytics recompute failed (non-fatal):', analyticsErr?.message);
+      }
+    }
+
     return NextResponse.json({
       processed: processedCount,
       errors: errorDetails.length,
@@ -149,6 +159,14 @@ export async function GET(request: NextRequest) {
       else errorCount++;
     } catch { errorCount++; }
   }, CONCURRENCY);
+
+  // Recompute analytics for all affected companies
+  if (processedCount > 0) {
+    const companyIds = new Set((pendingReports as any[]).map((r) => r.company_id).filter(Boolean));
+    for (const cid of companyIds) {
+      try { await recomputeAnalytics(cid); } catch { /* non-fatal */ }
+    }
+  }
 
   return NextResponse.json({ processed: processedCount, errors: errorCount });
 }

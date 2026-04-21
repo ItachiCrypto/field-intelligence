@@ -26,7 +26,7 @@ const PERIOD_OPTIONS: { key: PeriodFilter; label: string }[] = [
 ];
 
 export default function RadarPage() {
-  const { competitors: COMPETITORS, signals: SIGNALS, refresh } = useAppData();
+  const { competitors: COMPETITORS, signals: SIGNALS, prixSignals: PRIX_SIGNALS, refresh } = useAppData();
   const { company } = useAuth();
   const [periodFilter, setPeriodFilter] = useState<PeriodFilter>('all');
   const [regionFilter, setRegionFilter] = useState<string>('all');
@@ -45,6 +45,22 @@ export default function RadarPage() {
   const [formMentionType, setFormMentionType] = useState('');
   const [formRisk, setFormRisk] = useState<string>('vert');
   const [formIsNew, setFormIsNew] = useState(false);
+
+  // Compute mention counts per competitor from signals + prix_signals (table has no mentions column)
+  const mentionCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const s of SIGNALS || []) {
+      if (s.competitor_name) {
+        counts[s.competitor_name] = (counts[s.competitor_name] || 0) + 1;
+      }
+    }
+    for (const p of PRIX_SIGNALS || []) {
+      if (p.concurrent_nom) {
+        counts[p.concurrent_nom] = (counts[p.concurrent_nom] || 0) + 1;
+      }
+    }
+    return counts;
+  }, [SIGNALS, PRIX_SIGNALS]);
 
   const resetForm = () => {
     setFormName('');
@@ -233,7 +249,7 @@ export default function RadarPage() {
                         )}
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-center font-bold text-slate-900 tabular-nums">{comp.mentions}</td>
+                    <td className="px-4 py-3 text-center font-bold text-slate-900 tabular-nums">{mentionCounts[comp.name] ?? comp.mentions ?? 0}</td>
                     <td className="px-4 py-3 text-slate-600">{comp.mention_type}</td>
                     <td className="px-4 py-3 text-center">
                       <span className="inline-flex items-center gap-1">

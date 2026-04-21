@@ -7,7 +7,7 @@ import { KpiCard } from '@/components/shared/kpi-card';
 import {
   Link2, Unlink, RefreshCw, CheckCircle, XCircle,
   AlertTriangle, Clock, FileText, Zap, Settings,
-  ExternalLink, Trash2,
+  ExternalLink, Trash2, BarChart2,
 } from 'lucide-react';
 
 type ConnectionState = 'loading' | 'disconnected' | 'connected' | 'error';
@@ -41,6 +41,7 @@ export default function IntegrationsPage() {
   const [banner, setBanner] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [showWipeModal, setShowWipeModal] = useState(false);
   const [wiping, setWiping] = useState(false);
+  const [recomputing, setRecomputing] = useState(false);
 
   const fetchStatus = useCallback(async () => {
     try {
@@ -161,6 +162,21 @@ export default function IntegrationsPage() {
     } catch (e: any) {
       setBanner({ type: 'error', message: e?.message || 'Erreur pipeline.' });
       setPipeline(null);
+    }
+  };
+
+  const handleRecompute = async () => {
+    setRecomputing(true);
+    setBanner(null);
+    try {
+      const res = await fetch('/api/analytics/recompute', { method: 'POST' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) setBanner({ type: 'error', message: data?.error || 'Erreur recalcul analytics.' });
+      else setBanner({ type: 'success', message: `Analytics recalculees : ${data?.tables_updated?.join(', ') ?? '0 tables'}.` });
+    } catch {
+      setBanner({ type: 'error', message: 'Erreur lors du recalcul analytics.' });
+    } finally {
+      setRecomputing(false);
     }
   };
 
@@ -429,6 +445,30 @@ export default function IntegrationsPage() {
           </div>
         </div>
       )}
+
+      {/* Analytics recompute section */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-3">
+        <div className="flex items-center gap-2">
+          <BarChart2 className="w-5 h-5 text-indigo-600" />
+          <h2 className="text-base font-semibold text-slate-900">Analytics avancees</h2>
+        </div>
+        <p className="text-sm text-slate-500">
+          Recalcule les tableaux analytiques (sentiment, geo, segments, territoires, positionnement, recommandations)
+          à partir des donnees brutes deja importees. Automatiquement declenche apres chaque synchronisation.
+        </p>
+        <button
+          onClick={handleRecompute}
+          disabled={recomputing || !!pipeline}
+          className="inline-flex items-center gap-2 px-4 py-2 bg-slate-800 text-white text-sm font-medium rounded-lg hover:bg-slate-900 transition-colors disabled:opacity-50"
+        >
+          {recomputing ? (
+            <RefreshCw className="w-4 h-4 animate-spin" />
+          ) : (
+            <BarChart2 className="w-4 h-4" />
+          )}
+          {recomputing ? 'Recalcul en cours...' : 'Recalculer les analytics'}
+        </button>
+      </div>
 
       {/* Wipe confirmation modal */}
       {showWipeModal && (

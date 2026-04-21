@@ -53,7 +53,19 @@ export default function BarometerPage() {
   // Sinon, on prend la table needs directement (pre-agregee par la pipeline).
   const displayedNeeds = useMemo(() => {
     if (clientFilter === 'all') {
-      return [...NEEDS].sort((a, b) => (a.rank ?? 999) - (b.rank ?? 999));
+      // Aggregate by label to deduplicate (same need may appear across multiple CRs)
+      const map = new Map<string, { label: string; mentions: number; trend: string }>();
+      for (const need of NEEDS || []) {
+        const key = (need.label || '').trim();
+        if (!key) continue;
+        if (!map.has(key)) {
+          map.set(key, { label: key, mentions: 0, trend: need.trend || 'stable' });
+        }
+        map.get(key)!.mentions += need.mentions || 1;
+      }
+      return Array.from(map.values())
+        .sort((a, b) => b.mentions - a.mentions)
+        .map((e, i) => ({ rank: i + 1, ...e, evolution: 0 }));
     }
     // Agregation from signals ciblee par client status
     const map = new Map<string, { label: string; mentions: number; clients: Set<string> }>();

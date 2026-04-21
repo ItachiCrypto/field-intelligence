@@ -127,11 +127,40 @@ export async function processReport(report: RawVisitReport): Promise<{ success: 
         content: sig.content,
         competitor_name: sig.competitor_name ?? null,
         price_delta: sig.price_delta ?? null,
-        region: '', // resolved later if commercial is matched
+        region: extracted.region ?? '',
         treated: false,
         source_report_id: report.id,
       });
       signalsCreated++;
+    }
+
+    // ── Auto-create competitors from signals (check before insert) ──────────
+    // Gather unique competitor names from this report
+    const competitorNames = new Set<string>();
+    for (const sig of extracted.signals) {
+      if (sig.competitor_name) competitorNames.add(sig.competitor_name);
+    }
+    for (const px of extracted.prix_signals) {
+      if (px.concurrent_nom) competitorNames.add(px.concurrent_nom);
+    }
+    for (const compName of competitorNames) {
+      // Check if already exists before inserting (avoids needing UNIQUE constraint)
+      const { data: existingComp } = await supabase
+        .from('competitors' as any)
+        .select('id')
+        .eq('company_id', report.company_id)
+        .eq('name', compName)
+        .maybeSingle() as any;
+      if (!existingComp) {
+        // Determine type and risk from signals mentioning this competitor
+        const relatedSig = extracted.signals.find(s => s.competitor_name === compName);
+        await supabase.from('competitors' as any).insert({
+          company_id: report.company_id,
+          name: compName,
+          mention_type: relatedSig?.type ?? 'concurrence',
+          risk: relatedSig?.severity === 'rouge' ? 'rouge' : relatedSig?.severity === 'orange' ? 'orange' : 'jaune',
+        });
+      }
     }
 
     // Insert deals
@@ -155,7 +184,7 @@ export async function processReport(report: RawVisitReport): Promise<{ success: 
           concurrent_nom: deal.concurrent_nom ?? null,
           commercial_name: report.commercial_name ?? '',
           client_name: report.client_name ?? '',
-          region: '',
+          region: extracted.region ?? '',
           verbatim: deal.verbatim,
           date: report.visit_date ?? new Date().toISOString().split('T')[0],
           source_report_id: report.id,
@@ -169,7 +198,7 @@ export async function processReport(report: RawVisitReport): Promise<{ success: 
           concurrent_nom: deal.concurrent_nom ?? null,
           commercial_name: report.commercial_name ?? '',
           client_name: report.client_name ?? '',
-          region: '',
+          region: extracted.region ?? '',
           verbatim: deal.verbatim,
           date: report.visit_date ?? new Date().toISOString().split('T')[0],
           source_report_id: report.id,
@@ -188,7 +217,7 @@ export async function processReport(report: RawVisitReport): Promise<{ success: 
         statut_deal: 'en_cours',
         commercial_name: report.commercial_name ?? '',
         client_name: report.client_name ?? '',
-        region: '',
+        region: extracted.region ?? '',
         verbatim: px.verbatim,
         date: report.visit_date ?? new Date().toISOString().split('T')[0],
         source_report_id: report.id,
@@ -207,7 +236,7 @@ export async function processReport(report: RawVisitReport): Promise<{ success: 
         cause_echec: obj.cause_echec ?? null,
         facteur_reussite: obj.facteur_reussite ?? null,
         date: report.visit_date ?? new Date().toISOString().split('T')[0],
-        region: '',
+        region: extracted.region ?? '',
         source_report_id: report.id,
       });
       signalsCreated++;
@@ -287,6 +316,8 @@ export async function processReport(report: RawVisitReport): Promise<{ success: 
             severity: sig.severity,
             status: 'nouveau',
             source_report_id: report.id,
+            content: sig.content ?? null,
+            client_name: report.client_name ?? null,
           });
         }
       }
