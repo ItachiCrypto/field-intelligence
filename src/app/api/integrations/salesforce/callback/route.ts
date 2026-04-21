@@ -18,12 +18,14 @@ function errorRedirect(appUrl: string, message: string) {
 }
 
 export async function GET(request: NextRequest) {
-  const searchParams = request.nextUrl.searchParams;
-  const code = searchParams.get('code');
-  const state = searchParams.get('state');
   const appUrl =
     process.env.NEXT_PUBLIC_APP_URL ||
     'https://field-intelligence-five.vercel.app';
+
+  try {
+  const searchParams = request.nextUrl.searchParams;
+  const code = searchParams.get('code');
+  const state = searchParams.get('state');
 
   // Prepare a provisional response so we can always invalidate the PKCE
   // cookies regardless of which branch we take below.
@@ -141,4 +143,9 @@ export async function GET(request: NextRequest) {
     successResponse.cookies.set(cookie);
   }
   return successResponse;
+
+  } catch (err: any) {
+    console.error('[sf-callback] unhandled error:', err?.message ?? err);
+    return errorRedirect(appUrl, `Erreur interne: ${err?.message ?? 'unknown'}`);
+  }
 }
