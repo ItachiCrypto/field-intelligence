@@ -122,7 +122,6 @@ export async function fetchSalesforceTasks(
            Who.Name
     FROM Task
     WHERE LastModifiedDate >= ${since}
-    AND Description != null
     ORDER BY LastModifiedDate DESC
     LIMIT ${limit}
   `;
