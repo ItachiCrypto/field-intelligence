@@ -148,10 +148,10 @@ export async function POST(request: NextRequest) {
         .eq('id', connection.id);
     }
 
-    // Fetch toutes les activites CRM (Task + Event = inclut Calls, Emails, RDV).
-    // Default to 30 days ago if this is the first sync.
+    // Fetch toutes les activites CRM.
+    // Si jamais synchronisé : remonter 2 ans en arrière pour tout récupérer.
     const since = connection.last_sync_at
-      || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+      || new Date(Date.now() - 2 * 365 * 24 * 60 * 60 * 1000).toISOString();
     const activities: SalesforceActivity[] = await fetchCrmActivities(
       accessToken,
       connection.instance_url!,

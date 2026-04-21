@@ -112,7 +112,7 @@ export default function IntegrationsPage() {
     }
   };
 
-  // Pipeline complet : sync → process en boucle avec progression
+  // Pipeline complet : sync → process TOUT en un seul appel
   const handleSyncAndProcess = async () => {
     setPipeline({ running: true, step: 'sync', synced: 0, processed: 0, total: 0, errors: 0 });
     setBanner(null);
@@ -126,37 +126,40 @@ export default function IntegrationsPage() {
         return;
       }
       const synced: number = syncData?.synced ?? 0;
-      setPipeline(p => p ? { ...p, step: 'process', synced, total: synced } : null);
       await fetchStatus();
 
-      // Étape 2 : process en boucle jusqu'à épuisement des pending
-      let totalProcessed = 0;
-      let totalErrors = 0;
-      let remaining = synced;
-      while (remaining > 0) {
-        const procRes = await fetch('/api/integrations/process', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ retry_errors: false }),
-        });
-        const procData = await procRes.json().catch(() => ({}));
-        const batchProcessed: number = procData?.processed ?? 0;
-        const batchErrors: number = procData?.errors ?? 0;
-        totalProcessed += batchProcessed;
-        totalErrors += batchErrors;
-        remaining = remaining - batchProcessed - batchErrors;
-        if (batchProcessed === 0 && batchErrors === 0) break; // plus rien à faire
-        setPipeline(p => p ? { ...p, processed: totalProcessed, errors: totalErrors } : null);
+      // Fetch current pending count (includes previously unprocessed + newly synced)
+      const statusRes = await fetch('/api/integrations/salesforce/status');
+      const statusData = statusRes.ok ? await statusRes.json() : {};
+      const totalPending = (statusData.records_pending ?? 0) + synced;
+
+      setPipeline(p => p ? { ...p, step: 'process', synced, total: totalPending } : null);
+
+      if (totalPending === 0) {
+        await fetchStatus();
+        setBanner({ type: 'success', message: 'Tout est déjà à jour — aucun CR à traiter.' });
+        setPipeline(null);
+        return;
       }
+
+      // Étape 2 : UN seul appel qui traite TOUT (concurrence x5 côté serveur)
+      const procRes = await fetch('/api/integrations/process', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ retry_errors: true }),
+      });
+      const procData = await procRes.json().catch(() => ({}));
+      const totalProcessed: number = procData?.processed ?? 0;
+      const totalErrors: number = procData?.errors ?? 0;
+
       await fetchStatus();
-      setPipeline(p => p ? { ...p, running: false, step: 'done' } : null);
+      setPipeline(null);
       setBanner({
-        type: totalErrors > 0 ? 'error' : 'success',
-        message: `${synced} CR importés, ${totalProcessed} analysés par l'IA${totalErrors > 0 ? `, ${totalErrors} erreur(s)` : ''}.`,
+        type: totalErrors > 0 && totalProcessed === 0 ? 'error' : 'success',
+        message: `${synced} CR importés, ${totalProcessed} analysés par l'IA${totalErrors > 0 ? ` (${totalErrors} ignorés)` : ''}.`,
       });
     } catch (e: any) {
       setBanner({ type: 'error', message: e?.message || 'Erreur pipeline.' });
-    } finally {
       setPipeline(null);
     }
   };
@@ -322,27 +325,30 @@ export default function IntegrationsPage() {
                 <div className="rounded-lg bg-indigo-50 border border-indigo-200 p-3 space-y-2">
                   <div className="flex items-center justify-between text-xs font-medium text-indigo-700">
                     <span>
-                      {pipeline.step === 'sync' && '⟳ Import depuis Salesforce...'}
-                      {pipeline.step === 'process' && `⚡ Analyse IA — ${pipeline.processed}/${pipeline.synced} CR traités`}
-                      {pipeline.step === 'done' && '✓ Terminé'}
+                      {pipeline.step === 'sync' && '⟳ Import depuis Salesforce…'}
+                      {pipeline.step === 'process' && `⚡ Analyse IA en cours — ${pipeline.total} CR à traiter…`}
                     </span>
-                    <span>{pipeline.synced > 0 ? Math.round((pipeline.processed / pipeline.synced) * 100) : 0}%</span>
+                    <span className="flex items-center gap-1">
+                      <RefreshCw className="w-3 h-3 animate-spin" />
+                      {pipeline.step === 'sync' ? 'Sync…' : 'Traitement…'}
+                    </span>
                   </div>
-                  <div className="w-full bg-indigo-100 rounded-full h-2">
+                  {/* Barre animée indéterminée pendant le traitement serveur */}
+                  <div className="w-full bg-indigo-100 rounded-full h-2 overflow-hidden">
                     <div
-                      className="bg-indigo-600 h-2 rounded-full transition-all duration-300"
+                      className="h-2 rounded-full bg-indigo-600"
                       style={{
-                        width: pipeline.step === 'sync'
-                          ? '10%'
-                          : pipeline.synced > 0
-                          ? `${Math.max(10, Math.round((pipeline.processed / pipeline.synced) * 100))}%`
-                          : '100%',
+                        width: pipeline.step === 'sync' ? '15%' : '60%',
+                        animation: 'pulse 1.5s ease-in-out infinite',
+                        transition: 'width 0.5s ease',
                       }}
                     />
                   </div>
-                  {pipeline.errors > 0 && (
-                    <p className="text-xs text-amber-600">{pipeline.errors} erreur(s) ignorée(s)</p>
-                  )}
+                  <p className="text-xs text-indigo-500">
+                    {pipeline.step === 'sync'
+                      ? 'Connexion à Salesforce et import des activités…'
+                      : `Analyse IA parallèle (5 CR simultanés) — patience, cela peut prendre ~${Math.ceil((pipeline.total / 5) * 3)}s`}
+                  </p>
                 </div>
               )}
 
