@@ -199,17 +199,49 @@ export function parseExtractionResponse(responseText: string): ExtractedCRData |
     const jsonMatch = responseText.match(/\{[\s\S]*\}/);
     if (!jsonMatch) return null;
     const raw = JSON.parse(jsonMatch[0]);
+
+    // Try strict schema first
     const result = ExtractedCRSchema.safeParse(raw);
-    if (!result.success) {
-      // Log the validation error paths only — never echo the raw LLM content,
-      // which may include injected prompts from the source CR.
-      console.warn(
-        '[extraction] schema validation failed:',
-        result.error.issues.slice(0, 5).map((i) => i.path.join('.'))
-      );
-      return null;
-    }
-    return result.data as ExtractedCRData;
+    if (result.success) return result.data as ExtractedCRData;
+
+    // Log validation issues (paths only, never content)
+    console.warn(
+      '[extraction] schema validation failed, using best-effort fallback:',
+      result.error.issues.slice(0, 5).map((i) => `${i.path.join('.')}: ${i.message}`)
+    );
+
+    // Best-effort fallback: keep valid arrays, discard invalid items
+    const fallback: ExtractedCRData = {
+      region: typeof raw.region === 'string' ? raw.region : null,
+      secteur: typeof raw.secteur === 'string' ? raw.secteur : undefined,
+      signals: Array.isArray(raw.signals)
+        ? raw.signals.filter((s: any) => s?.type && s?.severity && s?.title && s?.content)
+        : [],
+      deals: Array.isArray(raw.deals)
+        ? raw.deals.filter((d: any) => d?.motif && d?.resultat && d?.verbatim)
+        : [],
+      prix_signals: Array.isArray(raw.prix_signals)
+        ? raw.prix_signals.filter((p: any) => p?.concurrent_nom)
+            .map((p: any) => ({
+              ...p,
+              ecart_pct: typeof p.ecart_pct === 'number' ? p.ecart_pct
+                : typeof p.ecart_pct === 'string' ? parseFloat(p.ecart_pct) || 0
+                : 0,
+            }))
+        : [],
+      objectifs: Array.isArray(raw.objectifs)
+        ? raw.objectifs.filter((o: any) => o?.type && o?.resultat)
+        : [],
+      sentiment: raw.sentiment,
+      needs: Array.isArray(raw.needs)
+        ? raw.needs.filter((n: any) => n?.label && n?.trend)
+        : [],
+      competitors_mentioned: Array.isArray(raw.competitors_mentioned)
+        ? raw.competitors_mentioned.filter((c: any) => c?.name)
+        : [],
+    } as unknown as ExtractedCRData;
+
+    return fallback;
   } catch {
     return null;
   }
