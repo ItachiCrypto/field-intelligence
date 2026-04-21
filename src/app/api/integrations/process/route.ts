@@ -34,13 +34,25 @@ export async function POST(request: NextRequest) {
 
     const serviceClient = createServiceClient();
 
+    // Parse optional body: { retry_errors: true } to re-queue failed reports
+    const body = await request.json().catch(() => ({}));
+    const retryErrors = body?.retry_errors === true;
+
+    if (retryErrors) {
+      await serviceClient
+        .from('raw_visit_reports' as any)
+        .update({ processing_status: 'pending' })
+        .eq('processing_status', 'error')
+        .lt('processing_attempts', 3);
+    }
+
     // Fetch pending reports that haven't exceeded retry limit
     const { data: pendingReports, error: fetchError } = await serviceClient
       .from('raw_visit_reports' as any)
       .select("*")
       .eq('processing_status', 'pending')
       .lt('processing_attempts', 3)
-      .limit(10) as { data: any[] | null; error: any };
+      .limit(50) as { data: any[] | null; error: any };
 
     if (fetchError) {
       console.error('Failed to fetch pending reports:', fetchError);
@@ -55,7 +67,7 @@ export async function POST(request: NextRequest) {
     }
 
     let processedCount = 0;
-    let errorCount = 0;
+    const errorDetails: { id: string; subject: string; error: string }[] = [];
 
     for (const report of pendingReports) {
       try {
@@ -64,20 +76,19 @@ export async function POST(request: NextRequest) {
           processedCount++;
         } else {
           console.error(`Failed to process report ${report.id}:`, result.error);
-          errorCount++;
+          errorDetails.push({ id: report.id, subject: report.subject ?? '', error: result.error ?? 'unknown' });
         }
-      } catch (processError) {
-        console.error(
-          `Failed to process report ${report.id}:`,
-          processError
-        );
-        errorCount++;
+      } catch (processError: any) {
+        const msg = processError?.message ?? String(processError);
+        console.error(`Failed to process report ${report.id}:`, msg);
+        errorDetails.push({ id: report.id, subject: report.subject ?? '', error: msg });
       }
     }
 
     return NextResponse.json({
       processed: processedCount,
-      errors: errorCount,
+      errors: errorDetails.length,
+      error_details: errorDetails,
     });
   } catch (error) {
     // Log full detail server-side; return a generic message to the client to
