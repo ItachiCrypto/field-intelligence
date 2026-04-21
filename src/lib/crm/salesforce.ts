@@ -148,7 +148,6 @@ export async function fetchSalesforceEvents(
            Who.Name
     FROM Event
     WHERE LastModifiedDate >= ${since}
-    AND Description != null
     ORDER BY LastModifiedDate DESC
     LIMIT ${limit}
   `;
