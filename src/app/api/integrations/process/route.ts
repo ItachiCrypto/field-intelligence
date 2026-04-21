@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
 
     if (fetchError) {
       console.error('[process] fetch error:', fetchError);
-      return NextResponse.json({ error: 'Failed to fetch pending reports' }, { status: 500 });
+      return NextResponse.json({ error: 'Failed to fetch pending reports', detail: fetchError?.message ?? JSON.stringify(fetchError) }, { status: 500 });
     }
 
     if (!pendingReports || pendingReports.length === 0) {
