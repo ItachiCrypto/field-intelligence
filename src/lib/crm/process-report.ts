@@ -225,6 +225,69 @@ export async function processReport(report: RawVisitReport): Promise<{ success: 
       });
     }
 
+    // ── Auto-upsert commercial ──────────────────────────────────────────
+    if (report.commercial_name?.trim()) {
+      const commName = report.commercial_name.trim();
+      // Create if not exists (ignoreDuplicates = true = INSERT … ON CONFLICT DO NOTHING)
+      await supabase.from('commercials' as any).upsert(
+        {
+          company_id: report.company_id,
+          name: commName,
+          region: extracted.region ?? '',
+          quality_score: 50,
+          quality_trend: 0,
+          cr_total: 0,
+          cr_week: 0,
+        },
+        { onConflict: 'company_id,name', ignoreDuplicates: true },
+      );
+      // Increment cr_total + cr_week via RPC (no overwrite race)
+      await supabase.rpc('increment_commercial_cr' as any, {
+        p_company_id: report.company_id,
+        p_name: commName,
+      });
+    }
+
+    // ── Auto-upsert account (client) ────────────────────────────────────
+    if (report.client_name?.trim()) {
+      await supabase.from('accounts' as any).upsert(
+        {
+          company_id: report.company_id,
+          name: report.client_name.trim(),
+          sector: (extracted as any).secteur ?? 'Autre',
+          region: extracted.region ?? '',
+          last_rdv: report.visit_date ?? null,
+          risk_score: 0,
+          risk_trend: 0,
+        },
+        { onConflict: 'company_id,name', ignoreDuplicates: false },
+      );
+    }
+
+    // ── Auto-create alerts for rouge/orange signals ─────────────────────
+    for (const sig of extracted.signals) {
+      if (sig.severity === 'rouge' || sig.severity === 'orange') {
+        // Find the signal we just inserted to get its ID
+        const { data: insertedSig } = await supabase
+          .from('signals' as any)
+          .select('id')
+          .eq('company_id', report.company_id)
+          .eq('source_report_id', report.id)
+          .eq('title', sig.title)
+          .maybeSingle() as any;
+
+        if (insertedSig?.id) {
+          await supabase.from('alerts' as any).insert({
+            company_id: report.company_id,
+            signal_id: insertedSig.id,
+            severity: sig.severity,
+            status: 'nouveau',
+            source_report_id: report.id,
+          });
+        }
+      }
+    }
+
     // Log processing result
     await supabase.from('processing_results' as any).insert({
       raw_report_id: report.id,

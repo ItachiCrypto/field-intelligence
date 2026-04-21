@@ -30,6 +30,14 @@ export default function IntegrationsPage() {
   const [status, setStatus] = useState<SyncStatus | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [processing, setProcessing] = useState(false);
+  const [pipeline, setPipeline] = useState<{
+    running: boolean;
+    step: 'sync' | 'process' | 'done';
+    synced: number;
+    processed: number;
+    total: number;
+    errors: number;
+  } | null>(null);
   const [banner, setBanner] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [showWipeModal, setShowWipeModal] = useState(false);
   const [wiping, setWiping] = useState(false);
@@ -72,18 +80,15 @@ export default function IntegrationsPage() {
     window.location.href = '/api/integrations/salesforce/authorize';
   };
 
+  // Sync seul (gardé pour rétro-compat)
   const handleSync = async () => {
     setSyncing(true);
     try {
       const res = await fetch('/api/integrations/sync', { method: 'POST' });
       const data = await res.json().catch(() => ({}));
       await fetchStatus();
-      if (!res.ok) {
-        setBanner({ type: 'error', message: data?.error || 'Erreur lors de la synchronisation.' });
-      } else {
-        const synced = data?.synced ?? data?.records_synced ?? 0;
-        setBanner({ type: 'success', message: `${synced} CR synchronises.` });
-      }
+      if (!res.ok) setBanner({ type: 'error', message: data?.error || 'Erreur lors de la synchronisation.' });
+      else setBanner({ type: 'success', message: `${data?.synced ?? 0} CR synchronises.` });
     } catch {
       setBanner({ type: 'error', message: 'Erreur lors de la synchronisation.' });
     } finally {
@@ -91,21 +96,68 @@ export default function IntegrationsPage() {
     }
   };
 
+  // Process seul (gardé pour rétro-compat)
   const handleProcess = async () => {
     setProcessing(true);
     try {
       const res = await fetch('/api/integrations/process', { method: 'POST' });
       const data = await res.json();
       await fetchStatus();
-      if (data.error) {
-        setBanner({ type: 'error', message: `Erreur: ${data.error}` });
-      } else {
-        setBanner({ type: 'success', message: `Traitement termine: ${data.processed} CR traitees, ${data.errors} erreurs.` });
-      }
+      if (data.error) setBanner({ type: 'error', message: `Erreur: ${data.error}` });
+      else setBanner({ type: 'success', message: `Traitement termine: ${data.processed} CR traitees, ${data.errors} erreurs.` });
     } catch {
       setBanner({ type: 'error', message: 'Erreur lors du traitement.' });
     } finally {
       setProcessing(false);
+    }
+  };
+
+  // Pipeline complet : sync → process en boucle avec progression
+  const handleSyncAndProcess = async () => {
+    setPipeline({ running: true, step: 'sync', synced: 0, processed: 0, total: 0, errors: 0 });
+    setBanner(null);
+    try {
+      // Étape 1 : sync
+      const syncRes = await fetch('/api/integrations/sync', { method: 'POST' });
+      const syncData = await syncRes.json().catch(() => ({}));
+      if (!syncRes.ok) {
+        setBanner({ type: 'error', message: syncData?.error || 'Erreur sync.' });
+        setPipeline(null);
+        return;
+      }
+      const synced: number = syncData?.synced ?? 0;
+      setPipeline(p => p ? { ...p, step: 'process', synced, total: synced } : null);
+      await fetchStatus();
+
+      // Étape 2 : process en boucle jusqu'à épuisement des pending
+      let totalProcessed = 0;
+      let totalErrors = 0;
+      let remaining = synced;
+      while (remaining > 0) {
+        const procRes = await fetch('/api/integrations/process', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ retry_errors: false }),
+        });
+        const procData = await procRes.json().catch(() => ({}));
+        const batchProcessed: number = procData?.processed ?? 0;
+        const batchErrors: number = procData?.errors ?? 0;
+        totalProcessed += batchProcessed;
+        totalErrors += batchErrors;
+        remaining = remaining - batchProcessed - batchErrors;
+        if (batchProcessed === 0 && batchErrors === 0) break; // plus rien à faire
+        setPipeline(p => p ? { ...p, processed: totalProcessed, errors: totalErrors } : null);
+      }
+      await fetchStatus();
+      setPipeline(p => p ? { ...p, running: false, step: 'done' } : null);
+      setBanner({
+        type: totalErrors > 0 ? 'error' : 'success',
+        message: `${synced} CR importés, ${totalProcessed} analysés par l'IA${totalErrors > 0 ? `, ${totalErrors} erreur(s)` : ''}.`,
+      });
+    } catch (e: any) {
+      setBanner({ type: 'error', message: e?.message || 'Erreur pipeline.' });
+    } finally {
+      setPipeline(null);
     }
   };
 
@@ -265,35 +317,57 @@ export default function IntegrationsPage() {
                 </div>
               </div>
 
+              {/* Barre de progression pipeline */}
+              {pipeline && (
+                <div className="rounded-lg bg-indigo-50 border border-indigo-200 p-3 space-y-2">
+                  <div className="flex items-center justify-between text-xs font-medium text-indigo-700">
+                    <span>
+                      {pipeline.step === 'sync' && '⟳ Import depuis Salesforce...'}
+                      {pipeline.step === 'process' && `⚡ Analyse IA — ${pipeline.processed}/${pipeline.synced} CR traités`}
+                      {pipeline.step === 'done' && '✓ Terminé'}
+                    </span>
+                    <span>{pipeline.synced > 0 ? Math.round((pipeline.processed / pipeline.synced) * 100) : 0}%</span>
+                  </div>
+                  <div className="w-full bg-indigo-100 rounded-full h-2">
+                    <div
+                      className="bg-indigo-600 h-2 rounded-full transition-all duration-300"
+                      style={{
+                        width: pipeline.step === 'sync'
+                          ? '10%'
+                          : pipeline.synced > 0
+                          ? `${Math.max(10, Math.round((pipeline.processed / pipeline.synced) * 100))}%`
+                          : '100%',
+                      }}
+                    />
+                  </div>
+                  {pipeline.errors > 0 && (
+                    <p className="text-xs text-amber-600">{pipeline.errors} erreur(s) ignorée(s)</p>
+                  )}
+                </div>
+              )}
+
               <div className="flex items-center gap-3 pt-2 flex-wrap">
+                {/* Bouton principal : sync + process en une fois */}
                 <button
-                  onClick={handleSync}
-                  disabled={syncing}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-200 transition-colors disabled:opacity-50"
+                  onClick={handleSyncAndProcess}
+                  disabled={!!pipeline || syncing || processing}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50"
                 >
-                  <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
-                  Synchroniser maintenant
+                  <Zap className={`w-4 h-4 ${pipeline ? 'animate-pulse' : ''}`} />
+                  {pipeline ? 'En cours...' : 'Synchroniser & Analyser'}
                 </button>
-                {recordsPending > 0 && (
-                  <button
-                    onClick={handleProcess}
-                    disabled={processing}
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50"
-                  >
-                    <Zap className={`w-4 h-4 ${processing ? 'animate-pulse' : ''}`} />
-                    {processing ? 'Traitement...' : 'Traiter les CR'}
-                  </button>
-                )}
                 <button
                   onClick={() => setShowWipeModal(true)}
-                  className="inline-flex items-center gap-2 px-4 py-2 text-amber-700 text-sm font-medium rounded-lg hover:bg-amber-50 transition-colors"
+                  disabled={!!pipeline}
+                  className="inline-flex items-center gap-2 px-4 py-2 text-amber-700 text-sm font-medium rounded-lg hover:bg-amber-50 transition-colors disabled:opacity-50"
                 >
                   <Trash2 className="w-4 h-4" />
                   Supprimer activites SF
                 </button>
                 <button
                   onClick={handleDisconnect}
-                  className="inline-flex items-center gap-2 px-4 py-2 text-rose-600 text-sm font-medium rounded-lg hover:bg-rose-50 transition-colors"
+                  disabled={!!pipeline}
+                  className="inline-flex items-center gap-2 px-4 py-2 text-rose-600 text-sm font-medium rounded-lg hover:bg-rose-50 transition-colors disabled:opacity-50"
                 >
                   <Unlink className="w-4 h-4" />
                   Deconnecter
