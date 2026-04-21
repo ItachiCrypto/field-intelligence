@@ -142,7 +142,7 @@ export async function fetchSalesforceEvents(
 ): Promise<SalesforceEvent[]> {
   const soql = `
     SELECT Id, Subject, Description, CreatedDate, StartDateTime, EndDateTime,
-           LastModifiedDate, OwnerId, WhoId, WhatId, IsAllDayEvent, Type,
+           LastModifiedDate, OwnerId, WhoId, WhatId, IsAllDayEvent,
            Owner.Email, Owner.Name,
            What.Name, What.Id,
            Who.Name
