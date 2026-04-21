@@ -226,9 +226,11 @@ export async function processReport(report: RawVisitReport): Promise<{ success: 
     }
 
     // ── Auto-upsert commercial ──────────────────────────────────────────
+    // N'incrémenter cr_total QUE sur la première tentative (processing_attempts === 0)
+    // pour éviter de doubler le compteur si le report est retraité.
     if (report.commercial_name?.trim()) {
       const commName = report.commercial_name.trim();
-      // Create if not exists (ignoreDuplicates = true = INSERT … ON CONFLICT DO NOTHING)
+      // Create if not exists
       await supabase.from('commercials' as any).upsert(
         {
           company_id: report.company_id,
@@ -241,11 +243,13 @@ export async function processReport(report: RawVisitReport): Promise<{ success: 
         },
         { onConflict: 'company_id,name', ignoreDuplicates: true },
       );
-      // Increment cr_total + cr_week via RPC (no overwrite race)
-      await supabase.rpc('increment_commercial_cr' as any, {
-        p_company_id: report.company_id,
-        p_name: commName,
-      });
+      // Incrément uniquement sur la 1ère tentative
+      if (report.processing_attempts === 0) {
+        await supabase.rpc('increment_commercial_cr' as any, {
+          p_company_id: report.company_id,
+          p_name: commName,
+        });
+      }
     }
 
     // ── Auto-upsert account (client) ────────────────────────────────────

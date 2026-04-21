@@ -167,7 +167,10 @@ export async function POST(request: NextRequest) {
         .from('raw_visit_reports' as any)
         .upsert(
           mapActivityToRow(activity, companyId, connection.id),
-          { onConflict: 'company_id,external_id' }
+          // ignoreDuplicates=true → INSERT … ON CONFLICT DO NOTHING
+          // Les records déjà traités (done/skipped) ne sont PAS remis en pending.
+          // Seuls les nouveaux records sont insérés comme 'pending'.
+          { onConflict: 'company_id,external_id', ignoreDuplicates: true }
         );
 
       if (upsertError) {
