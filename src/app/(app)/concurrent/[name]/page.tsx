@@ -466,9 +466,18 @@ function TabComm({ comms }: { comms: any[] }) {
             )}
           </div>
           <div className="flex items-center justify-between mt-2 text-[11px] tabular-nums">
-            <span className="text-emerald-700">+ {reactionCounts.positive}</span>
-            <span className="text-slate-500">= {reactionCounts.neutre}</span>
-            <span className="text-rose-700">- {reactionCounts.negative}</span>
+            <span className="inline-flex items-center gap-1 text-emerald-700">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              {reactionCounts.positive} positive{reactionCounts.positive > 1 ? 's' : ''}
+            </span>
+            <span className="inline-flex items-center gap-1 text-slate-500">
+              <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+              {reactionCounts.neutre} neutre{reactionCounts.neutre > 1 ? 's' : ''}
+            </span>
+            <span className="inline-flex items-center gap-1 text-rose-700">
+              <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+              {reactionCounts.negative} negative{reactionCounts.negative > 1 ? 's' : ''}
+            </span>
           </div>
         </div>
         {/* Types */}

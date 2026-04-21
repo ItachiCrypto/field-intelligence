@@ -12,7 +12,7 @@ import {
   LineChart, Line, Legend,
 } from 'recharts';
 import {
-  Megaphone, ThumbsUp, TrendingUp, Sparkles, ChevronDown, MapPin,
+  Megaphone, ThumbsUp, TrendingUp, Sparkles, ChevronDown, MapPin, Info,
 } from 'lucide-react';
 
 // Liste blanche des actions qui relevent purement de la COMMUNICATION externe.
@@ -75,6 +75,7 @@ type CompetitorCard = {
 export default function MktCommPage() {
   const { commConcurrentes: RAW_COMMS } = useAppData();
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [showHelp, setShowHelp] = useState(false);
 
   // On ne garde que les actions de communication pure (salon, pub, emailing, social, presse, sponsoring).
   // Les entrees restantes ('autre', 'partenariat') sont des activites commerciales/marketing au sens large.
@@ -209,6 +210,86 @@ export default function MktCommPage() {
         />
       </div>
 
+      {/* Panneau d'aide : explique comment les donnees sont extraites et
+          comment lire les indicateurs de chaque carte concurrent. */}
+      <div className="bg-sky-50/70 border border-sky-200 rounded-xl">
+        <button
+          type="button"
+          onClick={() => setShowHelp((v) => !v)}
+          className="w-full px-4 py-3 flex items-center justify-between gap-3 text-left"
+        >
+          <div className="flex items-center gap-2">
+            <Info className="w-4 h-4 text-sky-600 shrink-0" />
+            <span className="text-sm font-semibold text-sky-900">
+              Comment lire ces indicateurs&nbsp;?
+            </span>
+          </div>
+          <ChevronDown
+            className={`w-4 h-4 text-sky-700 transition-transform ${showHelp ? 'rotate-180' : ''}`}
+          />
+        </button>
+        {showHelp && (
+          <div className="px-4 pb-4 pt-1 text-xs text-sky-900 space-y-2 leading-relaxed">
+            <p>
+              <strong>D&apos;ou viennent les donnees&nbsp;?</strong> Chaque
+              action de communication concurrente (salon, pub, emailing, social
+              media, presse, sponsoring) est extraite automatiquement des
+              comptes-rendus de visite saisis par les commerciaux, via analyse
+              par IA. Une meme action peut etre mentionnee par plusieurs CR —
+              c&apos;est ce qu&apos;on appelle les <em>mentions</em>.
+            </p>
+            <p>
+              <strong>Actions vs mentions&nbsp;:</strong>{' '}
+              <span className="font-mono">N actions</span> = nombre d&apos;actions
+              distinctes detectees ;{' '}
+              <span className="font-mono">N mentions</span> = nombre total de fois
+              ou ces actions ont ete citees par les commerciaux (plus une action
+              est mentionnee, plus elle est visible sur le terrain).
+            </p>
+            <p>
+              <strong>Badge &laquo;&nbsp;nouvelle&nbsp;&raquo;</strong> : une
+              action apparaissant pour la premiere fois dans un CR dans les 30
+              derniers jours.
+            </p>
+            <p>
+              <strong>Reactions clients</strong> : lorsqu&apos;un commercial
+              remonte une action concurrente, il indique (ou l&apos;IA deduit du
+              verbatim) si le client a reagi positivement (curiosite / interet /
+              demande), de maniere neutre (information factuelle) ou
+              negativement (scepticisme / rejet). La barre colore en vert le
+              pourcentage de reactions positives, en gris le neutre, en rouge le
+              negatif. Les chiffres sous la barre sont les <em>compteurs</em>
+              {' '}associes&nbsp;: une polarite positive avec {' '}
+              <span className="inline-flex px-1 rounded bg-emerald-100 text-emerald-800 font-mono">
+                +N
+              </span>
+              , neutre{' '}
+              <span className="inline-flex px-1 rounded bg-slate-200 text-slate-700 font-mono">
+                =N
+              </span>
+              , negative{' '}
+              <span className="inline-flex px-1 rounded bg-rose-100 text-rose-800 font-mono">
+                -N
+              </span>
+              .
+            </p>
+            <p>
+              <strong>Region dominante</strong> : region ayant le plus grand
+              nombre d&apos;actions detectees pour ce concurrent — indique ou il
+              concentre ses efforts.
+            </p>
+            <p>
+              <strong>Evolution des actions recurrentes</strong> (graphique en
+              bas) : seules les paires{' '}
+              <em>(concurrent + type d&apos;action)</em> apparaissant au moins 2
+              fois sont tracees, pour mettre en evidence une <strong>amplification</strong>
+              (ex. pub Instagram qui monte en puissance). Les paires isolees
+              sont filtrees pour garder la lisibilite.
+            </p>
+          </div>
+        )}
+      </div>
+
       {/* Cards par concurrent */}
       <div className="space-y-3">
         <h2 className="text-sm font-semibold text-slate-900">Par concurrent</h2>
@@ -249,38 +330,58 @@ export default function MktCommPage() {
                   )}
                 </div>
 
-                {/* Reactions bar (stacked %) */}
+                {/* Reactions bar (stacked %) — Les segments sont proportionnels
+                    au nombre de CR citant cette reaction pour ce concurrent.
+                    Les 3 compteurs sous la barre sont explicites : positives,
+                    neutres, negatives. */}
                 <div className="px-5 pt-3 pb-3">
-                  <div className="text-[11px] text-slate-500 uppercase tracking-wider mb-1.5">
-                    Reactions clients
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[11px] text-slate-500 uppercase tracking-wider">
+                      Reactions clients
+                    </span>
+                    <span
+                      className="inline-flex items-center text-slate-400"
+                      title="Proportion des reactions positives / neutres / negatives relevees par les commerciaux dans leurs CR. Total = 100%."
+                    >
+                      <Info className="w-3 h-3" />
+                    </span>
                   </div>
                   <div className="h-2 w-full rounded-full overflow-hidden bg-slate-100 flex">
                     {c.reactionCounts.positive > 0 && (
                       <div
                         className="bg-emerald-500 h-full"
                         style={{ width: `${pct(c.reactionCounts.positive)}%` }}
-                        title={`Positive : ${c.reactionCounts.positive}`}
+                        title={`Positive : ${c.reactionCounts.positive} (${pct(c.reactionCounts.positive)}%)`}
                       />
                     )}
                     {c.reactionCounts.neutre > 0 && (
                       <div
                         className="bg-slate-400 h-full"
                         style={{ width: `${pct(c.reactionCounts.neutre)}%` }}
-                        title={`Neutre : ${c.reactionCounts.neutre}`}
+                        title={`Neutre : ${c.reactionCounts.neutre} (${pct(c.reactionCounts.neutre)}%)`}
                       />
                     )}
                     {c.reactionCounts.negative > 0 && (
                       <div
                         className="bg-rose-500 h-full"
                         style={{ width: `${pct(c.reactionCounts.negative)}%` }}
-                        title={`Negative : ${c.reactionCounts.negative}`}
+                        title={`Negative : ${c.reactionCounts.negative} (${pct(c.reactionCounts.negative)}%)`}
                       />
                     )}
                   </div>
                   <div className="flex items-center justify-between mt-2 text-[11px] tabular-nums">
-                    <span className="text-emerald-700">+{c.reactionCounts.positive}</span>
-                    <span className="text-slate-500">={c.reactionCounts.neutre}</span>
-                    <span className="text-rose-700">-{c.reactionCounts.negative}</span>
+                    <span className="inline-flex items-center gap-1 text-emerald-700">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                      {c.reactionCounts.positive} positive{c.reactionCounts.positive > 1 ? 's' : ''}
+                    </span>
+                    <span className="inline-flex items-center gap-1 text-slate-500">
+                      <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                      {c.reactionCounts.neutre} neutre{c.reactionCounts.neutre > 1 ? 's' : ''}
+                    </span>
+                    <span className="inline-flex items-center gap-1 text-rose-700">
+                      <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                      {c.reactionCounts.negative} negative{c.reactionCounts.negative > 1 ? 's' : ''}
+                    </span>
                   </div>
                 </div>
 
