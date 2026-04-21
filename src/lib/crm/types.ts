@@ -53,10 +53,46 @@ export interface SalesforceTask {
   OwnerId: string;
   WhoId: string | null;
   WhatId: string | null;
+  /** Standard Salesforce field : 'Task' | 'Call' | 'Email' | 'List Email' */
+  TaskSubtype?: string | null;
+  /** Optional Type field (custom picklist in many orgs) */
+  Type?: string | null;
   Owner?: { Email?: string; Name?: string };
   What?: { Name?: string; Id?: string };
   Who?: { Name?: string };
 }
+
+/**
+ * Salesforce Event : reunions / visites / RDV planifies au calendrier.
+ * Les commerciaux y consignent souvent le compte-rendu dans le Description.
+ */
+export interface SalesforceEvent {
+  Id: string;
+  Subject: string | null;
+  Description: string | null;
+  CreatedDate: string;
+  StartDateTime: string | null;
+  EndDateTime: string | null;
+  LastModifiedDate: string;
+  OwnerId: string;
+  WhoId: string | null;
+  WhatId: string | null;
+  IsAllDayEvent?: boolean;
+  Type?: string | null;
+  Owner?: { Email?: string; Name?: string };
+  What?: { Name?: string; Id?: string };
+  Who?: { Name?: string };
+}
+
+/**
+ * Categorisation unifiee — extraite lors de la sync, persistee dans
+ * raw_visit_reports.raw_json._activity_kind pour diagnostic.
+ */
+export type CrmActivityKind = 'task' | 'call' | 'email' | 'event';
+
+export type SalesforceActivity =
+  | ({ _kind: 'task' | 'call' | 'email' } & SalesforceTask)
+  | ({ _kind: 'event' } & SalesforceEvent);
 
 // What the NLP extraction returns
 export interface ExtractedCRData {

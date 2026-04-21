@@ -2,11 +2,43 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import {
-  fetchVisitReports,
+  fetchCrmActivities,
   refreshAccessToken,
 } from '@/lib/crm/salesforce';
 import { decrypt, encrypt } from '@/lib/crm/encryption';
-import type { SalesforceTask } from '@/lib/crm/types';
+import type { SalesforceActivity } from '@/lib/crm/types';
+
+/**
+ * Normalise une activite Salesforce (Task ou Event) dans le shape attendu
+ * par la table raw_visit_reports. Les differences principales :
+ *   - date : ActivityDate (Task) vs StartDateTime (Event)
+ *   - kind : 'task' | 'call' | 'email' | 'event' — enregistre dans raw_json
+ *     pour retrouver la source en cas de debug
+ */
+function mapActivityToRow(activity: SalesforceActivity, companyId: string, connectionId: string) {
+  const isEvent = activity._kind === 'event';
+  const visitDate = isEvent
+    ? (activity as any).StartDateTime ?? null
+    : (activity as any).ActivityDate ?? null;
+  return {
+    company_id: companyId,
+    crm_connection_id: connectionId,
+    external_id: activity.Id,
+    external_updated_at: activity.LastModifiedDate,
+    content_text: activity.Description ?? null,
+    subject: activity.Subject ?? null,
+    commercial_email: activity.Owner?.Email ?? null,
+    commercial_name: activity.Owner?.Name ?? null,
+    client_name: activity.What?.Name ?? activity.Who?.Name ?? null,
+    visit_date: visitDate,
+    raw_json: {
+      ...activity,
+      _activity_kind: activity._kind,
+    } as unknown as Record<string, unknown>,
+    processing_status: 'pending' as const,
+    synced_at: new Date().toISOString(),
+  };
+}
 import {
   isUuid,
   verifyCronBearer,
@@ -111,43 +143,31 @@ export async function POST(request: NextRequest) {
         .eq('id', connection.id);
     }
 
-    // Fetch visit reports from Salesforce
-    // Default to 30 days ago if this is the first sync
+    // Fetch toutes les activites CRM (Task + Event = inclut Calls, Emails, RDV).
+    // Default to 30 days ago if this is the first sync.
     const since = connection.last_sync_at
       || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-    const tasks: SalesforceTask[] = await fetchVisitReports(
+    const activities: SalesforceActivity[] = await fetchCrmActivities(
       accessToken,
       connection.instance_url!,
       since
     );
 
-    // Upsert each task into raw_visit_reports
+    // Upsert each activity into raw_visit_reports (table generique cote nous :
+    // elle porte toutes les activites CRM, pas seulement les CR).
     let syncedCount = 0;
 
-    for (const task of tasks) {
+    for (const activity of activities) {
       const { error: upsertError } = await serviceClient
         .from('raw_visit_reports' as any)
         .upsert(
-          {
-            company_id: companyId,
-            crm_connection_id: connection.id,
-            external_id: task.Id,
-            content_text: task.Description ?? null,
-            subject: task.Subject ?? null,
-            commercial_email: task.Owner?.Email ?? null,
-            commercial_name: task.Owner?.Name ?? null,
-            client_name: task.What?.Name ?? task.Who?.Name ?? null,
-            visit_date: task.ActivityDate ?? null,
-            raw_json: task as unknown as Record<string, unknown>,
-            processing_status: 'pending' as const,
-            synced_at: new Date().toISOString(),
-          },
+          mapActivityToRow(activity, companyId, connection.id),
           { onConflict: 'company_id,external_id' }
         );
 
       if (upsertError) {
         console.error(
-          `Failed to upsert task ${task.Id}:`,
+          `Failed to upsert activity ${activity.Id}:`,
           upsertError
         );
         continue;
@@ -208,32 +228,24 @@ export async function GET(request: NextRequest) {
       }
 
       const since = conn.last_sync_at || new Date(Date.now() - 7 * 86400000).toISOString();
-      const tasks = await fetchVisitReports(accessToken, conn.instance_url, since);
+      const activities = await fetchCrmActivities(accessToken, conn.instance_url, since);
 
-      for (const task of tasks) {
-        await serviceClient.from('raw_visit_reports').upsert({
-          company_id: conn.company_id,
-          crm_connection_id: conn.id,
-          external_id: task.Id,
-          external_updated_at: task.LastModifiedDate,
-          content_text: task.Description,
-          subject: task.Subject,
-          commercial_email: task.Owner?.Email ?? null,
-          commercial_name: task.Owner?.Name ?? null,
-          client_name: task.What?.Name || task.Who?.Name || null,
-          visit_date: task.ActivityDate,
-          raw_json: task,
-          processing_status: 'pending',
-        }, { onConflict: 'company_id,external_id' });
+      for (const activity of activities) {
+        await serviceClient
+          .from('raw_visit_reports')
+          .upsert(
+            mapActivityToRow(activity, conn.company_id, conn.id),
+            { onConflict: 'company_id,external_id' }
+          );
       }
 
       await serviceClient.from('crm_connections').update({
         last_sync_at: new Date().toISOString(),
-        records_synced: (conn.records_synced || 0) + tasks.length,
+        records_synced: (conn.records_synced || 0) + activities.length,
         last_sync_error: null,
       }).eq('id', conn.id);
 
-      totalSynced += tasks.length;
+      totalSynced += activities.length;
     } catch (err) {
       await serviceClient.from('crm_connections').update({
         last_sync_error: err.message,

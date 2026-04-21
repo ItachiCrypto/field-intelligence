@@ -7,7 +7,7 @@ import { KpiCard } from '@/components/shared/kpi-card';
 import {
   Link2, Unlink, RefreshCw, CheckCircle, XCircle,
   AlertTriangle, Clock, FileText, Zap, Settings,
-  ExternalLink,
+  ExternalLink, Trash2,
 } from 'lucide-react';
 
 type ConnectionState = 'loading' | 'disconnected' | 'connected' | 'error';
@@ -31,6 +31,8 @@ export default function IntegrationsPage() {
   const [syncing, setSyncing] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [banner, setBanner] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [showWipeModal, setShowWipeModal] = useState(false);
+  const [wiping, setWiping] = useState(false);
 
   const fetchStatus = useCallback(async () => {
     try {
@@ -116,6 +118,43 @@ export default function IntegrationsPage() {
       setBanner({ type: 'success', message: 'Salesforce deconnecte.' });
     } catch {
       setBanner({ type: 'error', message: 'Erreur lors de la deconnexion.' });
+    }
+  };
+
+  const handleWipeActivities = async () => {
+    setWiping(true);
+    try {
+      const res = await fetch('/api/integrations/salesforce/wipe-activities', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirm: true }),
+      });
+      const data = await res.json().catch(() => ({}));
+      setShowWipeModal(false);
+      if (!res.ok) {
+        if (data?.error === 'decrypt_failed') {
+          setBanner({
+            type: 'error',
+            message: data.message || 'Tokens chiffres avec une ancienne cle. Reconnectez Salesforce puis reessayez.',
+          });
+        } else {
+          setBanner({ type: 'error', message: data?.error || 'Erreur lors de la suppression.' });
+        }
+      } else {
+        const t = data.deleted?.tasks ?? 0;
+        const e = data.deleted?.events ?? 0;
+        const total = t + e;
+        setBanner({
+          type: 'success',
+          message: `${total} activite(s) supprimee(s) dans Salesforce (${t} Tasks, ${e} Events).${data.errors?.length ? ` ${data.errors.length} erreur(s).` : ''}`,
+        });
+        await fetchStatus();
+      }
+    } catch {
+      setShowWipeModal(false);
+      setBanner({ type: 'error', message: 'Erreur reseau lors de la suppression.' });
+    } finally {
+      setWiping(false);
     }
   };
 
@@ -226,7 +265,7 @@ export default function IntegrationsPage() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-3 pt-2">
+              <div className="flex items-center gap-3 pt-2 flex-wrap">
                 <button
                   onClick={handleSync}
                   disabled={syncing}
@@ -245,6 +284,13 @@ export default function IntegrationsPage() {
                     {processing ? 'Traitement...' : 'Traiter les CR'}
                   </button>
                 )}
+                <button
+                  onClick={() => setShowWipeModal(true)}
+                  className="inline-flex items-center gap-2 px-4 py-2 text-amber-700 text-sm font-medium rounded-lg hover:bg-amber-50 transition-colors"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Supprimer activites SF
+                </button>
                 <button
                   onClick={handleDisconnect}
                   className="inline-flex items-center gap-2 px-4 py-2 text-rose-600 text-sm font-medium rounded-lg hover:bg-rose-50 transition-colors"
@@ -300,6 +346,64 @@ export default function IntegrationsPage() {
               icon={<Clock className="w-5 h-5" />}
               iconColor="text-amber-600 bg-amber-50"
             />
+          </div>
+        </div>
+      )}
+
+      {/* Wipe confirmation modal */}
+      {showWipeModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl p-6 max-w-md w-full mx-4 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center shrink-0">
+                <Trash2 className="w-5 h-5 text-amber-700" />
+              </div>
+              <div>
+                <h3 className="text-base font-semibold text-slate-900">
+                  Supprimer toutes les activites Salesforce
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">Action irreversible dans Salesforce</p>
+              </div>
+            </div>
+
+            <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 text-sm text-amber-800 space-y-1.5">
+              <p className="font-medium">Attention — ceci supprimera dans votre org Salesforce :</p>
+              <ul className="list-disc list-inside space-y-0.5 text-amber-700">
+                <li>Toutes les <strong>Tasks</strong> (CR, appels, emails, taches)</li>
+                <li>Tous les <strong>Events</strong> (reunions, RDV)</li>
+              </ul>
+              <p className="text-amber-600 text-xs mt-2">
+                Cette action est permanente et ne peut pas etre annulee.
+                Utilisez uniquement sur un compte de test ou sandbox.
+              </p>
+            </div>
+
+            <div className="flex gap-3 pt-1">
+              <button
+                onClick={() => setShowWipeModal(false)}
+                disabled={wiping}
+                className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-50"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={handleWipeActivities}
+                disabled={wiping}
+                className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-amber-600 text-white text-sm font-medium rounded-lg hover:bg-amber-700 transition-colors disabled:opacity-50"
+              >
+                {wiping ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    Suppression...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4" />
+                    Oui, tout supprimer
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}
