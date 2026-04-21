@@ -116,7 +116,7 @@ export async function fetchSalesforceTasks(
 ): Promise<SalesforceTask[]> {
   const soql = `
     SELECT Id, Subject, Description, CreatedDate, ActivityDate, LastModifiedDate,
-           OwnerId, WhoId, WhatId, TaskSubtype, Type,
+           OwnerId, WhoId, WhatId, TaskSubtype,
            Owner.Email, Owner.Name,
            What.Name, What.Id,
            Who.Name
