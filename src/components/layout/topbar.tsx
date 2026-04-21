@@ -2,15 +2,21 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/lib/auth-context';
-import { Bell, Search, X } from 'lucide-react';
+import { Bell, Search, X, Calendar } from 'lucide-react';
 import { useAppData } from '@/lib/data';
-import { getISOWeekNumber } from '@/lib/date-utils';
 import Link from 'next/link';
 import { DateRangePicker } from './date-range-picker';
+import { useDateRange } from '@/lib/queries/date-range-context';
+
+// Format court type "22 mars 2026" pour l'affichage inline dans la topbar.
+function fmtDate(d: Date): string {
+  return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+}
 
 export function Topbar() {
   const { alerts: ALERTS, signals: SIGNALS, accounts: ACCOUNTS, commercials: COMMERCIALS } = useAppData();
   const { profile } = useAuth();
+  const { range } = useDateRange();
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const searchRef = useRef<HTMLInputElement>(null);
@@ -31,12 +37,21 @@ export function Topbar() {
 
   return (
     <header className="h-14 bg-white border-b border-slate-200 flex items-center justify-between px-6">
-      <div className="text-[13px] text-slate-400 font-medium">
-        {(() => {
-          const now = new Date();
-          const week = getISOWeekNumber(now);
-          return `Semaine ${week} \u2014 ${now.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}`;
-        })()}
+      {/* Resume de la plage active : cohérent avec le picker de droite.
+          Remplace l'ancien "Semaine X — date du jour" qui etait deconnecté
+          du filtre applique. */}
+      <div className="inline-flex items-center gap-2 text-[13px] text-slate-500 font-medium">
+        <Calendar className="w-3.5 h-3.5 text-slate-400" />
+        {range.unlimited ? (
+          <span>Donnees : toutes periodes</span>
+        ) : (
+          <span>
+            Donnees du{' '}
+            <span className="text-slate-700">{fmtDate(range.from)}</span>
+            {' au '}
+            <span className="text-slate-700">{fmtDate(range.to)}</span>
+          </span>
+        )}
       </div>
 
       <div className="flex items-center gap-2">
