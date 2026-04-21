@@ -63,17 +63,16 @@ export async function POST(request: NextRequest) {
       await q;
     }
 
-    // Récupérer TOUS les pending sans limite
-    let query = serviceClient
+    // Récupérer TOUS les pending sans limite — filtres AVANT order/limit
+    let q = serviceClient
       .from('raw_visit_reports' as any)
       .select('*')
       .eq('processing_status', 'pending')
-      .lt('processing_attempts', 3)
+      .lt('processing_attempts', 3);
+    if (companyFilter) q = q.eq('company_id', companyFilter);
+    const { data: pendingReports, error: fetchError } = await q
       .order('created_at', { ascending: true })
-      .limit(500); // large enough pour couvrir tous les cas réels
-    if (companyFilter) query = query.eq('company_id', companyFilter);
-
-    const { data: pendingReports, error: fetchError } = await query as { data: any[] | null; error: any };
+      .limit(500) as { data: any[] | null; error: any };
 
     if (fetchError) {
       console.error('[process] fetch error:', fetchError);
