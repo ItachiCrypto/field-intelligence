@@ -2,6 +2,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import Link from 'next/link';
 import { useAppData } from '@/lib/data';
 import { KpiCard } from '@/components/shared/kpi-card';
 import { formatDate } from '@/lib/utils';
@@ -458,7 +459,13 @@ export default function MktPrixPage() {
                   {/* Header */}
                   <div className="px-5 pt-4 pb-3 border-b border-slate-100 flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <h3 className="font-semibold text-slate-900 truncate">{c.concurrent_nom}</h3>
+                      <Link
+                        href={`/concurrent/${encodeURIComponent(c.concurrent_nom)}`}
+                        className="font-semibold text-slate-900 hover:text-indigo-700 hover:underline underline-offset-2 truncate block"
+                        title="Ouvrir la fiche concurrent"
+                      >
+                        {c.concurrent_nom}
+                      </Link>
                       <p className="text-xs text-slate-500 mt-0.5">
                         {total} signal{total > 1 ? 'aux' : ''}
                       </p>

@@ -2,6 +2,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import Link from 'next/link';
 import { useAppData } from '@/lib/data';
 import { SEVERITY_CONFIG, REGIONS } from '@/lib/constants';
 import { SeverityBadge } from '@/components/shared/severity-badge';
@@ -217,7 +218,14 @@ export default function RadarPage() {
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2.5">
                         <SeverityIndicator severity={comp.risk} size="sm" />
-                        <span className="font-medium text-slate-900">{comp.name}</span>
+                        <Link
+                          href={`/concurrent/${encodeURIComponent(comp.name)}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="font-medium text-slate-900 hover:text-indigo-700 hover:underline underline-offset-2"
+                          title="Ouvrir la fiche concurrent"
+                        >
+                          {comp.name}
+                        </Link>
                         {comp.is_new && (
                           <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold bg-sky-50 text-sky-700 border border-sky-200 uppercase tracking-wider">
                             Nouveau
