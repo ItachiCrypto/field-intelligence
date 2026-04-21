@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/auth-context';
 import { Sidebar } from '@/components/layout/sidebar';
 import { Topbar } from '@/components/layout/topbar';
 import { DataProvider } from '@/lib/queries/data-context';
+import { DateRangeProvider } from '@/lib/queries/date-range-context';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { profile, loading } = useAuth();
@@ -48,17 +49,21 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     );
   }
 
+  // DateRangeProvider DOIT wrapper DataProvider : ce dernier consomme le
+  // contexte de plage pour filtrer les tableaux exposes par useAppData.
   return (
-    <DataProvider>
-      <div className="flex h-screen overflow-hidden">
-        <Sidebar />
-        <div className="flex-1 flex flex-col overflow-hidden">
-          <Topbar />
-          <main className="flex-1 overflow-y-auto p-6 bg-slate-50">
-            {children}
-          </main>
+    <DateRangeProvider>
+      <DataProvider>
+        <div className="flex h-screen overflow-hidden">
+          <Sidebar />
+          <div className="flex-1 flex flex-col overflow-hidden">
+            <Topbar />
+            <main className="flex-1 overflow-y-auto p-6 bg-slate-50">
+              {children}
+            </main>
+          </div>
         </div>
-      </div>
-    </DataProvider>
+      </DataProvider>
+    </DateRangeProvider>
   );
 }

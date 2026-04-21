@@ -6,6 +6,7 @@ import { Bell, Search, X } from 'lucide-react';
 import { useAppData } from '@/lib/data';
 import { getISOWeekNumber } from '@/lib/date-utils';
 import Link from 'next/link';
+import { DateRangePicker } from './date-range-picker';
 
 export function Topbar() {
   const { alerts: ALERTS, signals: SIGNALS, accounts: ACCOUNTS, commercials: COMMERCIALS } = useAppData();
@@ -39,6 +40,9 @@ export function Topbar() {
       </div>
 
       <div className="flex items-center gap-2">
+        {/* Global date range picker — filtre toutes les pages */}
+        <DateRangePicker />
+
         {/* Search */}
         <div className="relative">
           {searchOpen ? (
