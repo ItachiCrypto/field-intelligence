@@ -17,9 +17,14 @@ import type { SalesforceActivity } from '@/lib/crm/types';
  */
 function mapActivityToRow(activity: SalesforceActivity, companyId: string, connectionId: string) {
   const isEvent = activity._kind === 'event';
-  const visitDate = isEvent
+  // Extraire la partie date uniquement (la colonne visit_date est de type `date`)
+  const rawDate = isEvent
     ? (activity as any).StartDateTime ?? null
     : (activity as any).ActivityDate ?? null;
+  // StartDateTime est un ISO datetime → tronquer à YYYY-MM-DD
+  const visitDate = rawDate
+    ? (rawDate as string).slice(0, 10)
+    : null;
   return {
     company_id: companyId,
     crm_connection_id: connectionId,
@@ -186,9 +191,10 @@ export async function POST(request: NextRequest) {
       .eq('id', connection.id);
 
     return NextResponse.json({ success: true, synced: syncedCount });
-  } catch (error) {
-    console.error('[sync] error:', error instanceof Error ? error.message : 'unknown');
-    return NextResponse.json({ error: 'Sync failed' }, { status: 500 });
+  } catch (error: any) {
+    const msg = error?.message ?? String(error) ?? 'unknown';
+    console.error('[sync] error:', msg);
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
 
