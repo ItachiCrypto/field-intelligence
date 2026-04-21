@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
       .lt('processing_attempts', 3);
     if (companyFilter) q = q.eq('company_id', companyFilter);
     const { data: pendingReports, error: fetchError } = await q
-      .order('created_at', { ascending: true })
+      .order('synced_at', { ascending: true })
       .limit(500) as { data: any[] | null; error: any };
 
     if (fetchError) {
