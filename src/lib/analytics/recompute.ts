@@ -477,7 +477,7 @@ export async function recomputeAnalytics(
       };
       insights.push({
         company_id: companyId,
-        segment: null,
+        segment: 'general',
         insight: `Signal dominant dans les CR : ${labels[topType] ?? topType} (${count} occurrence${count > 1 ? 's' : ''}). Orienter les prochaines visites sur ce point.`,
         priorite: 1,
       });
