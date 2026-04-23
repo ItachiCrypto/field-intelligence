@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Zap, Mail, ExternalLink } from 'lucide-react';
+import { Activity, Mail, ExternalLink } from 'lucide-react';
 
 const COLS = [
   {
@@ -32,14 +32,17 @@ const COLS = [
 
 export function MarketingFooter() {
   return (
-    <footer className="border-t border-white/[0.06]">
+    <footer style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
       <div className="max-w-6xl mx-auto px-5 sm:px-8 py-16">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-12 lg:gap-8">
           {/* Brand */}
           <div className="space-y-5">
             <div className="flex items-center gap-2.5">
-              <div className="w-7 h-7 rounded-lg bg-[#6366F1] flex items-center justify-center">
-                <Zap className="w-3.5 h-3.5 text-white" fill="currentColor" />
+              <div
+                className="w-7 h-7 rounded-lg flex items-center justify-center"
+                style={{ background: '#F59E0B' }}
+              >
+                <Activity className="w-3.5 h-3.5 text-white" strokeWidth={2.5} />
               </div>
               <span
                 className="text-white font-bold text-[15px]"
@@ -48,7 +51,7 @@ export function MarketingFooter() {
                 Field Intelligence
               </span>
             </div>
-            <p className="text-[13px] text-white/35 leading-relaxed">
+            <p className="text-[13px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.30)' }}>
               L&apos;intelligence terrain que vos études de marché ne capturent jamais.
             </p>
             <div className="flex items-center gap-2">
@@ -56,14 +59,24 @@ export function MarketingFooter() {
                 href="https://linkedin.com"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="w-8 h-8 rounded-lg bg-white/[0.05] border border-white/[0.07] flex items-center justify-center text-white/40 hover:text-white hover:border-white/20 transition-colors"
+                className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors"
+                style={{
+                  background: 'rgba(255,255,255,0.05)',
+                  border: '1px solid rgba(255,255,255,0.07)',
+                  color: 'rgba(255,255,255,0.35)',
+                }}
                 aria-label="LinkedIn"
               >
                 <ExternalLink className="w-3.5 h-3.5" />
               </a>
               <a
                 href="mailto:hello@field-intelligence.io"
-                className="w-8 h-8 rounded-lg bg-white/[0.05] border border-white/[0.07] flex items-center justify-center text-white/40 hover:text-white hover:border-white/20 transition-colors"
+                className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors"
+                style={{
+                  background: 'rgba(255,255,255,0.05)',
+                  border: '1px solid rgba(255,255,255,0.07)',
+                  color: 'rgba(255,255,255,0.35)',
+                }}
                 aria-label="Email"
               >
                 <Mail className="w-3.5 h-3.5" />
@@ -75,8 +88,8 @@ export function MarketingFooter() {
           {COLS.map((col) => (
             <div key={col.label} className="space-y-4">
               <h4
-                className="text-[11px] font-semibold text-white/25 uppercase tracking-widest"
-                style={{ fontFamily: 'var(--font-syne), sans-serif' }}
+                className="text-[11px] font-semibold uppercase tracking-widest"
+                style={{ color: 'rgba(255,255,255,0.20)', fontFamily: 'var(--font-syne), sans-serif' }}
               >
                 {col.label}
               </h4>
@@ -85,7 +98,8 @@ export function MarketingFooter() {
                   <li key={l.href}>
                     <Link
                       href={l.href}
-                      className="text-[13px] text-white/40 hover:text-white transition-colors"
+                      className="text-[13px] transition-colors"
+                      style={{ color: 'rgba(255,255,255,0.35)' }}
                     >
                       {l.label}
                     </Link>
@@ -97,11 +111,17 @@ export function MarketingFooter() {
         </div>
 
         {/* Bottom */}
-        <div className="mt-16 pt-8 border-t border-white/[0.06] flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p className="text-[12px] text-white/20">
+        <div
+          className="mt-16 pt-8 flex flex-col sm:flex-row items-center justify-between gap-4"
+          style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}
+        >
+          <p className="text-[12px]" style={{ color: 'rgba(255,255,255,0.18)' }}>
             © {new Date().getFullYear()} Field Intelligence. Tous droits réservés.
           </p>
-          <div className="flex items-center gap-4 text-[12px] text-white/20">
+          <div
+            className="flex items-center gap-4 text-[12px]"
+            style={{ color: 'rgba(255,255,255,0.18)' }}
+          >
             <span className="flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
               Hébergé en Europe

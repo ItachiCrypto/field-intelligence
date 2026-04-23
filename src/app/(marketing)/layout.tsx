@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Syne, DM_Sans } from 'next/font/google';
+import { Syne, DM_Sans, Cormorant_Garamond } from 'next/font/google';
 import { MarketingNav } from '@/components/marketing/nav';
 import { MarketingFooter } from '@/components/marketing/footer';
 
@@ -14,6 +14,14 @@ const dmSans = DM_Sans({
   subsets: ['latin'],
   weight: ['400', '500', '600'],
   variable: '--font-dm-sans',
+  display: 'swap',
+});
+
+const cormorant = Cormorant_Garamond({
+  subsets: ['latin'],
+  weight: ['300', '400', '500', '600', '700'],
+  style: ['normal', 'italic'],
+  variable: '--font-cormorant',
   display: 'swap',
 });
 
@@ -32,8 +40,8 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
   return (
     <div
       data-marketing="true"
-      className={`${syne.variable} ${dmSans.variable} bg-[#0A0A0A] text-white min-h-screen`}
-      style={{ fontFamily: 'var(--font-dm-sans), sans-serif' }}
+      className={`${syne.variable} ${dmSans.variable} ${cormorant.variable} text-white min-h-screen`}
+      style={{ fontFamily: 'var(--font-dm-sans), sans-serif', background: '#06090F' }}
     >
       <MarketingNav />
       <main>{children}</main>

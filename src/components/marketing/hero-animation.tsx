@@ -3,20 +3,19 @@
 import { useState, useEffect } from 'react';
 
 const CR_TEXT =
-  '"Client mentionne qu\'Acme leur a proposé un bundle avec 3 mois offerts, prix 15% en dessous du nôtre — il teste depuis 2 semaines et semble convaincu par l\'argument ROI."';
+  '"Le client mentionne qu\'Acme a proposé un bundle — 3 mois offerts, prix 15% sous le nôtre. Il teste depuis 2 semaines et semble convaincu par l\'argument ROI."';
 
 const TAGS = [
-  { label: 'CONCURRENT ACTIF', bg: 'bg-red-500/15', text: 'text-red-400', border: 'border-red-500/20', dot: 'bg-red-400', delay: 0 },
-  { label: 'OFFRE BUNDLE', bg: 'bg-amber-500/15', text: 'text-amber-400', border: 'border-amber-500/20', dot: 'bg-amber-400', delay: 250 },
-  { label: 'ÉCART PRIX −15%', bg: 'bg-orange-500/15', text: 'text-orange-400', border: 'border-orange-500/20', dot: 'bg-orange-400', delay: 500 },
-  { label: 'TEST 2 SEMAINES', bg: 'bg-violet-500/15', text: 'text-violet-400', border: 'border-violet-500/20', dot: 'bg-violet-400', delay: 750 },
+  { label: 'CONCURRENT ACTIF', color: '#EF4444', r: 239, g: 68, b: 68, delay: 0 },
+  { label: 'OFFRE BUNDLE', color: '#F59E0B', r: 245, g: 158, b: 11, delay: 300 },
+  { label: 'ÉCART PRIX −15%', color: '#F97316', r: 249, g: 115, b: 22, delay: 600 },
+  { label: 'RISQUE CHURN', color: '#A78BFA', r: 167, g: 139, b: 250, delay: 900 },
 ];
 
 export function HeroAnimation() {
-  const [phase, setPhase] = useState<'text' | 'tags'>('text');
-  const [visibleTags, setVisibleTags] = useState<number[]>([]);
   const [typed, setTyped] = useState('');
-  const [done, setDone] = useState(false);
+  const [phase, setPhase] = useState<'typing' | 'tagged'>('typing');
+  const [visibleTags, setVisibleTags] = useState<number[]>([]);
 
   useEffect(() => {
     let i = 0;
@@ -25,87 +24,173 @@ export function HeroAnimation() {
       i++;
       if (i >= CR_TEXT.length) {
         clearInterval(interval);
-        setDone(true);
-        setTimeout(() => setPhase('tags'), 500);
+        setTimeout(() => {
+          setPhase('tagged');
+          TAGS.forEach((tag, idx) => {
+            setTimeout(() => setVisibleTags((prev) => [...prev, idx]), tag.delay);
+          });
+        }, 450);
       }
-    }, 18);
+    }, 20);
     return () => clearInterval(interval);
   }, []);
 
-  useEffect(() => {
-    if (phase !== 'tags') return;
-    TAGS.forEach((tag, idx) => {
-      setTimeout(() => {
-        setVisibleTags((prev) => [...prev, idx]);
-      }, tag.delay);
-    });
-  }, [phase]);
-
   return (
-    <div className="relative w-full max-w-xl mx-auto">
-      {/* Glow behind terminal */}
-      <div className="absolute -inset-8 bg-[#6366F1] opacity-[0.07] blur-3xl rounded-full pointer-events-none" />
+    <div className="relative w-full select-none">
+      {/* Ambient amber glow */}
+      <div
+        className="absolute pointer-events-none"
+        style={{
+          inset: '-40px',
+          background: 'radial-gradient(ellipse at 60% 45%, rgba(245,158,11,0.13) 0%, transparent 68%)',
+        }}
+      />
 
-      {/* Terminal window */}
-      <div className="relative rounded-xl border border-white/[0.08] bg-[#111111] overflow-hidden shadow-2xl">
+      {/* Card */}
+      <div
+        className="relative overflow-hidden"
+        style={{
+          background: '#0C1018',
+          border: '1px solid rgba(255,255,255,0.08)',
+          borderRadius: '14px',
+          transform: 'perspective(1000px) rotateY(-5deg) rotateX(1.5deg)',
+          boxShadow: '0 32px 64px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.04), 0 8px 32px rgba(245,158,11,0.05)',
+        }}
+      >
         {/* Chrome bar */}
-        <div className="flex items-center gap-1.5 px-4 py-3 border-b border-white/[0.06] bg-white/[0.02]">
-          <div className="w-2.5 h-2.5 rounded-full bg-[#FF5F56]" />
-          <div className="w-2.5 h-2.5 rounded-full bg-[#FFBD2E]" />
-          <div className="w-2.5 h-2.5 rounded-full bg-[#27C93F]" />
-          <div className="flex-1 flex items-center justify-center">
-            <span className="text-[11px] text-white/25 font-mono">Salesforce — Compte rendu de visite</span>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            padding: '12px 16px',
+            borderBottom: '1px solid rgba(255,255,255,0.06)',
+            background: 'rgba(255,255,255,0.02)',
+          }}
+        >
+          <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#FF5F56', display: 'block' }} />
+          <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#FFBD2E', display: 'block' }} />
+          <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#27C93F', display: 'block' }} />
+          <div style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
+            <span style={{ fontSize: 11, fontFamily: 'monospace', color: 'rgba(255,255,255,0.22)' }}>
+              Salesforce — Compte rendu de visite
+            </span>
           </div>
         </div>
 
-        {/* Content */}
-        <div className="p-5">
-          <div className="text-[10px] text-white/20 font-mono uppercase tracking-widest mb-3">
-            Description
+        <div style={{ padding: '20px' }}>
+          {/* Meta row */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
+            <span style={{ fontSize: 10, fontFamily: 'monospace', color: 'rgba(255,255,255,0.20)', textTransform: 'uppercase', letterSpacing: '0.12em' }}>
+              Description
+            </span>
+            <span style={{ fontSize: 10, fontFamily: 'monospace', color: 'rgba(255,255,255,0.15)' }}>
+              Thomas D. · 14 avr.
+            </span>
           </div>
-          <p className="text-white/70 text-[13px] leading-relaxed font-mono min-h-[80px]">
+
+          {/* Typed text */}
+          <p
+            style={{
+              fontSize: 13,
+              fontFamily: 'monospace',
+              lineHeight: 1.7,
+              color: 'rgba(255,255,255,0.62)',
+              minHeight: 72,
+              marginBottom: 16,
+            }}
+          >
             {typed}
-            {!done && (
-              <span className="inline-block w-[2px] h-[14px] bg-[#6366F1] ml-0.5 align-middle animate-pulse" />
+            {phase === 'typing' && (
+              <span
+                style={{
+                  display: 'inline-block',
+                  width: 2,
+                  height: 13,
+                  marginLeft: 2,
+                  verticalAlign: 'middle',
+                  background: '#F59E0B',
+                  animation: 'blink 1s step-end infinite',
+                }}
+              />
             )}
           </p>
+
+          {/* Tags */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
+            {TAGS.map((tag, idx) => (
+              <span
+                key={tag.label}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 5,
+                  padding: '4px 10px',
+                  fontSize: 10,
+                  fontFamily: 'monospace',
+                  fontWeight: 700,
+                  letterSpacing: '0.1em',
+                  borderRadius: 5,
+                  color: tag.color,
+                  background: `rgba(${tag.r},${tag.g},${tag.b},0.12)`,
+                  border: `1px solid rgba(${tag.r},${tag.g},${tag.b},0.22)`,
+                  opacity: visibleTags.includes(idx) ? 1 : 0,
+                  transform: visibleTags.includes(idx) ? 'translateY(0)' : 'translateY(5px)',
+                  transition: 'opacity 0.4s ease, transform 0.4s ease',
+                }}
+              >
+                <span
+                  style={{
+                    width: 5,
+                    height: 5,
+                    borderRadius: '50%',
+                    background: tag.color,
+                    flexShrink: 0,
+                  }}
+                />
+                {tag.label}
+              </span>
+            ))}
+          </div>
         </div>
 
-        {/* Tags */}
-        <div
-          className={`px-5 pb-5 flex flex-wrap gap-2 transition-all duration-300 ${
-            phase === 'tags' ? 'opacity-100' : 'opacity-0'
-          }`}
-        >
-          {TAGS.map((tag, idx) => (
-            <span
-              key={tag.label}
-              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold tracking-wider border transition-all duration-500 ${tag.bg} ${tag.text} ${tag.border} ${
-                visibleTags.includes(idx)
-                  ? 'opacity-100 translate-y-0'
-                  : 'opacity-0 translate-y-1'
-              }`}
-            >
-              <span className={`w-1.5 h-1.5 rounded-full ${tag.dot}`} />
-              {tag.label}
-            </span>
-          ))}
-        </div>
-
-        {/* Status bar */}
-        {phase === 'tags' && visibleTags.length === TAGS.length && (
-          <div className="px-5 pb-4">
-            <div className="h-px bg-white/[0.06] mb-3" />
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] text-white/25 font-mono">4 signaux extraits</span>
-              <span className="inline-flex items-center gap-1.5 text-[11px] text-[#6366F1] font-mono">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#6366F1] animate-pulse" />
-                Synchronisé avec le dashboard
+        {/* Status footer */}
+        {visibleTags.length === TAGS.length && (
+          <div style={{ padding: '0 20px 16px' }}>
+            <div style={{ height: 1, background: 'rgba(255,255,255,0.05)', marginBottom: 12 }} />
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: 10, fontFamily: 'monospace', color: 'rgba(255,255,255,0.18)' }}>
+                4 signaux extraits
+              </span>
+              <span
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  fontSize: 10,
+                  fontFamily: 'monospace',
+                  color: '#F59E0B',
+                }}
+              >
+                <span
+                  style={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: '50%',
+                    background: '#F59E0B',
+                    animation: 'pulse 2s infinite',
+                  }}
+                />
+                Synchronisé · dashboard
               </span>
             </div>
           </div>
         )}
       </div>
+
+      <style>{`
+        @keyframes blink { 50% { opacity: 0; } }
+      `}</style>
     </div>
   );
 }

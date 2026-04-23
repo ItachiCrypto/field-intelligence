@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Menu, X, Zap } from 'lucide-react';
+import { Menu, X, Activity } from 'lucide-react';
 
 const links = [
   { label: 'Fonctionnalités', href: '/fonctionnalites' },
@@ -24,17 +24,21 @@ export function MarketingNav() {
 
   return (
     <header
-      className={`fixed top-0 inset-x-0 z-50 transition-all duration-500 ${
+      className={`fixed top-0 inset-x-0 z-50 transition-all duration-500`}
+      style={
         scrolled
-          ? 'bg-[#0A0A0A]/90 backdrop-blur-xl border-b border-white/[0.06]'
-          : 'bg-transparent'
-      }`}
+          ? { background: 'rgba(6,9,15,0.94)', backdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(255,255,255,0.05)' }
+          : { background: 'transparent' }
+      }
     >
-      <nav className="max-w-6xl mx-auto px-5 sm:px-8 h-[60px] flex items-center justify-between">
+      <nav className="max-w-6xl mx-auto px-5 sm:px-8 h-[64px] flex items-center justify-between">
         {/* Logo */}
-        <Link href="/" className="flex items-center gap-2.5 group flex-shrink-0">
-          <div className="w-7 h-7 rounded-lg bg-[#6366F1] flex items-center justify-center">
-            <Zap className="w-3.5 h-3.5 text-white" fill="currentColor" />
+        <Link href="/" className="flex items-center gap-2.5 flex-shrink-0">
+          <div
+            className="w-7 h-7 rounded-lg flex items-center justify-center"
+            style={{ background: '#F59E0B' }}
+          >
+            <Activity className="w-3.5 h-3.5 text-white" strokeWidth={2.5} />
           </div>
           <span
             className="text-white font-bold text-[15px] tracking-tight"
@@ -50,7 +54,7 @@ export function MarketingNav() {
             <Link
               key={l.href}
               href={l.href}
-              className="px-3.5 py-2 text-[13px] font-medium text-white/50 hover:text-white rounded-lg transition-colors duration-200"
+              className="px-3.5 py-2 text-[13px] font-medium text-white/40 hover:text-white rounded-lg transition-colors duration-200"
             >
               {l.label}
             </Link>
@@ -61,13 +65,14 @@ export function MarketingNav() {
         <div className="hidden lg:flex items-center gap-3">
           <Link
             href="/auth/login"
-            className="text-[13px] font-medium text-white/50 hover:text-white px-3 py-2 transition-colors"
+            className="text-[13px] font-medium text-white/40 hover:text-white px-3 py-2 transition-colors"
           >
             Connexion
           </Link>
           <Link
             href="/auth/signup"
-            className="inline-flex items-center gap-1.5 px-4 py-2 bg-white text-[#0A0A0A] text-[13px] font-semibold rounded-lg hover:bg-white/90 transition-colors"
+            className="inline-flex items-center gap-1.5 px-4 py-2 bg-white text-[#06090F] text-[13px] font-semibold rounded-lg transition-colors"
+            style={{ boxShadow: '0 0 0 1px rgba(255,255,255,0.1)' }}
           >
             Démarrer gratuitement
           </Link>
@@ -76,7 +81,7 @@ export function MarketingNav() {
         {/* Mobile burger */}
         <button
           onClick={() => setOpen(!open)}
-          className="lg:hidden p-2 text-white/60 hover:text-white transition-colors"
+          className="lg:hidden p-2 text-white/50 hover:text-white transition-colors"
           aria-label="Menu"
         >
           {open ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -85,30 +90,37 @@ export function MarketingNav() {
 
       {/* Mobile menu */}
       {open && (
-        <div className="lg:hidden bg-[#0A0A0A] border-b border-white/[0.08]">
+        <div
+          className="lg:hidden border-b"
+          style={{ background: '#06090F', borderColor: 'rgba(255,255,255,0.06)' }}
+        >
           <div className="max-w-6xl mx-auto px-5 py-4 flex flex-col gap-0.5">
             {links.map((l) => (
               <Link
                 key={l.href}
                 href={l.href}
                 onClick={() => setOpen(false)}
-                className="px-4 py-3 text-sm font-medium text-white/60 hover:text-white rounded-lg transition-colors"
+                className="px-4 py-3 text-sm font-medium text-white/50 hover:text-white rounded-lg transition-colors"
               >
                 {l.label}
               </Link>
             ))}
-            <div className="pt-3 mt-2 border-t border-white/[0.08] flex flex-col gap-2">
+            <div
+              className="pt-3 mt-2 border-t flex flex-col gap-2"
+              style={{ borderColor: 'rgba(255,255,255,0.07)' }}
+            >
               <Link
                 href="/auth/login"
                 onClick={() => setOpen(false)}
-                className="px-4 py-2.5 text-sm font-medium text-white/60 text-center rounded-lg border border-white/[0.10] hover:border-white/20"
+                className="px-4 py-2.5 text-sm font-medium text-white/50 text-center rounded-lg border transition-colors"
+                style={{ borderColor: 'rgba(255,255,255,0.10)' }}
               >
                 Connexion
               </Link>
               <Link
                 href="/auth/signup"
                 onClick={() => setOpen(false)}
-                className="px-4 py-2.5 text-sm font-semibold text-[#0A0A0A] bg-white text-center rounded-lg"
+                className="px-4 py-2.5 text-sm font-semibold text-[#06090F] bg-white text-center rounded-lg"
               >
                 Démarrer gratuitement
               </Link>
