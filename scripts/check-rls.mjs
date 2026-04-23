@@ -1,0 +1,12 @@
+import pg from 'pg';
+import fs from 'node:fs';
+const env = fs.readFileSync('.env.local', 'utf8');
+const conn = env.match(/^PG_CONNECTION=(.+)$/m)[1].trim();
+const c = new pg.Client({ connectionString: conn, ssl: { rejectUnauthorized: false } });
+await c.connect();
+const r = await c.query("SELECT pg_get_functiondef(oid) AS def FROM pg_proc WHERE proname = 'current_company_id'");
+console.log(r.rows[0]?.def);
+console.log('---');
+const r2 = await c.query("SELECT pg_get_functiondef(oid) AS def FROM pg_proc WHERE proname = 'current_user_role'");
+console.log(r2.rows[0]?.def);
+await c.end();

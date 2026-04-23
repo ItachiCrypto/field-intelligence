@@ -4,11 +4,68 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { CATEGORY_LABELS, type Abbreviation } from '@/lib/abbreviations';
 import { useAuth } from '@/lib/auth-context';
-import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
-import { Search, Plus, Pencil, Trash2, Check, X } from 'lucide-react';
+import { Search, Plus, Pencil, Trash2, Check, X, AlertCircle } from 'lucide-react';
 
-const supabase = createClient();
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+
+// Recupere l'access token depuis le cookie auth Supabase (meme logique que use-data.ts)
+function getAccessToken(): string | null {
+  try {
+    const cookies = document.cookie.split(';');
+    for (const cookie of cookies) {
+      const trimmed = cookie.trim();
+      if (trimmed.startsWith('sb-') && trimmed.includes('-auth-token=')) {
+        const value = decodeURIComponent(trimmed.split('=').slice(1).join('='));
+        if (value.startsWith('base64-')) {
+          const decoded = atob(value.slice(7));
+          const parsed = JSON.parse(decoded);
+          return parsed.access_token || null;
+        }
+        const parsed = JSON.parse(value);
+        return parsed.access_token || null;
+      }
+    }
+  } catch {
+    /* cookie parse failed */
+  }
+  return null;
+}
+
+async function rest(
+  method: string,
+  path: string,
+  body?: unknown,
+  extraHeaders?: Record<string, string>
+): Promise<{ ok: boolean; status: number; data: any; error?: string }> {
+  const token = getAccessToken();
+  const resp = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+    method,
+    headers: {
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${token ?? SUPABASE_ANON_KEY}`,
+      'Content-Type': 'application/json',
+      Prefer: 'return=representation',
+      ...(extraHeaders ?? {}),
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const text = await resp.text();
+  let data: any = null;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    data = text;
+  }
+  if (!resp.ok) {
+    const msg =
+      (data && (data.message || data.error || data.hint)) ||
+      `HTTP ${resp.status}`;
+    return { ok: false, status: resp.status, data, error: msg };
+  }
+  return { ok: true, status: resp.status, data };
+}
 
 const CATEGORIES = ['tous', 'general', 'commercial', 'technique', 'organisation'] as const;
 const CATEGORY_CHIP_LABELS: Record<string, string> = {
@@ -30,6 +87,7 @@ export default function AbbreviationsPage() {
   const [activeCategory, setActiveCategory] = useState<string>('tous');
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // Add form state
   const [newShort, setNewShort] = useState('');
@@ -43,17 +101,27 @@ export default function AbbreviationsPage() {
 
   const fetchAbbreviations = useCallback(async () => {
     if (!company?.id) return;
-    const { data } = await supabase
-      .from('abbreviations')
-      .select('*')
-      .eq('company_id', company.id)
-      .order('short', { ascending: true });
-    if (data) setAbbreviations(data as Abbreviation[]);
+    const res = await rest(
+      'GET',
+      `abbreviations?select=*&company_id=eq.${company.id}&order=short.asc`
+    );
+    if (res.ok && Array.isArray(res.data)) {
+      setAbbreviations(res.data as Abbreviation[]);
+    } else if (!res.ok) {
+      setErrorMsg(`Lecture: ${res.error}`);
+    }
   }, [company?.id]);
 
   useEffect(() => {
     fetchAbbreviations();
   }, [fetchAbbreviations]);
+
+  // Auto-dismiss error after 6s
+  useEffect(() => {
+    if (!errorMsg) return;
+    const t = setTimeout(() => setErrorMsg(null), 6000);
+    return () => clearTimeout(t);
+  }, [errorMsg]);
 
   const filtered = useMemo(() => {
     let list = abbreviations;
@@ -73,12 +141,35 @@ export default function AbbreviationsPage() {
 
   async function handleAdd() {
     if (!newShort.trim() || !newFull.trim() || !company?.id) return;
-    await supabase.from('abbreviations').insert({
+    setErrorMsg(null);
+
+    const payload = {
       short: newShort.trim().toUpperCase(),
       full: newFull.trim(),
       category: newCategory,
       company_id: company.id,
-    });
+    };
+
+    const res = await rest('POST', 'abbreviations', payload);
+    if (!res.ok) {
+      setErrorMsg(`Ajout impossible: ${res.error}`);
+      return;
+    }
+
+    // Mise a jour optimiste + refetch pour rester coherent
+    const inserted = Array.isArray(res.data) ? res.data[0] : res.data;
+    if (inserted) {
+      setAbbreviations((prev) =>
+        [...prev, inserted as Abbreviation].sort((a, b) =>
+          a.short.localeCompare(b.short)
+        )
+      );
+      // Si la nouvelle categorie ne match pas le filtre actif, on bascule
+      // sur "tous" pour que l'utilisateur voie immediatement son ajout.
+      if (activeCategory !== 'tous' && inserted.category !== activeCategory) {
+        setActiveCategory('tous');
+      }
+    }
     setNewShort('');
     setNewFull('');
     setNewCategory('general');
@@ -95,18 +186,28 @@ export default function AbbreviationsPage() {
 
   async function handleSaveEdit(id: string) {
     if (!editShort.trim() || !editFull.trim()) return;
-    await supabase.from('abbreviations').update({
+    setErrorMsg(null);
+    const res = await rest('PATCH', `abbreviations?id=eq.${id}`, {
       short: editShort.trim().toUpperCase(),
       full: editFull.trim(),
       category: editCategory,
-    }).eq('id', id);
+    });
+    if (!res.ok) {
+      setErrorMsg(`Modification impossible: ${res.error}`);
+      return;
+    }
     setEditingId(null);
     fetchAbbreviations();
   }
 
   async function handleDelete(id: string) {
     if (!window.confirm('Supprimer cette abbreviation ?')) return;
-    await supabase.from('abbreviations').delete().eq('id', id);
+    setErrorMsg(null);
+    const res = await rest('DELETE', `abbreviations?id=eq.${id}`);
+    if (!res.ok) {
+      setErrorMsg(`Suppression impossible: ${res.error}`);
+      return;
+    }
     fetchAbbreviations();
   }
 
@@ -121,6 +222,20 @@ export default function AbbreviationsPage() {
           Gerez les abbreviations utilisees dans vos comptes rendus
         </p>
       </div>
+
+      {/* Error banner */}
+      {errorMsg && (
+        <div className="flex items-start gap-3 p-3.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-sm">
+          <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+          <div className="flex-1">{errorMsg}</div>
+          <button
+            onClick={() => setErrorMsg(null)}
+            className="text-rose-400 hover:text-rose-600"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {/* Search + Add button */}
       <div className="flex items-center gap-3">
@@ -139,8 +254,6 @@ export default function AbbreviationsPage() {
             const opening = !showAddForm;
             setShowAddForm(opening);
             setEditingId(null);
-            // Pre-fill la categorie avec le filtre actif (sauf 'tous' -> fallback general)
-            // pour que l'ajout s'affiche immediatement dans la liste filtree.
             if (opening) {
               setNewCategory(
                 activeCategory !== 'tous'
