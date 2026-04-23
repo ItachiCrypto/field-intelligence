@@ -8,6 +8,7 @@ import {
   ThumbsUp,
   Target,
   TrendingDown,
+  XCircle,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -17,6 +18,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
   DollarSign,
   ThumbsUp,
   Target,
+  XCircle,
 };
 
 function getSignalIcon(type: SignalType): LucideIcon {

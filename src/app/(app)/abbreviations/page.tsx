@@ -136,8 +136,18 @@ export default function AbbreviationsPage() {
         </div>
         <button
           onClick={() => {
-            setShowAddForm(!showAddForm);
+            const opening = !showAddForm;
+            setShowAddForm(opening);
             setEditingId(null);
+            // Pre-fill la categorie avec le filtre actif (sauf 'tous' -> fallback general)
+            // pour que l'ajout s'affiche immediatement dans la liste filtree.
+            if (opening) {
+              setNewCategory(
+                activeCategory !== 'tous'
+                  ? (activeCategory as Abbreviation['category'])
+                  : 'general'
+              );
+            }
           }}
           className="inline-flex items-center gap-2 px-4 py-2.5 bg-slate-900 text-white text-sm font-medium rounded-lg hover:bg-slate-800 transition-colors"
         >

@@ -7,7 +7,7 @@ import type { RegionProfile, SentimentType } from '@/lib/types-v2';
 import { cn } from '@/lib/utils';
 import { KpiCard } from '@/components/shared/kpi-card';
 import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, Cell,
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
 } from 'recharts';
 import {
   MapPin, Swords, Lightbulb, AlertTriangle, Globe, Users,
@@ -215,7 +215,15 @@ export default function MktGeoPage() {
       {/* ============================================================ */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
         <h2 className="text-sm font-semibold text-slate-900 mb-1">Top besoins par region</h2>
-        <p className="text-xs text-slate-500 mb-4">Presence (1) ou absence (0) des 3 besoins les plus cites nationalement</p>
+        <p className="text-xs text-slate-500 mb-3">Presence (1) ou absence (0) des 3 besoins les plus cites nationalement</p>
+        <div className="flex flex-wrap items-center gap-4 mb-4">
+          {topBesoins.map((b, i) => (
+            <span key={b} className="inline-flex items-center gap-1.5 text-xs text-slate-600">
+              <span className="w-2.5 h-2.5 rounded-sm" style={{ background: BAR_PALETTE[i] }} />
+              {b}
+            </span>
+          ))}
+        </div>
         <div className="h-72">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={besoinsChartData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
@@ -238,10 +246,7 @@ export default function MktGeoPage() {
                   border: '1px solid #e2e8f0',
                   boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
                 }}
-                formatter={((value: any) => [value === 1 ? 'Oui' : 'Non']) as any}
-              />
-              <Legend
-                wrapperStyle={{ fontSize: 11, paddingTop: 8 }}
+                formatter={((value: any, name: any) => [value === 1 ? 'Oui' : 'Non', name]) as any}
               />
               {topBesoins.map((b, i) => (
                 <Bar key={b} dataKey={b} fill={BAR_PALETTE[i]} radius={[4, 4, 0, 0]} barSize={20} />

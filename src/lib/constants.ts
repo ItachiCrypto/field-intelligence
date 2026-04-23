@@ -8,6 +8,7 @@ export const SIGNAL_TYPES = {
   prix: { label: 'Prix', color: 'bg-amber-50 text-amber-700 border-amber-200', iconName: 'DollarSign' as const },
   satisfaction: { label: 'Satisfaction', color: 'bg-emerald-50 text-emerald-700 border-emerald-200', iconName: 'ThumbsUp' as const },
   opportunite: { label: 'Opportunite', color: 'bg-violet-50 text-violet-700 border-violet-200', iconName: 'Target' as const },
+  echec: { label: 'Echec', color: 'bg-slate-100 text-slate-700 border-slate-300', iconName: 'XCircle' as const },
 } as const;
 
 export const SEVERITY_CONFIG = {

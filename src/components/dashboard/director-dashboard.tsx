@@ -38,9 +38,11 @@ function scoreTextColor(score: number): string {
 }
 
 export function DirectorDashboard() {
-  const { signals: SIGNALS, alerts: ALERTS, commercials: COMMERCIALS } = useAppData() as any;
-  // CR total analyses (champ stocke par le pipeline) et CR semaine glissante
-  const totalCRAllTime = COMMERCIALS.reduce((s: number, c: any) => s + (c.cr_total || 0), 0);
+  const { signals: SIGNALS, alerts: ALERTS, commercials: COMMERCIALS, rawReportsCount } = useAppData() as any;
+  // CR total analyses : on prefere le vrai compte depuis raw_visit_reports, car la
+  // somme des cr_total des commerciaux peut manquer les CRs dont le commercial_name
+  // n'a pas matche un commercial existant en base.
+  const totalCRAllTime = rawReportsCount || COMMERCIALS.reduce((s: number, c: any) => s + (c.cr_total || 0), 0);
   const totalCRWeek = COMMERCIALS.reduce((s: number, c: any) => s + (c.cr_week || 0), 0);
   const criticalAlerts = ALERTS.filter(
     (a: any) => a.severity === 'rouge' && a.status === 'nouveau'

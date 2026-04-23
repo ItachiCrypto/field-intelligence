@@ -10,6 +10,7 @@ const TYPE_OPTIONS = [
   { value: 'prix', label: 'Prix' },
   { value: 'satisfaction', label: 'Satisfaction' },
   { value: 'opportunite', label: 'Opportunite' },
+  { value: 'echec', label: 'Echec' },
 ];
 
 const SEVERITY_OPTIONS = [

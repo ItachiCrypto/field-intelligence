@@ -155,10 +155,10 @@ export default function MktPosPage() {
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
           <div className="flex items-center gap-2 mb-1">
             <TrendingUp className="w-4 h-4 text-indigo-600" />
-            <h2 className="text-sm font-semibold text-slate-900">Evolution du positionnement percu vs trimestre precedent</h2>
+            <h2 className="text-sm font-semibold text-slate-900">Volume de mentions vs trimestre precedent</h2>
           </div>
           <p className="text-xs text-slate-500 mb-4">
-            Comparaison du volume de mentions par acteur — trimestre actuel (90 derniers jours) vs trimestre precedent.
+            Nombre de mentions de chaque acteur dans les signaux concurrence — trimestre actuel (90 derniers jours) vs trimestre precedent.
           </p>
           <div className="h-64 mb-4">
             <ResponsiveContainer width="100%" height="100%">

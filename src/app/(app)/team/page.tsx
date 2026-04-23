@@ -17,7 +17,7 @@ type SortKey = 'name' | 'region' | 'cr_week' | 'cr_total' | 'quality_score' | 'u
 type SortDir = 'asc' | 'desc';
 
 export default function TeamPage() {
-  const { commercials: COMMERCIALS, refresh } = useAppData();
+  const { commercials: COMMERCIALS, rawReportsCount, refresh } = useAppData();
   const { company } = useAuth();
   const [sortKey, setSortKey] = useState<SortKey>('quality_score');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
@@ -119,7 +119,9 @@ export default function TeamPage() {
   }, [COMMERCIALS, sortKey, sortDir]);
 
   const avgScore = COMMERCIALS.length > 0 ? Math.round(COMMERCIALS.reduce((s, c) => s + c.quality_score, 0) / COMMERCIALS.length) : 0;
-  const totalCRAllTime = COMMERCIALS.reduce((s, c) => s + (c.cr_total || 0), 0);
+  // Source de verite : raw_visit_reports (tous les CRs ingeres), pas la somme
+  // des cr_total par commercial (qui peut manquer des CRs sans commercial matche).
+  const totalCRAllTime = rawReportsCount || COMMERCIALS.reduce((s, c) => s + (c.cr_total || 0), 0);
   const totalCRWeek = COMMERCIALS.reduce((s, c) => s + (c.cr_week || 0), 0);
   const coachingCount = COMMERCIALS.filter((c) => c.quality_trend < -5).length;
 

@@ -49,7 +49,7 @@ Extrayez en JSON strict (pas de texte avant/apres, uniquement le JSON) :
   "secteur": "Pharma|Industrie|Tech|BTP|Agroalimentaire|Distribution|Services|Energie|Transport|Automobile|Autre",
   "signals": [
     {
-      "type": "concurrence|besoin|prix|satisfaction|opportunite",
+      "type": "concurrence|besoin|prix|satisfaction|opportunite|echec",
       "severity": "rouge|orange|jaune|vert",
       "title": "titre court du signal",
       "content": "description du signal",
@@ -88,7 +88,7 @@ Extrayez en JSON strict (pas de texte avant/apres, uniquement le JSON) :
   ],
   "sentiment": "positif|negatif|neutre|interesse",
   "needs": [
-    { "label": "besoin identifie", "trend": "up|down|stable|new", "region": "region" }
+    { "label": "formulation concise du besoin exprime par le client (ex: 'formation produit', 'delai livraison trop long')", "trend": "up|down|stable|new", "region": "region" }
   ],
   "competitors_mentioned": [
     { "name": "nom", "mention_type": "description courte", "type_action_communication": "remise|campagne|event|partenariat|autre" }
@@ -136,7 +136,7 @@ const MEDIUM_TEXT = z.string().max(4000);
 const CAP_LIST = <T extends z.ZodTypeAny>(item: T) => z.array(item).max(50);
 
 const SignalSchema = z.object({
-  type: z.enum(['concurrence', 'besoin', 'prix', 'satisfaction', 'opportunite']),
+  type: z.enum(['concurrence', 'besoin', 'prix', 'satisfaction', 'opportunite', 'echec']),
   severity: z.enum(['rouge', 'orange', 'jaune', 'vert']),
   title: SHORT_TEXT,
   content: MEDIUM_TEXT,

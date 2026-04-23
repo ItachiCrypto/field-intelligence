@@ -23,6 +23,7 @@ const TYPE_OPTIONS: { key: SignalType | 'all'; label: string }[] = [
   { key: 'prix', label: 'Prix' },
   { key: 'satisfaction', label: 'Satisfaction' },
   { key: 'opportunite', label: 'Opportunite' },
+  { key: 'echec', label: 'Echec' },
 ];
 
 const PERIOD_OPTIONS: { key: PeriodFilter; label: string }[] = [
@@ -219,16 +220,20 @@ export default function SignalsPage() {
                 {group.signals.map((signal) => (
                   <div key={signal.id} className="group relative">
                     <SignalCard signal={signal} />
-                    <div className="absolute top-3 right-3 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      {signal.source_report_id && (
-                        <button
-                          onClick={() => setViewingSourceOf(signal)}
-                          className="p-1.5 rounded-lg bg-white border border-slate-200 text-slate-400 hover:text-teal-600 hover:border-teal-200 transition-colors shadow-sm"
-                          title="Voir le CR source"
-                        >
-                          <FileText className="w-3.5 h-3.5" />
-                        </button>
-                      )}
+                    {/* Bouton CR source toujours visible (discret mais cliquable) */}
+                    {signal.source_report_id && (
+                      <button
+                        onClick={() => setViewingSourceOf(signal)}
+                        className="absolute top-3 right-3 inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-teal-50 border border-teal-200 text-teal-700 hover:bg-teal-100 text-[11px] font-medium transition-colors shadow-sm"
+                        title="Voir le compte rendu source"
+                      >
+                        <FileText className="w-3 h-3" />
+                        CR source
+                      </button>
+                    )}
+                    <div
+                      className={`absolute ${signal.source_report_id ? 'top-3 right-[96px]' : 'top-3 right-3'} flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity`}
+                    >
                       <button
                         onClick={() => setSharingSignal(signal)}
                         className="p-1.5 rounded-lg bg-white border border-slate-200 text-slate-400 hover:text-sky-600 hover:border-sky-200 transition-colors shadow-sm"

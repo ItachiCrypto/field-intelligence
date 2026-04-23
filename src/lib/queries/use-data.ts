@@ -94,6 +94,10 @@ export function useData() {
     dealCommercialTendance: [] as any[],
     motifsSentiment: [] as any[],
     abbreviations: [] as any[],
+    // Nombre reel de CRs analyses par la pipeline (compte depuis raw_visit_reports).
+    // Evite les divergences avec la somme de commercials.cr_total (qui peut sous-compter
+    // si le commercial_name du CR ne matche pas un commercial existant).
+    rawReportsCount: 0,
   });
 
   const [loading, setLoading] = useState(false);
@@ -164,6 +168,30 @@ export function useData() {
         fetchTable('abbreviations', companyId, accessToken),
       ]);
 
+      // Compte reel des CRs dans raw_visit_reports — source de verite
+      // pour "CR analyses" a l'echelle entreprise (vs somme cr_total des commerciaux).
+      let rawReportsCount = 0;
+      try {
+        const rawUrl = `${SUPABASE_URL}/rest/v1/raw_visit_reports?select=id&company_id=eq.${companyId}`;
+        const rawResp = await fetch(rawUrl, {
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'count=exact',
+            'Range-Unit': 'items',
+            'Range': '0-0',
+          },
+        });
+        const contentRange = rawResp.headers.get('content-range');
+        if (contentRange) {
+          const total = contentRange.split('/')[1];
+          if (total && total !== '*') rawReportsCount = parseInt(total, 10) || 0;
+        }
+      } catch {
+        rawReportsCount = 0;
+      }
+
       const hasLiveData = signals.length > 0 || accounts.length > 0;
 
       setData({
@@ -180,6 +208,7 @@ export function useData() {
         territoires, regionProfiles, geoPoints,
         recommandationsIA, dealsCommerciaux, dealCommercialTendance, motifsSentiment,
         abbreviations,
+        rawReportsCount,
       });
 
       setIsLive(hasLiveData);

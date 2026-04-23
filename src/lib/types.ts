@@ -9,7 +9,7 @@ export interface User {
   avatar?: string;
 }
 
-export type SignalType = 'concurrence' | 'besoin' | 'prix' | 'satisfaction' | 'opportunite';
+export type SignalType = 'concurrence' | 'besoin' | 'prix' | 'satisfaction' | 'opportunite' | 'echec';
 export type Severity = 'rouge' | 'orange' | 'jaune' | 'vert';
 export type AlertStatus = 'nouveau' | 'en_cours' | 'traite' | 'archive';
 

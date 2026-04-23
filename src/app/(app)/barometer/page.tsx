@@ -3,7 +3,6 @@
 
 import { useMemo, useState } from 'react';
 import { useAppData } from '@/lib/data';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { BarChart3, ArrowUpRight, ArrowDownRight, Minus, Sparkles, Cloud } from 'lucide-react';
 
 const TREND_CONFIG = {
@@ -12,8 +11,6 @@ const TREND_CONFIG = {
   stable: { Icon: Minus, color: 'text-slate-400', label: 'Stable' },
   new: { Icon: Sparkles, color: 'text-indigo-500', label: 'Nouveau' },
 };
-
-const BAR_COLORS = ['#6366f1', '#818cf8', '#a5b4fc', '#c7d2fe', '#6366f1', '#818cf8', '#a5b4fc', '#c7d2fe'];
 
 type ClientFilter = 'all' | 'nouveau' | 'etabli';
 
@@ -95,7 +92,6 @@ export default function BarometerPage() {
   }, [clientFilter, NEEDS, SIGNALS, clientStatus]);
 
   const maxMentions = displayedNeeds.length > 0 ? Math.max(...displayedNeeds.map((n) => n.mentions)) : 0;
-  const chartData = displayedNeeds.map((n) => ({ name: n.label, mentions: n.mentions }));
 
   // Nuage de mots : on eclate les labels pour chaque item en mots cles (>3 lettres, pas stop words)
   // Chaque mot est credite de 'mentions' pour son poids d'affichage.
@@ -245,36 +241,6 @@ export default function BarometerPage() {
         </div>
       )}
 
-      {/* Bar chart */}
-      {chartData.length > 0 && (
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-          <h2 className="text-sm font-semibold text-slate-900 mb-4">Repartition des mentions</h2>
-          <div className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} layout="vertical" margin={{ top: 0, right: 20, bottom: 0, left: 0 }}>
-                <XAxis type="number" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 12 }} />
-                <YAxis
-                  type="category"
-                  dataKey="name"
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fill: '#334155', fontSize: 11, fontWeight: 500 }}
-                  width={180}
-                />
-                <Tooltip
-                  contentStyle={{ borderRadius: '0.75rem', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}
-                  formatter={(value) => [`${value}`, 'Mentions']}
-                />
-                <Bar dataKey="mentions" radius={[0, 6, 6, 0]} barSize={20}>
-                  {chartData.map((_, index) => (
-                    <Cell key={index} fill={BAR_COLORS[index % BAR_COLORS.length]} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
