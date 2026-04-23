@@ -73,7 +73,9 @@ export async function updateSession(request: NextRequest) {
   const isAdminRoute = pathname.startsWith('/admin');
   const isAdminApi = pathname.startsWith('/api/admin');
   const isPublicApi = isApiRoute && isPublicApiRoute(pathname);
-  const isPublicRoute = pathname === '/' || isAuthRoute;
+  const MARKETING_ROUTES = ['/fonctionnalites', '/pourquoi', '/comment', '/blog', '/demo'];
+  const isMarketingRoute = pathname === '/' || MARKETING_ROUTES.some(r => pathname === r || pathname.startsWith(r + '/'));
+  const isPublicRoute = isMarketingRoute || isAuthRoute;
 
   // -------------------------------------------------------------------------
   // CSRF defense-in-depth: refuse cross-origin mutations on any path.
