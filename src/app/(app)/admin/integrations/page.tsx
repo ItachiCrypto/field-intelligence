@@ -1,13 +1,11 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { useAuth } from '@/lib/auth-context';
 import { KpiCard } from '@/components/shared/kpi-card';
 import {
   Link2, Unlink, RefreshCw, CheckCircle, XCircle,
-  AlertTriangle, Clock, FileText, Zap, Settings,
-  ExternalLink, Trash2, BarChart2,
+  AlertTriangle, Clock, FileText, Zap, ExternalLink, Trash2,
 } from 'lucide-react';
 
 type ConnectionState = 'loading' | 'disconnected' | 'connected' | 'error';
@@ -22,26 +20,26 @@ interface SyncStatus {
   error?: string;
 }
 
+interface PipelineState {
+  running: boolean;
+  step: string;
+  message: string;
+  progress: number;   // 0-100
+  total: number;
+  processed: number;
+  errors: number;
+}
+
 export default function IntegrationsPage() {
-  const { profile, company } = useAuth();
   const searchParams = useSearchParams();
 
   const [state, setState] = useState<ConnectionState>('loading');
   const [status, setStatus] = useState<SyncStatus | null>(null);
-  const [syncing, setSyncing] = useState(false);
-  const [processing, setProcessing] = useState(false);
-  const [pipeline, setPipeline] = useState<{
-    running: boolean;
-    step: 'sync' | 'process' | 'done';
-    synced: number;
-    processed: number;
-    total: number;
-    errors: number;
-  } | null>(null);
+  const [pipeline, setPipeline] = useState<PipelineState | null>(null);
   const [banner, setBanner] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [showWipeModal, setShowWipeModal] = useState(false);
   const [wiping, setWiping] = useState(false);
-  const [recomputing, setRecomputing] = useState(false);
+  const esRef = useRef<EventSource | null>(null);
 
   const fetchStatus = useCallback(async () => {
     try {
@@ -58,137 +56,116 @@ export default function IntegrationsPage() {
     }
   }, []);
 
-  useEffect(() => {
-    fetchStatus();
-  }, [fetchStatus]);
+  useEffect(() => { fetchStatus(); }, [fetchStatus]);
 
-  // Check URL params for OAuth callback result
   useEffect(() => {
     const urlStatus = searchParams.get('status');
     const urlMessage = searchParams.get('message');
-
     if (urlStatus === 'connected') {
-      setBanner({ type: 'success', message: 'Salesforce connecte avec succes.' });
+      setBanner({ type: 'success', message: 'Salesforce connecté avec succès.' });
       setState('connected');
     } else if (urlStatus === 'error') {
       setBanner({ type: 'error', message: urlMessage || 'Erreur lors de la connexion.' });
       setState('error');
-      setStatus((prev) => prev ? { ...prev, error: urlMessage || 'Erreur inconnue' } : { connected: false, error: urlMessage || 'Erreur inconnue' });
     }
   }, [searchParams]);
 
-  const handleConnect = () => {
-    window.location.href = '/api/integrations/salesforce/authorize';
-  };
+  // Cleanup SSE on unmount
+  useEffect(() => () => { esRef.current?.close(); }, []);
 
-  // Sync seul (gardé pour rétro-compat)
-  const handleSync = async () => {
-    setSyncing(true);
-    try {
-      const res = await fetch('/api/integrations/sync', { method: 'POST' });
-      const data = await res.json().catch(() => ({}));
-      await fetchStatus();
-      if (!res.ok) setBanner({ type: 'error', message: data?.error || 'Erreur lors de la synchronisation.' });
-      else setBanner({ type: 'success', message: `${data?.synced ?? 0} CR synchronises.` });
-    } catch {
-      setBanner({ type: 'error', message: 'Erreur lors de la synchronisation.' });
-    } finally {
-      setSyncing(false);
-    }
-  };
+  const handleConnect = () => { window.location.href = '/api/integrations/salesforce/authorize'; };
 
-  // Process seul (gardé pour rétro-compat)
-  const handleProcess = async () => {
-    setProcessing(true);
-    try {
-      const res = await fetch('/api/integrations/process', { method: 'POST' });
-      const data = await res.json();
-      await fetchStatus();
-      if (data.error) setBanner({ type: 'error', message: `Erreur: ${data.error}` });
-      else setBanner({ type: 'success', message: `Traitement termine: ${data.processed} CR traitees, ${data.errors} erreurs.` });
-    } catch {
-      setBanner({ type: 'error', message: 'Erreur lors du traitement.' });
-    } finally {
-      setProcessing(false);
-    }
-  };
-
-  // Pipeline complet : sync → process TOUT en un seul appel
   const handleSyncAndProcess = async () => {
-    setPipeline({ running: true, step: 'sync', synced: 0, processed: 0, total: 0, errors: 0 });
+    if (pipeline?.running) return;
     setBanner(null);
+    setPipeline({ running: true, step: 'connect', message: 'Connexion à Salesforce…', progress: 2, total: 0, processed: 0, errors: 0 });
+
+    // Use fetch + ReadableStream for SSE (works in all browsers, handles auth cookies)
     try {
-      // Étape 1 : sync
-      const syncRes = await fetch('/api/integrations/sync', { method: 'POST' });
-      const syncData = await syncRes.json().catch(() => ({}));
-      if (!syncRes.ok) {
-        setBanner({ type: 'error', message: syncData?.error || 'Erreur sync.' });
-        setPipeline(null);
-        return;
-      }
-      const synced: number = syncData?.synced ?? 0;
-      await fetchStatus();
-
-      // Fetch current pending count (includes previously unprocessed + newly synced)
-      const statusRes = await fetch('/api/integrations/salesforce/status');
-      const statusData = statusRes.ok ? await statusRes.json() : {};
-      const totalPending = (statusData.records_pending ?? 0) + synced;
-
-      setPipeline(p => p ? { ...p, step: 'process', synced, total: totalPending } : null);
-
-      if (totalPending === 0) {
-        await fetchStatus();
-        setBanner({ type: 'success', message: 'Tout est déjà à jour — aucun CR à traiter.' });
+      const res = await fetch('/api/integrations/pipeline', { method: 'POST' });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        setBanner({ type: 'error', message: err?.error || `Erreur ${res.status}` });
         setPipeline(null);
         return;
       }
 
-      // Étape 2 : UN seul appel qui traite TOUT (concurrence x5 côté serveur)
-      const procRes = await fetch('/api/integrations/process', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ retry_errors: true }),
-      });
-      const procData = await procRes.json().catch(() => ({}));
-      const totalProcessed: number = procData?.processed ?? 0;
-      const totalErrors: number = procData?.errors ?? 0;
+      const reader = res.body!.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
 
-      await fetchStatus();
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? '';
+
+        for (const line of lines) {
+          if (line.startsWith('event: ')) {
+            // event type handled by next data line
+          } else if (line.startsWith('data: ')) {
+            try {
+              const payload = JSON.parse(line.slice(6));
+
+              if (payload.step === 'done' || payload.processed !== undefined && payload.total !== undefined && payload.progress === 100) {
+                // Done
+                setPipeline(null);
+                await fetchStatus();
+                setBanner({ type: 'success', message: payload.message || 'Pipeline terminé.' });
+              } else if (payload.message && payload.progress !== undefined) {
+                setPipeline(p => p ? {
+                  ...p,
+                  step: payload.step ?? p.step,
+                  message: payload.message,
+                  progress: payload.progress,
+                  total: payload.total ?? p.total,
+                  processed: payload.processed ?? p.processed,
+                  errors: payload.errors ?? p.errors,
+                } : null);
+              }
+            } catch { /* ignore malformed */ }
+          } else if (line.startsWith('event: error')) {
+            // handled by next data line
+          } else if (line.startsWith('data: ') && buffer.includes('"error"')) {
+            // already handled above
+          }
+        }
+      }
+
+      // Handle any remaining buffer
+      if (buffer.startsWith('data: ')) {
+        try {
+          const payload = JSON.parse(buffer.slice(6));
+          if (payload.message) {
+            setPipeline(null);
+            await fetchStatus();
+            if (payload.error || payload.step === 'error') {
+              setBanner({ type: 'error', message: payload.message });
+            } else {
+              setBanner({ type: 'success', message: payload.message });
+            }
+          }
+        } catch { /* ignore */ }
+      }
+
       setPipeline(null);
-      setBanner({
-        type: totalErrors > 0 && totalProcessed === 0 ? 'error' : 'success',
-        message: `${synced} CR importés, ${totalProcessed} analysés par l'IA${totalErrors > 0 ? ` (${totalErrors} ignorés)` : ''}.`,
-      });
+      await fetchStatus();
     } catch (e: any) {
-      setBanner({ type: 'error', message: e?.message || 'Erreur pipeline.' });
+      setBanner({ type: 'error', message: e?.message || 'Erreur réseau.' });
       setPipeline(null);
-    }
-  };
-
-  const handleRecompute = async () => {
-    setRecomputing(true);
-    setBanner(null);
-    try {
-      const res = await fetch('/api/analytics/recompute', { method: 'POST' });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) setBanner({ type: 'error', message: data?.error || 'Erreur recalcul analytics.' });
-      else setBanner({ type: 'success', message: `Analytics recalculees : ${data?.tables_updated?.join(', ') ?? '0 tables'}.` });
-    } catch {
-      setBanner({ type: 'error', message: 'Erreur lors du recalcul analytics.' });
-    } finally {
-      setRecomputing(false);
     }
   };
 
   const handleDisconnect = async () => {
-    if (!confirm('Etes-vous sur de vouloir deconnecter Salesforce ?')) return;
+    if (!confirm('Êtes-vous sûr de vouloir déconnecter Salesforce ?')) return;
     try {
       await fetch('/api/integrations/salesforce/disconnect', { method: 'POST' });
       setState('disconnected');
       setStatus(null);
-      setBanner({ type: 'success', message: 'Salesforce deconnecte.' });
+      setBanner({ type: 'success', message: 'Salesforce déconnecté.' });
     } catch {
-      setBanner({ type: 'error', message: 'Erreur lors de la deconnexion.' });
+      setBanner({ type: 'error', message: 'Erreur lors de la déconnexion.' });
     }
   };
 
@@ -203,27 +180,21 @@ export default function IntegrationsPage() {
       const data = await res.json().catch(() => ({}));
       setShowWipeModal(false);
       if (!res.ok) {
-        if (data?.error === 'decrypt_failed') {
-          setBanner({
-            type: 'error',
-            message: data.message || 'Tokens chiffres avec une ancienne cle. Reconnectez Salesforce puis reessayez.',
-          });
-        } else {
-          setBanner({ type: 'error', message: data?.error || 'Erreur lors de la suppression.' });
-        }
+        setBanner({
+          type: 'error',
+          message: data?.error === 'decrypt_failed'
+            ? (data.message || 'Tokens expirés. Reconnectez Salesforce.')
+            : (data?.error || 'Erreur lors de la suppression.'),
+        });
       } else {
         const t = data.deleted?.tasks ?? 0;
         const e = data.deleted?.events ?? 0;
-        const total = t + e;
-        setBanner({
-          type: 'success',
-          message: `${total} activite(s) supprimee(s) dans Salesforce (${t} Tasks, ${e} Events).${data.errors?.length ? ` ${data.errors.length} erreur(s).` : ''}`,
-        });
+        setBanner({ type: 'success', message: `${t + e} activité(s) supprimée(s) dans Salesforce (${t} Tasks, ${e} Events).` });
         await fetchStatus();
       }
     } catch {
       setShowWipeModal(false);
-      setBanner({ type: 'error', message: 'Erreur reseau lors de la suppression.' });
+      setBanner({ type: 'error', message: 'Erreur réseau lors de la suppression.' });
     } finally {
       setWiping(false);
     }
@@ -235,53 +206,42 @@ export default function IntegrationsPage() {
 
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-8">
+
       {/* Banner */}
       {banner && (
-        <div
-          className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium ${
-            banner.type === 'success'
-              ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-              : 'bg-rose-50 text-rose-800 border border-rose-200'
-          }`}
-        >
-          {banner.type === 'success' ? (
-            <CheckCircle className="w-4 h-4 shrink-0" />
-          ) : (
-            <AlertTriangle className="w-4 h-4 shrink-0" />
-          )}
+        <div className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium ${
+          banner.type === 'success'
+            ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+            : 'bg-rose-50 text-rose-800 border border-rose-200'
+        }`}>
+          {banner.type === 'success'
+            ? <CheckCircle className="w-4 h-4 shrink-0" />
+            : <AlertTriangle className="w-4 h-4 shrink-0" />}
           <span>{banner.message}</span>
-          <button
-            onClick={() => setBanner(null)}
-            className="ml-auto text-current opacity-60 hover:opacity-100"
-          >
-            &times;
-          </button>
+          <button onClick={() => setBanner(null)} className="ml-auto opacity-60 hover:opacity-100">&times;</button>
         </div>
       )}
 
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-slate-900">Integrations CRM</h1>
+        <h1 className="text-2xl font-bold text-slate-900">Intégrations CRM</h1>
         <p className="mt-1 text-sm text-slate-500">
           Connectez votre CRM pour alimenter automatiquement vos dashboards
         </p>
       </div>
 
       {/* Connection Card */}
-      <div
-        className={`bg-white rounded-xl border shadow-sm ${
-          state === 'connected'
-            ? 'border-l-4 border-l-emerald-500 border-slate-200'
-            : state === 'error'
-            ? 'border-l-4 border-l-rose-500 border-slate-200'
-            : 'border-slate-200'
-        }`}
-      >
+      <div className={`bg-white rounded-xl border shadow-sm ${
+        state === 'connected' ? 'border-l-4 border-l-emerald-500 border-slate-200'
+        : state === 'error' ? 'border-l-4 border-l-rose-500 border-slate-200'
+        : 'border-slate-200'
+      }`}>
         <div className="p-6">
+
           {state === 'loading' && (
             <div className="flex items-center gap-3 text-slate-400">
               <RefreshCw className="w-5 h-5 animate-spin" />
-              <span className="text-sm">Chargement...</span>
+              <span className="text-sm">Chargement…</span>
             </div>
           )}
 
@@ -311,88 +271,98 @@ export default function IntegrationsPage() {
             <div className="space-y-5">
               <div className="flex items-center gap-3">
                 <CheckCircle className="w-5 h-5 text-emerald-600" />
-                <span className="text-lg font-semibold text-slate-900">Salesforce connecte</span>
+                <span className="text-lg font-semibold text-slate-900">Salesforce connecté</span>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
                 <div>
                   <span className="text-slate-400 block mb-0.5">Instance</span>
-                  <span className="text-slate-700 font-medium flex items-center gap-1">
-                    {status?.instance_url || '--'}
-                    <ExternalLink className="w-3 h-3 text-slate-400" />
+                  <span className="text-slate-700 font-medium flex items-center gap-1 truncate">
+                    {status?.instance_url?.replace('https://', '') || '--'}
+                    <ExternalLink className="w-3 h-3 text-slate-400 shrink-0" />
                   </span>
                 </div>
                 <div>
-                  <span className="text-slate-400 block mb-0.5">Derniere synchro</span>
+                  <span className="text-slate-400 block mb-0.5">Dernière synchro</span>
                   <span className="text-slate-700 font-medium">
-                    {status?.last_sync
-                      ? new Date(status.last_sync).toLocaleString('fr-FR')
-                      : '--'}
+                    {status?.last_sync ? new Date(status.last_sync).toLocaleString('fr-FR') : '--'}
                   </span>
                 </div>
                 <div>
-                  <span className="text-slate-400 block mb-0.5">CR synchronises</span>
+                  <span className="text-slate-400 block mb-0.5">CR synchronisés</span>
                   <span className="text-slate-700 font-medium">{recordsSynced}</span>
                 </div>
               </div>
 
-              {/* Barre de progression pipeline */}
-              {pipeline && (
-                <div className="rounded-lg bg-indigo-50 border border-indigo-200 p-3 space-y-2">
-                  <div className="flex items-center justify-between text-xs font-medium text-indigo-700">
-                    <span>
-                      {pipeline.step === 'sync' && '⟳ Import depuis Salesforce…'}
-                      {pipeline.step === 'process' && `⚡ Analyse IA en cours — ${pipeline.total} CR à traiter…`}
-                    </span>
-                    <span className="flex items-center gap-1">
+              {/* ── Barre de progression pipeline ── */}
+              {pipeline?.running && (
+                <div className="rounded-xl bg-indigo-50 border border-indigo-200 p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-semibold text-indigo-800">{pipeline.message}</span>
+                    <span className="text-xs text-indigo-500 flex items-center gap-1">
                       <RefreshCw className="w-3 h-3 animate-spin" />
-                      {pipeline.step === 'sync' ? 'Sync…' : 'Traitement…'}
+                      {pipeline.progress}%
                     </span>
                   </div>
-                  {/* Barre animée indéterminée pendant le traitement serveur */}
-                  <div className="w-full bg-indigo-100 rounded-full h-2 overflow-hidden">
+
+                  {/* Barre de progression réelle */}
+                  <div className="w-full bg-indigo-100 rounded-full h-2.5 overflow-hidden">
                     <div
-                      className="h-2 rounded-full bg-indigo-600"
-                      style={{
-                        width: pipeline.step === 'sync' ? '15%' : '60%',
-                        animation: 'pulse 1.5s ease-in-out infinite',
-                        transition: 'width 0.5s ease',
-                      }}
+                      className="h-2.5 rounded-full bg-indigo-600 transition-all duration-500 ease-out"
+                      style={{ width: `${pipeline.progress}%` }}
                     />
                   </div>
-                  <p className="text-xs text-indigo-500">
-                    {pipeline.step === 'sync'
-                      ? 'Connexion à Salesforce et import des activités…'
-                      : `Analyse IA parallèle (5 CR simultanés) — patience, cela peut prendre ~${Math.ceil((pipeline.total / 5) * 3)}s`}
-                  </p>
+
+                  {/* Détail par étape */}
+                  <div className="flex items-center gap-6 text-xs text-indigo-600">
+                    <span className={`flex items-center gap-1 ${pipeline.progress >= 15 ? 'opacity-100' : 'opacity-40'}`}>
+                      <CheckCircle className="w-3 h-3" />
+                      Import SF
+                    </span>
+                    <span className={`flex items-center gap-1 ${pipeline.progress >= 20 ? 'opacity-100' : 'opacity-40'}`}>
+                      {pipeline.progress >= 85 ? <CheckCircle className="w-3 h-3" /> : <RefreshCw className={`w-3 h-3 ${pipeline.progress >= 20 && pipeline.progress < 85 ? 'animate-spin' : ''}`} />}
+                      Analyse IA {pipeline.total > 0 ? `${pipeline.processed}/${pipeline.total}` : ''}
+                    </span>
+                    <span className={`flex items-center gap-1 ${pipeline.progress >= 90 ? 'opacity-100' : 'opacity-40'}`}>
+                      {pipeline.progress >= 100 ? <CheckCircle className="w-3 h-3" /> : <RefreshCw className={`w-3 h-3 ${pipeline.progress >= 88 ? 'animate-spin' : ''}`} />}
+                      Analytics
+                    </span>
+                  </div>
+
+                  {pipeline.total > 0 && (
+                    <p className="text-xs text-indigo-500">
+                      ~{Math.ceil(((pipeline.total - pipeline.processed) / 5) * 3)}s restantes
+                    </p>
+                  )}
                 </div>
               )}
 
-              <div className="flex items-center gap-3 pt-2 flex-wrap">
-                {/* Bouton principal : sync + process en une fois */}
+              <div className="flex items-center gap-3 pt-1 flex-wrap">
                 <button
                   onClick={handleSyncAndProcess}
-                  disabled={!!pipeline || syncing || processing}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50"
+                  disabled={!!pipeline?.running}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
                 >
-                  <Zap className={`w-4 h-4 ${pipeline ? 'animate-pulse' : ''}`} />
-                  {pipeline ? 'En cours...' : 'Synchroniser & Analyser'}
+                  <Zap className={`w-4 h-4 ${pipeline?.running ? 'animate-pulse' : ''}`} />
+                  {pipeline?.running ? 'En cours…' : 'Synchroniser'}
                 </button>
+
                 <button
                   onClick={() => setShowWipeModal(true)}
-                  disabled={!!pipeline}
+                  disabled={!!pipeline?.running}
                   className="inline-flex items-center gap-2 px-4 py-2 text-amber-700 text-sm font-medium rounded-lg hover:bg-amber-50 transition-colors disabled:opacity-50"
                 >
                   <Trash2 className="w-4 h-4" />
-                  Supprimer activites SF
+                  Supprimer activités SF
                 </button>
+
                 <button
                   onClick={handleDisconnect}
-                  disabled={!!pipeline}
+                  disabled={!!pipeline?.running}
                   className="inline-flex items-center gap-2 px-4 py-2 text-rose-600 text-sm font-medium rounded-lg hover:bg-rose-50 transition-colors disabled:opacity-50"
                 >
                   <Unlink className="w-4 h-4" />
-                  Deconnecter
+                  Déconnecter
                 </button>
               </div>
             </div>
@@ -404,9 +374,7 @@ export default function IntegrationsPage() {
                 <XCircle className="w-5 h-5 text-rose-600" />
                 <span className="text-lg font-semibold text-slate-900">Erreur de connexion</span>
               </div>
-              <p className="text-sm text-rose-600">
-                {status?.error || 'Impossible de se connecter a Salesforce.'}
-              </p>
+              <p className="text-sm text-rose-600">{status?.error || 'Impossible de se connecter à Salesforce.'}</p>
               <button
                 onClick={handleConnect}
                 className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors"
@@ -419,143 +387,40 @@ export default function IntegrationsPage() {
         </div>
       </div>
 
-      {/* Sync Dashboard */}
+      {/* KPIs */}
       {state === 'connected' && (
-        <div className="space-y-4">
-          <h2 className="text-lg font-semibold text-slate-900">Tableau de synchronisation</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <KpiCard
-              label="CR importes"
-              value={recordsSynced}
-              icon={<FileText className="w-5 h-5" />}
-              iconColor="text-indigo-600 bg-indigo-50"
-            />
-            <KpiCard
-              label="CR traites"
-              value={recordsProcessed}
-              icon={<Zap className="w-5 h-5" />}
-              iconColor="text-emerald-600 bg-emerald-50"
-            />
-            <KpiCard
-              label="En attente"
-              value={recordsPending}
-              icon={<Clock className="w-5 h-5" />}
-              iconColor="text-amber-600 bg-amber-50"
-            />
-          </div>
-        </div>
-      )}
-
-      {/* Analytics recompute section */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-3">
-        <div className="flex items-center gap-2">
-          <BarChart2 className="w-5 h-5 text-indigo-600" />
-          <h2 className="text-base font-semibold text-slate-900">Analytics avancees</h2>
-        </div>
-        <p className="text-sm text-slate-500">
-          Recalcule les tableaux analytiques (sentiment, geo, segments, territoires, positionnement, recommandations)
-          à partir des donnees brutes deja importees. Automatiquement declenche apres chaque synchronisation.
-        </p>
-        <button
-          onClick={handleRecompute}
-          disabled={recomputing || !!pipeline}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-slate-800 text-white text-sm font-medium rounded-lg hover:bg-slate-900 transition-colors disabled:opacity-50"
-        >
-          {recomputing ? (
-            <RefreshCw className="w-4 h-4 animate-spin" />
-          ) : (
-            <BarChart2 className="w-4 h-4" />
-          )}
-          {recomputing ? 'Recalcul en cours...' : 'Recalculer les analytics'}
-        </button>
-      </div>
-
-      {/* Wipe confirmation modal */}
-      {showWipeModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl p-6 max-w-md w-full mx-4 space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center shrink-0">
-                <Trash2 className="w-5 h-5 text-amber-700" />
-              </div>
-              <div>
-                <h3 className="text-base font-semibold text-slate-900">
-                  Supprimer toutes les activites Salesforce
-                </h3>
-                <p className="text-xs text-slate-400 mt-0.5">Action irreversible dans Salesforce</p>
-              </div>
-            </div>
-
-            <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 text-sm text-amber-800 space-y-1.5">
-              <p className="font-medium">Attention — ceci supprimera dans votre org Salesforce :</p>
-              <ul className="list-disc list-inside space-y-0.5 text-amber-700">
-                <li>Toutes les <strong>Tasks</strong> (CR, appels, emails, taches)</li>
-                <li>Tous les <strong>Events</strong> (reunions, RDV)</li>
-              </ul>
-              <p className="text-amber-600 text-xs mt-2">
-                Cette action est permanente et ne peut pas etre annulee.
-                Utilisez uniquement sur un compte de test ou sandbox.
-              </p>
-            </div>
-
-            <div className="flex gap-3 pt-1">
-              <button
-                onClick={() => setShowWipeModal(false)}
-                disabled={wiping}
-                className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-50"
-              >
-                Annuler
-              </button>
-              <button
-                onClick={handleWipeActivities}
-                disabled={wiping}
-                className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-amber-600 text-white text-sm font-medium rounded-lg hover:bg-amber-700 transition-colors disabled:opacity-50"
-              >
-                {wiping ? (
-                  <>
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                    Suppression...
-                  </>
-                ) : (
-                  <>
-                    <Trash2 className="w-4 h-4" />
-                    Oui, tout supprimer
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <KpiCard
+            label="CR importés"
+            value={recordsSynced}
+            icon={<FileText className="w-5 h-5" />}
+            iconColor="text-indigo-600 bg-indigo-50"
+          />
+          <KpiCard
+            label="CR analysés par l'IA"
+            value={recordsProcessed}
+            icon={<Zap className="w-5 h-5" />}
+            iconColor="text-emerald-600 bg-emerald-50"
+          />
+          <KpiCard
+            label="En attente"
+            value={recordsPending}
+            icon={<Clock className="w-5 h-5" />}
+            iconColor="text-amber-600 bg-amber-50"
+          />
         </div>
       )}
 
       {/* How it works */}
       <div className="space-y-4">
-        <h2 className="text-lg font-semibold text-slate-900">Comment ca fonctionne</h2>
+        <h2 className="text-lg font-semibold text-slate-900">Comment ça fonctionne</h2>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {[
-            {
-              step: 1,
-              title: 'Connexion',
-              description: "L'admin connecte le Salesforce de l'entreprise via OAuth",
-              icon: <Link2 className="w-5 h-5" />,
-            },
-            {
-              step: 2,
-              title: 'Import automatique',
-              description: 'Les CR de visite sont importes toutes les 15 minutes',
-              icon: <RefreshCw className="w-5 h-5" />,
-            },
-            {
-              step: 3,
-              title: 'Analyse IA',
-              description: 'Claude analyse chaque CR et extrait les signaux pour vos dashboards',
-              icon: <Zap className="w-5 h-5" />,
-            },
+            { step: 1, title: 'Connexion', description: "L'admin connecte le Salesforce de l'entreprise via OAuth", icon: <Link2 className="w-5 h-5" /> },
+            { step: 2, title: 'Import automatique', description: 'Les comptes rendus, contacts et opportunités sont importés depuis Salesforce', icon: <RefreshCw className="w-5 h-5" /> },
+            { step: 3, title: 'Analyse IA', description: 'Claude analyse chaque CR et extrait les signaux, deals et alertes pour vos dashboards', icon: <Zap className="w-5 h-5" /> },
           ].map((item) => (
-            <div
-              key={item.step}
-              className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm"
-            >
+            <div key={item.step} className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
               <div className="flex items-center gap-3 mb-3">
                 <div className="w-8 h-8 bg-indigo-50 rounded-lg flex items-center justify-center text-indigo-600 text-sm font-bold">
                   {item.step}
@@ -570,6 +435,47 @@ export default function IntegrationsPage() {
           ))}
         </div>
       </div>
+
+      {/* Wipe modal */}
+      {showWipeModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl p-6 max-w-md w-full mx-4 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center shrink-0">
+                <Trash2 className="w-5 h-5 text-amber-700" />
+              </div>
+              <div>
+                <h3 className="text-base font-semibold text-slate-900">Supprimer toutes les activités Salesforce</h3>
+                <p className="text-xs text-slate-400 mt-0.5">Action irréversible dans Salesforce</p>
+              </div>
+            </div>
+            <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 text-sm text-amber-800 space-y-1.5">
+              <p className="font-medium">Attention — ceci supprimera dans votre org Salesforce :</p>
+              <ul className="list-disc list-inside space-y-0.5 text-amber-700 text-xs">
+                <li>Toutes les <strong>Tasks</strong> (CR, appels, emails, tâches)</li>
+                <li>Tous les <strong>Events</strong> (réunions, RDV)</li>
+              </ul>
+              <p className="text-amber-600 text-xs mt-2">Utilisez uniquement sur un compte de test ou sandbox.</p>
+            </div>
+            <div className="flex gap-3 pt-1">
+              <button
+                onClick={() => setShowWipeModal(false)}
+                disabled={wiping}
+                className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 disabled:opacity-50"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={handleWipeActivities}
+                disabled={wiping}
+                className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-amber-600 text-white text-sm font-medium rounded-lg hover:bg-amber-700 disabled:opacity-50"
+              >
+                {wiping ? <><RefreshCw className="w-4 h-4 animate-spin" />Suppression…</> : <><Trash2 className="w-4 h-4" />Oui, tout supprimer</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
