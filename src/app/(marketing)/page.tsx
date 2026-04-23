@@ -160,7 +160,7 @@ export default function HomePage() {
       `}</style>
 
       {/* ── HERO ─────────────────────────────────────────────── */}
-      <section className="relative min-h-[100svh] flex flex-col items-center justify-center px-5 pt-24 pb-16 overflow-hidden">
+      <section className="relative min-h-[100svh] flex flex-col items-center justify-center px-5 pt-24 pb-16 overflow-hidden bg-[#0A0A0A]">
         <Grain />
 
         {/* Grid lines */}
@@ -224,7 +224,7 @@ export default function HomePage() {
       </section>
 
       {/* ── CRM TRUST BAND ───────────────────────────────────── */}
-      <section className="border-y border-white/[0.06] py-8 px-5">
+      <section className="border-y border-white/[0.06] py-8 px-5 bg-[#0A0A0A]">
         <div className="max-w-4xl mx-auto space-y-4">
           <p className="text-center text-[12px] text-white/20 uppercase tracking-widest">
             Connecté à votre CRM existant
@@ -234,7 +234,7 @@ export default function HomePage() {
       </section>
 
       {/* ── PROBLEM ─────────────────────────────────────────── */}
-      <section className="relative py-24 sm:py-32 px-5 overflow-hidden">
+      <section className="relative py-24 sm:py-32 px-5 overflow-hidden bg-[#0A0A0A]">
         <Grain />
         <div className="relative z-10 max-w-5xl mx-auto">
           <div className="max-w-2xl mb-16">
@@ -411,7 +411,7 @@ export default function HomePage() {
       </section>
 
       {/* ── BEFORE / AFTER ──────────────────────────────────── */}
-      <section className="relative border-t border-white/[0.06] py-24 sm:py-32 px-5 overflow-hidden">
+      <section className="relative border-t border-white/[0.06] py-24 sm:py-32 px-5 overflow-hidden bg-[#0A0A0A]">
         <Grain />
         <div className="relative z-10 max-w-4xl mx-auto space-y-12">
           <div className="text-center space-y-2">
@@ -472,7 +472,7 @@ export default function HomePage() {
       </section>
 
       {/* ── TESTIMONIALS ────────────────────────────────────── */}
-      <section className="relative border-t border-white/[0.06] py-24 sm:py-32 px-5 overflow-hidden">
+      <section className="relative border-t border-white/[0.06] py-24 sm:py-32 px-5 overflow-hidden bg-[#0A0A0A]">
         <Grain />
         <div className="relative z-10 max-w-5xl mx-auto space-y-12">
           <div className="text-center">
@@ -586,7 +586,7 @@ export default function HomePage() {
       </section>
 
       {/* ── FINAL CTA ───────────────────────────────────────── */}
-      <section className="relative border-t border-white/[0.06] py-24 sm:py-32 px-5 overflow-hidden">
+      <section className="relative border-t border-white/[0.06] py-24 sm:py-32 px-5 overflow-hidden bg-[#0A0A0A]">
         <Grain />
 
         {/* Big glow */}

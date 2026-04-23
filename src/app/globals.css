@@ -23,6 +23,11 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Marketing pages: override body background to full dark */
+body:has([data-marketing]) {
+  background: #0a0a0a;
+}
+
 /* Tabular nums for KPIs */
 .tabular-nums {
   font-variant-numeric: tabular-nums;

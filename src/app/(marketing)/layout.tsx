@@ -31,7 +31,8 @@ export const metadata: Metadata = {
 export default function MarketingLayout({ children }: { children: React.ReactNode }) {
   return (
     <div
-      className={`${syne.variable} ${dmSans.variable} bg-[#0A0A0A] text-white`}
+      data-marketing="true"
+      className={`${syne.variable} ${dmSans.variable} bg-[#0A0A0A] text-white min-h-screen`}
       style={{ fontFamily: 'var(--font-dm-sans), sans-serif' }}
     >
       <MarketingNav />
