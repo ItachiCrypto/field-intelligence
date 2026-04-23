@@ -61,6 +61,9 @@ const WIPE_TABLES = [
   'recommandations_ia',
   'abbreviations',
   'invitations',
+  'contacts',
+  'opportunities',
+  'processing_results',
 ];
 
 async function main() {
@@ -79,7 +82,9 @@ async function main() {
     const joined = WIPE_TABLES.map((t) => `public.${t}`).join(', ');
     await c.query(`TRUNCATE TABLE ${joined} RESTART IDENTITY CASCADE`);
     await c.query('COMMIT');
-    console.log('[wipe] OK');
+    // Reset last_sync_at sur crm_connections → prochain sync repart de 0
+    await c.query(`UPDATE public.crm_connections SET last_sync_at = NULL, records_synced = 0`);
+    console.log('[wipe] OK — last_sync_at reset sur toutes les connexions CRM');
     // Verification rapide : on re-compte et on vide les preserves
     const keep = await c.query(`
       SELECT 'companies' AS t, COUNT(*)::int AS n FROM public.companies
