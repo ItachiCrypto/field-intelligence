@@ -18,20 +18,22 @@ const dmSans = DM_Sans({
 });
 
 export const metadata: Metadata = {
-  title: 'Field Intelligence — L\'intelligence terrain pour votre marketing',
+  title: "Field Intelligence — L'intelligence terrain pour votre marketing",
   description:
-    'Transformez les comptes rendus CRM de vos commerciaux en intelligence marché actionnable. Radar concurrentiel, besoins clients, analyse prix — en temps réel, sans rien changer aux habitudes terrain.',
+    'Transformez les comptes rendus CRM de vos commerciaux en intelligence marché actionnable. Radar concurrentiel, besoins clients, analyse prix — en temps réel.',
   openGraph: {
-    title: 'Field Intelligence — L\'intelligence terrain pour votre marketing',
-    description:
-      'Transformez les comptes rendus CRM de vos commerciaux en intelligence marché actionnable.',
+    title: "Field Intelligence — L'intelligence terrain pour votre marketing",
+    description: 'Transformez les comptes rendus CRM de vos commerciaux en intelligence marché actionnable.',
     type: 'website',
   },
 };
 
 export default function MarketingLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className={`${syne.variable} ${dmSans.variable}`} style={{ fontFamily: 'var(--font-dm-sans), sans-serif' }}>
+    <div
+      className={`${syne.variable} ${dmSans.variable} bg-[#0A0A0A] text-white`}
+      style={{ fontFamily: 'var(--font-dm-sans), sans-serif' }}
+    >
       <MarketingNav />
       <main>{children}</main>
       <MarketingFooter />

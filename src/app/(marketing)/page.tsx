@@ -1,17 +1,38 @@
 import Link from 'next/link';
 import {
   Sword, DollarSign, Package, BarChart2, TrendingUp, Map,
-  CheckCircle, XCircle, ArrowRight, Zap, Shield, Clock,
+  ArrowRight, CheckCircle, XCircle, Zap, ChevronRight,
 } from 'lucide-react';
 import { HeroAnimation } from '@/components/marketing/hero-animation';
 import { RoiSimulator } from '@/components/marketing/roi-simulator';
 import { CrmLogos } from '@/components/marketing/crm-logos';
 
-/* ── Reusable heading style ─────────────────────────────── */
-function SectionTitle({ children, center = false }: { children: React.ReactNode; center?: boolean }) {
+/* ── Grain overlay ─────────────────────────────────────────── */
+const GRAIN_SVG = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E")`;
+
+function Grain() {
+  return (
+    <div
+      className="pointer-events-none absolute inset-0 opacity-[0.035]"
+      style={{ backgroundImage: GRAIN_SVG, backgroundRepeat: 'repeat', backgroundSize: '300px 300px' }}
+      aria-hidden="true"
+    />
+  );
+}
+
+/* ── Section heading ───────────────────────────────────────── */
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="inline-block text-[11px] font-semibold text-[#6366F1] uppercase tracking-[0.15em] mb-4">
+      {children}
+    </span>
+  );
+}
+
+function SectionTitle({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   return (
     <h2
-      className={`text-3xl sm:text-4xl font-bold text-[#111827] leading-tight ${center ? 'text-center' : ''}`}
+      className={`text-3xl sm:text-4xl lg:text-5xl font-bold text-white leading-[1.1] tracking-[-0.03em] ${className}`}
       style={{ fontFamily: 'var(--font-syne), sans-serif' }}
     >
       {children}
@@ -19,464 +40,468 @@ function SectionTitle({ children, center = false }: { children: React.ReactNode;
   );
 }
 
-/* ── Features grid data ─────────────────────────────────── */
+/* ── Features bento data ───────────────────────────────────── */
 const FEATURES = [
   {
-    icon: <Sword className="w-5 h-5" />,
-    color: 'text-[#6366F1] bg-[#EEF2FF]',
+    icon: <Sword className="w-4 h-4" />,
+    color: '#818CF8',
     title: 'Radar Concurrentiel',
-    desc: 'Qui est actif chez vos clients, dans quelles régions, avec quel argument. En temps réel — pas dans 6 semaines.',
-    stat: '12 concurrents détectés',
-    statColor: 'text-[#6366F1]',
+    desc: 'Qui est actif chez vos clients, dans quelle région, avec quel argument. En temps réel.',
+    stat: '12 concurrents cartographiés',
+    wide: true,
   },
   {
-    icon: <DollarSign className="w-5 h-5" />,
-    color: 'text-amber-600 bg-amber-50',
+    icon: <DollarSign className="w-4 h-4" />,
+    color: '#FB923C',
     title: 'Radar Prix',
-    desc: 'L\'écart de prix réel perçu sur le terrain par concurrent. Les seuils de résistance réels de vos clients. Pas des suppositions.',
-    stat: '−15% écart détecté vs. Acme',
-    statColor: 'text-amber-600',
+    desc: 'L\'écart de prix réel perçu terrain — pas les grilles affichées.',
+    stat: '−15% détecté vs. Acme',
+    wide: false,
   },
   {
-    icon: <Package className="w-5 h-5" />,
-    color: 'text-red-600 bg-red-50',
+    icon: <Package className="w-4 h-4" />,
+    color: '#F87171',
     title: 'Offres Concurrentes',
-    desc: 'Chaque bundle, promo, essai gratuit ou condition spéciale détecté en rendez-vous. Avec son impact mesuré sur vos deals.',
+    desc: 'Chaque bundle, essai gratuit ou condition spéciale détectée en RDV.',
     stat: '3 bundles actifs repérés',
-    statColor: 'text-red-600',
+    wide: false,
   },
   {
-    icon: <BarChart2 className="w-5 h-5" />,
-    color: 'text-[#059669] bg-emerald-50',
+    icon: <BarChart2 className="w-4 h-4" />,
+    color: '#34D399',
     title: 'Baromètre des Besoins',
-    desc: 'Les vrais besoins de vos clients cette semaine — pas ceux d\'une étude de 3 mois. Avec les mots exacts qu\'ils utilisent.',
+    desc: 'Les vrais besoins de vos clients cette semaine, avec leurs mots exacts.',
     stat: '7 besoins émergents',
-    statColor: 'text-[#059669]',
+    wide: false,
   },
   {
-    icon: <TrendingUp className="w-5 h-5" />,
-    color: 'text-[#6366F1] bg-[#EEF2FF]',
+    icon: <TrendingUp className="w-4 h-4" />,
+    color: '#818CF8',
     title: 'Deals Gagnés / Perdus',
-    desc: 'Pourquoi vous gagnez et pourquoi vous perdez — extrait des verbatims terrain, pas des déclarations biaisées post-deal.',
-    stat: '68% taux de closing',
-    statColor: 'text-[#6366F1]',
+    desc: 'Pourquoi vous gagnez et perdez — depuis les verbatims terrain.',
+    stat: '+18% closing identifié',
+    wide: false,
   },
   {
-    icon: <Map className="w-5 h-5" />,
-    color: 'text-teal-600 bg-teal-50',
-    title: 'Analyse Géographique',
-    desc: 'Carte de chaleur de la pression concurrentielle et des besoins clients par région et par secteur.',
-    stat: 'IDF : zone critique',
-    statColor: 'text-teal-600',
+    icon: <Map className="w-4 h-4" />,
+    color: '#2DD4BF',
+    title: 'Cartographie Terrain',
+    desc: 'Heatmap de pression concurrentielle et de risque portefeuille par zone.',
+    stat: '3 zones critiques IDF',
+    wide: true,
   },
 ];
 
-/* ── Before/After data ──────────────────────────────────── */
-const BEFORE = [
-  'Vous découvrez qu\'un concurrent est actif chez vos clients… dans leur communiqué de presse',
-  'Vos battlecards sont basées sur ce qu\'ils affichent sur leur site — pas sur ce qu\'ils font vraiment',
-  'Vous créez des contenus avec votre vocabulaire — pas celui de vos clients',
-  'Votre brief produit s\'appuie sur une étude de marché vieille de 6 mois',
-  'Vous ne savez pas pourquoi vous perdez des deals sur le pricing',
-  'Vous sollicitez les commerciaux pour avoir des retours terrain — et ils n\'ont pas le temps',
+/* ── Before / After data ───────────────────────────────────── */
+const COMPARISON = [
+  { aspect: 'Fraîcheur', before: 'Étude de marché : 6-12 mois', after: 'Signal terrain : temps réel' },
+  { aspect: 'Source', before: 'Sondages, panels, cabinets', after: 'Verbatims de vos propres RDV' },
+  { aspect: 'Coût', before: '15 000€ – 80 000€ par étude', after: 'Abonnement mensuel fixe' },
+  { aspect: 'Biais', before: 'Déclaratif, questions orientées', after: 'Comportemental, non sollicité' },
+  { aspect: 'Couverture', before: 'Échantillon représentatif', after: '100% de vos RDV clients' },
+  { aspect: 'Format', before: 'Rapport PDF + réunion', after: 'Dashboard filtrable + alertes' },
 ];
 
-const AFTER = [
-  'Alerte en temps réel dès qu\'un concurrent est mentionné dans un CR terrain',
-  'Battlecards générées automatiquement depuis les verbatims clients réels',
-  'Nuage de mots du vrai vocabulaire de vos clients — extrait des CR cette semaine',
-  'Baromètre des besoins mis à jour en continu depuis 50 CR par semaine',
-  'Analyse des motifs de perte avec valeur CA et tendance mensuelle',
-  '0 sollicitation des commerciaux — l\'intelligence vient à vous automatiquement',
-];
-
-/* ── Testimonials ───────────────────────────────────────── */
+/* ── Testimonials ──────────────────────────────────────────── */
 const TESTIMONIALS = [
   {
-    quote:
-      'J\'ai découvert qu\'Acme était actif chez 8 de nos clients depuis 6 semaines. Mes commerciaux le savaient. Personne ne me l\'avait dit. Field Intelligence me l\'a dit le lendemain de l\'installation.',
-    name: 'Sophie L.',
+    quote: 'On avait des battlecards Salesforce basées sur leur comms publiques. Avec Field Intelligence, on a découvert 3 offres bundle qu\'on ignorait complètement.',
+    name: 'C. Martin',
     role: 'Directrice Marketing',
-    company: 'Industrie agroalimentaire',
-    initial: 'SL',
-    color: 'bg-[#3730A3]',
+    company: 'Éditeur SaaS B2B, 80M€ ARR',
   },
   {
-    quote:
-      'Pour la première fois, j\'ai pu présenter au comité de direction une analyse concurrentielle basée sur ce que nos clients disent vraiment — pas sur ce que les concurrents communiquent.',
-    name: 'Marc D.',
-    role: 'Chef de Produit',
-    company: 'Services B2B',
-    initial: 'MD',
-    color: 'bg-[#059669]',
+    quote: 'Field Intelligence a remplacé notre point mensuel avec les KAM par un dashboard qu\'on consulte chaque matin. Le delta de réactivité est énorme.',
+    name: 'L. Bernard',
+    role: 'Head of Product Marketing',
+    company: 'Scale-up industrielle, 40 commerciaux',
   },
   {
-    quote:
-      'Le nuage de mots des besoins clients a complètement changé notre façon d\'écrire nos contenus. On utilisait notre vocabulaire. Pas le leur.',
-    name: 'Julie R.',
-    role: 'Responsable Marketing',
-    company: 'Pharma',
-    initial: 'JR',
-    color: 'bg-amber-500',
+    quote: 'Pour la première fois, notre brief produit est basé sur ce que les clients disent réellement en RDV — pas sur ce qu\'ils répondent à nos sondages.',
+    name: 'A. Dupont',
+    role: 'VP Marketing',
+    company: 'Groupe B2B, 120M€ CA',
   },
 ];
-
-/* ─────────────────────────────────────────────────────────── */
 
 export default function HomePage() {
   return (
     <>
-      {/* ── HERO ────────────────────────────────────────────── */}
-      <section className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden bg-[#0F0F1A] pt-16">
-        {/* Background grid */}
-        <div
-          className="absolute inset-0 opacity-[0.04]"
-          style={{
-            backgroundImage:
-              'linear-gradient(#6366F1 1px, transparent 1px), linear-gradient(to right, #6366F1 1px, transparent 1px)',
-            backgroundSize: '48px 48px',
-          }}
-        />
-        {/* Glow blobs */}
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-[#3730A3]/30 rounded-full blur-[100px] pointer-events-none" />
-        <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-[#6366F1]/20 rounded-full blur-[80px] pointer-events-none" />
+      <style>{`
+        @keyframes fadeUp {
+          from { opacity: 0; transform: translateY(16px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to   { opacity: 1; }
+        }
+        .anim-1 { animation: fadeUp 0.7s cubic-bezier(.22,1,.36,1) 0.1s both; }
+        .anim-2 { animation: fadeUp 0.7s cubic-bezier(.22,1,.36,1) 0.22s both; }
+        .anim-3 { animation: fadeUp 0.7s cubic-bezier(.22,1,.36,1) 0.34s both; }
+        .anim-4 { animation: fadeUp 0.7s cubic-bezier(.22,1,.36,1) 0.46s both; }
+        .anim-5 { animation: fadeUp 0.7s cubic-bezier(.22,1,.36,1) 0.62s both; }
+        input[type=range]::-webkit-slider-thumb {
+          -webkit-appearance: none;
+          width: 16px; height: 16px;
+          border-radius: 50%;
+          background: white;
+          cursor: pointer;
+          box-shadow: 0 0 0 3px rgba(99,102,241,0.3);
+        }
+        input[type=range]::-moz-range-thumb {
+          width: 16px; height: 16px;
+          border-radius: 50%;
+          background: white;
+          cursor: pointer;
+          border: none;
+          box-shadow: 0 0 0 3px rgba(99,102,241,0.3);
+        }
+      `}</style>
 
-        <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-20 flex flex-col items-center text-center gap-8">
-          {/* Badge */}
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-[#6366F1]/30 bg-[#6366F1]/10 text-[#A5B4FC] text-sm font-medium">
-            <Zap className="w-3.5 h-3.5" fill="currentColor" />
+      {/* ── HERO ─────────────────────────────────────────────── */}
+      <section className="relative min-h-[100svh] flex flex-col items-center justify-center px-5 pt-24 pb-16 overflow-hidden">
+        <Grain />
+
+        {/* Grid lines */}
+        <div className="absolute inset-0 pointer-events-none" aria-hidden="true">
+          <div className="absolute inset-x-0 top-[20%] h-px bg-white/[0.04]" />
+          <div className="absolute inset-x-0 bottom-[20%] h-px bg-white/[0.04]" />
+          <div className="absolute inset-y-0 left-[15%] w-px bg-white/[0.03]" />
+          <div className="absolute inset-y-0 right-[15%] w-px bg-white/[0.03]" />
+        </div>
+
+        {/* Glow orb */}
+        <div
+          className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[500px] rounded-full pointer-events-none"
+          style={{ background: 'radial-gradient(ellipse, rgba(99,102,241,0.13) 0%, transparent 70%)' }}
+          aria-hidden="true"
+        />
+
+        <div className="relative z-10 max-w-4xl mx-auto text-center space-y-8">
+          {/* Chip */}
+          <div className="anim-1 inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/[0.10] bg-white/[0.04] text-[12px] text-white/50">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#6366F1] animate-pulse" />
             Intelligence terrain en temps réel
           </div>
 
-          {/* H1 */}
+          {/* Title */}
           <h1
-            className="text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-extrabold text-white leading-[1.05] max-w-4xl"
+            className="anim-2 text-[clamp(44px,8vw,96px)] font-extrabold text-white leading-[1.0] tracking-[-0.04em]"
             style={{ fontFamily: 'var(--font-syne), sans-serif' }}
           >
-            Votre marketing mérite mieux que la{' '}
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#6366F1] to-[#A5B4FC]">
-              veille web.
-            </span>
+            Votre marketing<br />
+            mérite mieux<br />
+            <span className="text-[#6366F1]">que la veille web.</span>
           </h1>
 
           {/* Subtitle */}
-          <p className="text-lg text-slate-400 max-w-2xl leading-relaxed">
-            Vos commerciaux entendent chaque jour ce que vos clients pensent vraiment de vos concurrents,
-            de vos prix, de vos offres. Field Intelligence capte ces conversations et les transforme
-            en intelligence marché pour votre équipe — automatiquement, en temps réel.
+          <p className="anim-3 text-[17px] text-white/45 max-w-xl mx-auto leading-relaxed">
+            Vos commerciaux entendent chaque jour ce que vos clients pensent de vos concurrents, de vos prix, de vos offres. Field Intelligence capte ces conversations et les transforme en intelligence marché — automatiquement.
           </p>
 
           {/* CTAs */}
-          <div className="flex flex-col sm:flex-row items-center gap-4">
+          <div className="anim-4 flex flex-col sm:flex-row items-center justify-center gap-3">
             <Link
               href="/auth/signup"
-              className="inline-flex items-center gap-2 px-7 py-3.5 bg-[#6366F1] hover:bg-[#4F46E5] text-white font-semibold rounded-xl shadow-lg shadow-indigo-900/40 transition-all hover:scale-105"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-white text-[#0A0A0A] text-[14px] font-semibold rounded-lg hover:bg-white/90 transition-colors"
             >
-              <Zap className="w-4 h-4" />
-              Voir l&apos;outil en action
+              Démarrer gratuitement <ArrowRight className="w-4 h-4" />
             </Link>
             <Link
-              href="#roi"
-              className="text-slate-400 hover:text-white text-sm font-medium flex items-center gap-1 transition-colors"
+              href="#simulator"
+              className="inline-flex items-center gap-2 px-6 py-3 text-[14px] font-medium text-white/50 hover:text-white transition-colors"
             >
-              Calculer ce que vous perdez chaque semaine
-              <ArrowRight className="w-4 h-4" />
+              Calculer ce que vous perdez <ChevronRight className="w-4 h-4" />
             </Link>
           </div>
 
-          {/* Hero animation */}
-          <div className="w-full mt-4">
+          {/* Animation */}
+          <div className="anim-5">
             <HeroAnimation />
           </div>
         </div>
+      </section>
 
-        {/* CRM trust band */}
-        <div className="relative z-10 w-full border-t border-slate-800/60 bg-slate-900/40 backdrop-blur-sm py-6">
-          <p className="text-center text-xs text-slate-500 mb-4 uppercase tracking-widest font-medium">
-            Compatible avec tous vos CRM
+      {/* ── CRM TRUST BAND ───────────────────────────────────── */}
+      <section className="border-y border-white/[0.06] py-8 px-5">
+        <div className="max-w-4xl mx-auto space-y-4">
+          <p className="text-center text-[12px] text-white/20 uppercase tracking-widest">
+            Connecté à votre CRM existant
           </p>
           <CrmLogos />
         </div>
       </section>
 
-      {/* ── PROBLÈME ─────────────────────────────────────────── */}
-      <section className="bg-white py-24 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-16 space-y-4">
-            <SectionTitle center>
-              Votre marketing travaille avec des données qui ont{' '}
-              <span className="text-red-600">6 semaines de retard.</span>
+      {/* ── PROBLEM ─────────────────────────────────────────── */}
+      <section className="relative py-24 sm:py-32 px-5 overflow-hidden">
+        <Grain />
+        <div className="relative z-10 max-w-5xl mx-auto">
+          <div className="max-w-2xl mb-16">
+            <SectionLabel>Le problème</SectionLabel>
+            <SectionTitle>
+              85% des signaux terrain<br />
+              <span className="text-white/30">disparaissent chaque semaine.</span>
             </SectionTitle>
-            <p className="text-lg text-slate-500 max-w-2xl mx-auto">
-              Pendant ce temps, vos commerciaux savent tout. Et cette information reste dans des CR
-              que personne ne lit.
-            </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {[
               {
-                icon: '🔴',
-                title: 'Concurrence',
-                heading: 'Vous apprenez les mouvements concurrents trop tard',
-                desc: 'Un concurrent est actif chez 12 de vos clients depuis 3 mois. Vos études de marché vous le diront dans 6 mois. Vos commerciaux le savent depuis hier.',
+                n: '01',
+                color: 'text-red-400',
+                bg: 'bg-red-500/[0.08]',
+                border: 'border-red-500/[0.12]',
+                title: 'L\'étude est déjà périmée',
+                desc: '6 à 12 mois pour produire. Les concurrents ont bougé. Vous briefez vos équipes avec des données d\'hier.',
               },
               {
-                icon: '🔴',
-                title: 'Besoins',
-                heading: 'Vos contenus ne parlent pas le langage de vos clients',
-                desc: 'Vous créez des campagnes avec les mots de votre service marketing. Vos clients utilisent des termes complètement différents pour décrire leurs problèmes.',
+                n: '02',
+                color: 'text-amber-400',
+                bg: 'bg-amber-500/[0.08]',
+                border: 'border-amber-500/[0.12]',
+                title: 'Le CR ne remonte jamais',
+                desc: '3 à 5 CR par semaine dans le CRM. Chacun contient des signaux priceless sur la concurrence et les prix. Personne ne les lit.',
               },
               {
-                icon: '🔴',
-                title: 'Décisions',
-                heading: 'Vos décisions marketing reposent sur des hypothèses',
-                desc: 'Pricing, positionnement, roadmap produit — vous décidez sur des études trimestrielles pendant que le terrain change chaque semaine.',
+                n: '03',
+                color: 'text-[#818CF8]',
+                bg: 'bg-[#6366F1]/[0.08]',
+                border: 'border-[#6366F1]/[0.12]',
+                title: 'Vos battlecards sont du vent',
+                desc: 'Basées sur ce que les concurrents affichent — pas ce qu\'ils font sur le terrain. Le décalage se voit dans vos taux de closing.',
               },
-            ].map((item) => (
+            ].map((p) => (
               <div
-                key={item.title}
-                className="rounded-2xl border border-red-100 bg-red-50/40 p-6 space-y-3 hover:border-red-200 hover:shadow-sm transition-all"
+                key={p.n}
+                className={`rounded-2xl border ${p.border} ${p.bg} p-6 space-y-4`}
               >
-                <div className="flex items-center gap-2">
-                  <span className="text-lg">{item.icon}</span>
-                  <span className="text-xs font-bold text-red-500 uppercase tracking-widest">
-                    {item.title}
-                  </span>
-                </div>
+                <span className={`text-[11px] font-bold ${p.color} font-mono tracking-widest`}>{p.n}</span>
                 <h3
-                  className="text-base font-bold text-slate-900"
+                  className="text-[17px] font-bold text-white leading-snug"
                   style={{ fontFamily: 'var(--font-syne), sans-serif' }}
                 >
-                  {item.heading}
+                  {p.title}
                 </h3>
-                <p className="text-sm text-slate-600 leading-relaxed">{item.desc}</p>
+                <p className="text-[13px] text-white/40 leading-relaxed">{p.desc}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ── SOLUTION ─────────────────────────────────────────── */}
-      <section className="bg-[#F9FAFB] py-24 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-16 space-y-4">
-            <SectionTitle center>
-              Field Intelligence transforme chaque CR en intelligence marché.{' '}
-              <span className="text-[#6366F1]">Automatiquement.</span>
+      {/* ── FEATURES BENTO ──────────────────────────────────── */}
+      <section className="relative border-t border-white/[0.06] py-24 sm:py-32 px-5 overflow-hidden bg-[#0D0D0D]">
+        <Grain />
+        <div className="relative z-10 max-w-5xl mx-auto space-y-12">
+          <div className="max-w-2xl">
+            <SectionLabel>Fonctionnalités</SectionLabel>
+            <SectionTitle>
+              Six modules.<br />
+              <span className="text-white/30">Une seule source de vérité.</span>
             </SectionTitle>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-0 relative">
-            {/* Connecting line (hidden on mobile) */}
-            <div className="hidden md:block absolute top-10 left-1/3 right-1/3 h-0.5 bg-gradient-to-r from-[#6366F1]/40 to-[#6366F1]/40 z-0" />
-
-            {[
-              {
-                step: '01',
-                icon: '📝',
-                title: 'La source',
-                desc: 'Votre commercial rédige son CR dans son CRM habituel. Il ne change rien. Il ne sait même pas que Field Intelligence tourne.',
-                detail: 'Champ texte CRM',
-              },
-              {
-                step: '02',
-                icon: '🧠',
-                title: 'L\'analyse',
-                desc: 'Notre IA lit chaque CR, détecte les signaux concurrentiels, prix, besoins et tendances, et les catégorise en temps réel.',
-                detail: 'CONCURRENT · PRIX · OFFRE · BESOIN',
-              },
-              {
-                step: '03',
-                icon: '📊',
-                title: 'L\'intelligence',
-                desc: 'Chaque signal arrive dans votre interface Field Intelligence — trié, priorisé, visualisé. Prêt à actionner.',
-                detail: 'Dashboard marketing',
-              },
-            ].map((item, idx) => (
-              <div key={item.step} className="relative z-10 flex flex-col items-center text-center p-8 space-y-4">
-                <div className="w-16 h-16 rounded-2xl bg-white border-2 border-[#6366F1]/20 shadow-sm flex items-center justify-center text-2xl">
-                  {item.icon}
-                </div>
-                <div className="text-xs font-bold text-[#6366F1] uppercase tracking-widest">
-                  Étape {item.step}
+          {/* Bento: row 1 — wide + narrow + narrow */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Wide card */}
+            <div className="md:col-span-2 rounded-2xl border border-white/[0.07] bg-[#111111] p-7 space-y-5 hover:border-[#6366F1]/30 transition-colors group">
+              <div className="flex items-center gap-3">
+                <div
+                  className="w-8 h-8 rounded-lg flex items-center justify-center bg-white/[0.06]"
+                  style={{ color: FEATURES[0].color }}
+                >
+                  {FEATURES[0].icon}
                 </div>
                 <h3
-                  className="text-xl font-bold text-slate-900"
+                  className="text-[16px] font-bold text-white"
                   style={{ fontFamily: 'var(--font-syne), sans-serif' }}
                 >
-                  {item.title}
+                  {FEATURES[0].title}
                 </h3>
-                <p className="text-sm text-slate-600 leading-relaxed max-w-xs">{item.desc}</p>
-                <div className="px-3 py-1.5 rounded-lg bg-[#EEF2FF] text-xs font-mono text-[#3730A3] font-medium">
-                  {item.detail}
-                </div>
-                {idx < 2 && (
-                  <div className="md:hidden text-2xl text-[#6366F1]/40">↓</div>
-                )}
               </div>
-            ))}
-          </div>
-
-          <p className="text-center text-sm text-slate-500 mt-6 bg-white rounded-xl border border-slate-200 py-3 px-6 inline-flex items-center gap-3 mx-auto block max-w-xl">
-            <CheckCircle className="w-4 h-4 text-[#059669] shrink-0" />
-            Zéro action requise de vos commerciaux · Zéro intégration complexe · Zéro formation
-          </p>
-        </div>
-      </section>
-
-      {/* ── FEATURES GRID ────────────────────────────────────── */}
-      <section className="bg-white py-24 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-16 space-y-4">
-            <SectionTitle center>
-              Tout ce que votre marketing cherchait sans jamais pouvoir le trouver.
-            </SectionTitle>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {FEATURES.map((f) => (
+              <p className="text-[13px] text-white/40 leading-relaxed">{FEATURES[0].desc}</p>
               <div
-                key={f.title}
-                className="group rounded-2xl border border-slate-200 bg-white p-6 space-y-4 hover:border-[#6366F1]/30 hover:shadow-lg hover:shadow-indigo-50 transition-all duration-300"
+                className="inline-block text-[12px] font-medium px-3 py-1 rounded-md bg-white/[0.05] border border-white/[0.08]"
+                style={{ color: FEATURES[0].color }}
               >
-                <div className="flex items-start justify-between">
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${f.color}`}>
-                    {f.icon}
-                  </div>
-                  <span className={`text-xs font-bold tabular-nums ${f.statColor}`}>
-                    {f.stat}
-                  </span>
-                </div>
-                <h3
-                  className="text-base font-bold text-slate-900"
-                  style={{ fontFamily: 'var(--font-syne), sans-serif' }}
-                >
-                  {f.title}
-                </h3>
-                <p className="text-sm text-slate-600 leading-relaxed">{f.desc}</p>
-                <div className="pt-2 border-t border-slate-100">
-                  <Link
-                    href="/fonctionnalites"
-                    className={`text-xs font-semibold flex items-center gap-1 ${f.statColor} hover:gap-2 transition-all`}
-                  >
-                    Voir en détail <ArrowRight className="w-3 h-3" />
-                  </Link>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── AVANT / APRÈS ────────────────────────────────────── */}
-      <section className="bg-[#F9FAFB] py-24 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-5xl mx-auto">
-          <div className="text-center mb-16">
-            <SectionTitle center>
-              Ce que votre marketing fait aujourd&apos;hui.{' '}
-              <span className="text-[#6366F1]">Ce qu&apos;il fera avec Field Intelligence.</span>
-            </SectionTitle>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            {/* Sans */}
-            <div className="rounded-2xl border border-red-200 bg-red-50/30 overflow-hidden">
-              <div className="px-6 py-4 bg-red-50 border-b border-red-200 flex items-center gap-2">
-                <XCircle className="w-5 h-5 text-red-500" />
-                <span
-                  className="font-bold text-red-700 text-sm"
-                  style={{ fontFamily: 'var(--font-syne), sans-serif' }}
-                >
-                  SANS Field Intelligence
-                </span>
-              </div>
-              <div className="p-6 space-y-3">
-                {BEFORE.map((item, i) => (
-                  <div key={i} className="flex items-start gap-3">
-                    <div className="w-5 h-5 rounded-full border-2 border-red-300 flex-shrink-0 mt-0.5" />
-                    <p className="text-sm text-slate-600 leading-relaxed">{item}</p>
-                  </div>
-                ))}
+                {FEATURES[0].stat}
               </div>
             </div>
-
-            {/* Avec */}
-            <div className="rounded-2xl border border-emerald-200 bg-emerald-50/30 overflow-hidden">
-              <div className="px-6 py-4 bg-emerald-50 border-b border-emerald-200 flex items-center gap-2">
-                <CheckCircle className="w-5 h-5 text-[#059669]" />
-                <span
-                  className="font-bold text-emerald-700 text-sm"
-                  style={{ fontFamily: 'var(--font-syne), sans-serif' }}
-                >
-                  AVEC Field Intelligence
-                </span>
+            {/* Narrow */}
+            <div className="rounded-2xl border border-white/[0.07] bg-[#111111] p-7 space-y-5 hover:border-[#6366F1]/30 transition-colors">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-white/[0.06] flex items-center justify-center" style={{ color: FEATURES[1].color }}>
+                  {FEATURES[1].icon}
+                </div>
+                <h3 className="text-[16px] font-bold text-white" style={{ fontFamily: 'var(--font-syne), sans-serif' }}>{FEATURES[1].title}</h3>
               </div>
-              <div className="p-6 space-y-3">
-                {AFTER.map((item, i) => (
-                  <div key={i} className="flex items-start gap-3">
-                    <CheckCircle className="w-5 h-5 text-[#059669] flex-shrink-0 mt-0.5" />
-                    <p className="text-sm text-slate-700 leading-relaxed font-medium">{item}</p>
-                  </div>
-                ))}
+              <p className="text-[13px] text-white/40 leading-relaxed">{FEATURES[1].desc}</p>
+              <div className="inline-block text-[12px] font-medium px-3 py-1 rounded-md bg-white/[0.05] border border-white/[0.08]" style={{ color: FEATURES[1].color }}>{FEATURES[1].stat}</div>
+            </div>
+          </div>
+
+          {/* Row 2 — narrow + narrow + wide */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="rounded-2xl border border-white/[0.07] bg-[#111111] p-7 space-y-5 hover:border-[#6366F1]/30 transition-colors">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-white/[0.06] flex items-center justify-center" style={{ color: FEATURES[2].color }}>{FEATURES[2].icon}</div>
+                <h3 className="text-[16px] font-bold text-white" style={{ fontFamily: 'var(--font-syne), sans-serif' }}>{FEATURES[2].title}</h3>
+              </div>
+              <p className="text-[13px] text-white/40 leading-relaxed">{FEATURES[2].desc}</p>
+              <div className="inline-block text-[12px] font-medium px-3 py-1 rounded-md bg-white/[0.05] border border-white/[0.08]" style={{ color: FEATURES[2].color }}>{FEATURES[2].stat}</div>
+            </div>
+            <div className="rounded-2xl border border-white/[0.07] bg-[#111111] p-7 space-y-5 hover:border-[#6366F1]/30 transition-colors">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-white/[0.06] flex items-center justify-center" style={{ color: FEATURES[3].color }}>{FEATURES[3].icon}</div>
+                <h3 className="text-[16px] font-bold text-white" style={{ fontFamily: 'var(--font-syne), sans-serif' }}>{FEATURES[3].title}</h3>
+              </div>
+              <p className="text-[13px] text-white/40 leading-relaxed">{FEATURES[3].desc}</p>
+              <div className="inline-block text-[12px] font-medium px-3 py-1 rounded-md bg-white/[0.05] border border-white/[0.08]" style={{ color: FEATURES[3].color }}>{FEATURES[3].stat}</div>
+            </div>
+            <div className="rounded-2xl border border-white/[0.07] bg-[#111111] p-7 space-y-5 hover:border-[#6366F1]/30 transition-colors">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-white/[0.06] flex items-center justify-center" style={{ color: FEATURES[4].color }}>{FEATURES[4].icon}</div>
+                <h3 className="text-[16px] font-bold text-white" style={{ fontFamily: 'var(--font-syne), sans-serif' }}>{FEATURES[4].title}</h3>
+              </div>
+              <p className="text-[13px] text-white/40 leading-relaxed">{FEATURES[4].desc}</p>
+              <div className="inline-block text-[12px] font-medium px-3 py-1 rounded-md bg-white/[0.05] border border-white/[0.08]" style={{ color: FEATURES[4].color }}>{FEATURES[4].stat}</div>
+            </div>
+          </div>
+
+          {/* Row 3 — full wide */}
+          <div className="rounded-2xl border border-white/[0.07] bg-[#111111] p-7 space-y-5 hover:border-[#6366F1]/30 transition-colors">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-white/[0.06] flex items-center justify-center" style={{ color: FEATURES[5].color }}>{FEATURES[5].icon}</div>
+                  <h3 className="text-[16px] font-bold text-white" style={{ fontFamily: 'var(--font-syne), sans-serif' }}>{FEATURES[5].title}</h3>
+                </div>
+                <p className="text-[13px] text-white/40 leading-relaxed">{FEATURES[5].desc}</p>
+                <div className="inline-block text-[12px] font-medium px-3 py-1 rounded-md bg-white/[0.05] border border-white/[0.08]" style={{ color: FEATURES[5].color }}>{FEATURES[5].stat}</div>
+              </div>
+              {/* Mini geo visual */}
+              <div className="rounded-xl bg-white/[0.03] border border-white/[0.06] p-4 flex items-center justify-center min-h-[100px]">
+                <div className="space-y-2 w-full max-w-xs">
+                  {[['Île-de-France', 91, '#F87171'], ['PACA', 74, '#FB923C'], ['Auvergne-Rhône', 58, '#818CF8'], ['Grand Est', 34, '#34D399']].map(([region, pct, color]) => (
+                    <div key={region as string} className="space-y-1">
+                      <div className="flex justify-between text-[11px]">
+                        <span className="text-white/30">{region as string}</span>
+                        <span style={{ color: color as string }}>{pct as number}%</span>
+                      </div>
+                      <div className="h-[3px] rounded-full bg-white/[0.06] overflow-hidden">
+                        <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: color as string }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      </section>
 
-      {/* ── ROI SIMULATOR ────────────────────────────────────── */}
-      <section id="roi" className="bg-white py-24 px-4 sm:px-6 lg:px-8 scroll-mt-16">
-        <div className="max-w-4xl mx-auto space-y-10">
-          <div className="text-center space-y-4">
-            <SectionTitle center>
-              Combien perdez-vous chaque semaine en informations non captées ?
-            </SectionTitle>
-            <p className="text-slate-500">
-              Ajustez les paramètres selon votre équipe pour calculer votre potentiel
-            </p>
-          </div>
-          <RoiSimulator />
           <div className="text-center">
             <Link
-              href="/auth/signup"
-              className="inline-flex items-center gap-2 text-[#6366F1] font-semibold hover:gap-3 transition-all"
+              href="/fonctionnalites"
+              className="inline-flex items-center gap-2 text-[13px] text-white/40 hover:text-white transition-colors"
             >
-              Voir comment récupérer cette intelligence
-              <ArrowRight className="w-4 h-4" />
+              Voir toutes les fonctionnalités <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>
         </div>
       </section>
 
-      {/* ── TESTIMONIALS ─────────────────────────────────────── */}
-      <section className="bg-[#F9FAFB] py-24 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-6xl mx-auto space-y-12">
-          <div className="text-center">
-            <SectionTitle center>
-              Ce que les responsables marketing disent après 30 jours.
+      {/* ── BEFORE / AFTER ──────────────────────────────────── */}
+      <section className="relative border-t border-white/[0.06] py-24 sm:py-32 px-5 overflow-hidden">
+        <Grain />
+        <div className="relative z-10 max-w-4xl mx-auto space-y-12">
+          <div className="text-center space-y-2">
+            <SectionLabel>Avant / Après</SectionLabel>
+            <SectionTitle className="text-center">
+              Ce n&apos;est pas une étude<br />
+              <span className="text-white/30">de marché améliorée.</span>
             </SectionTitle>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {TESTIMONIALS.map((t) => (
+          <div className="rounded-2xl border border-white/[0.07] overflow-hidden">
+            {/* Header */}
+            <div className="grid grid-cols-3 border-b border-white/[0.07] bg-white/[0.02]">
+              <div className="p-4 text-[11px] font-semibold text-white/20 uppercase tracking-widest" />
+              <div className="p-4 border-l border-white/[0.07] flex items-center gap-2 text-[12px] font-medium text-white/30">
+                <XCircle className="w-3.5 h-3.5 text-red-400/70" />
+                Étude de marché
+              </div>
+              <div className="p-4 border-l border-white/[0.07] flex items-center gap-2 text-[12px] font-semibold text-[#818CF8]">
+                <CheckCircle className="w-3.5 h-3.5 text-[#6366F1]" />
+                Field Intelligence
+              </div>
+            </div>
+
+            {COMPARISON.map((row, i) => (
               <div
-                key={t.name}
-                className="bg-white rounded-2xl border border-slate-200 p-6 space-y-5 hover:shadow-lg transition-all duration-300"
+                key={row.aspect}
+                className={`grid grid-cols-3 ${i % 2 === 0 ? '' : 'bg-white/[0.015]'}`}
               >
-                <div className="text-3xl text-[#6366F1]/30 font-serif leading-none">&ldquo;</div>
-                <p className="text-sm text-slate-700 leading-relaxed italic">{t.quote}</p>
-                <div className="flex items-center gap-3 pt-2 border-t border-slate-100">
-                  <div
-                    className={`w-10 h-10 rounded-full ${t.color} flex items-center justify-center text-white text-sm font-bold flex-shrink-0`}
-                  >
-                    {t.initial}
+                <div className="p-4 text-[12px] font-medium text-white/25 border-r border-white/[0.07]">
+                  {row.aspect}
+                </div>
+                <div className="p-4 text-[13px] text-white/30 border-r border-white/[0.07]">
+                  {row.before}
+                </div>
+                <div className="p-4 text-[13px] font-medium text-emerald-400">
+                  {row.after}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── ROI SIMULATOR ───────────────────────────────────── */}
+      <section id="simulator" className="relative border-t border-white/[0.06] py-24 sm:py-32 px-5 bg-[#0D0D0D] overflow-hidden">
+        <Grain />
+        <div className="relative z-10 max-w-4xl mx-auto space-y-12">
+          <div className="text-center space-y-2">
+            <SectionLabel>Simulateur</SectionLabel>
+            <SectionTitle className="text-center">
+              Calculez ce que vous<br />
+              <span className="text-white/30">perdez chaque semaine.</span>
+            </SectionTitle>
+          </div>
+          <RoiSimulator />
+        </div>
+      </section>
+
+      {/* ── TESTIMONIALS ────────────────────────────────────── */}
+      <section className="relative border-t border-white/[0.06] py-24 sm:py-32 px-5 overflow-hidden">
+        <Grain />
+        <div className="relative z-10 max-w-5xl mx-auto space-y-12">
+          <div className="text-center">
+            <SectionLabel>Témoignages</SectionLabel>
+            <SectionTitle className="text-center">
+              Ce qu&apos;en disent<br />
+              <span className="text-white/30">nos clients.</span>
+            </SectionTitle>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {TESTIMONIALS.map((t, i) => (
+              <div key={i} className="rounded-2xl border border-white/[0.07] bg-[#111111] p-7 flex flex-col gap-6">
+                {/* Stars */}
+                <div className="flex gap-0.5">
+                  {Array.from({ length: 5 }).map((_, si) => (
+                    <span key={si} className="text-[#6366F1] text-sm">★</span>
+                  ))}
+                </div>
+                <p className="text-[13px] text-white/50 leading-relaxed flex-1 italic">
+                  &ldquo;{t.quote}&rdquo;
+                </p>
+                <div className="flex items-center gap-3 pt-4 border-t border-white/[0.06]">
+                  <div className="w-8 h-8 rounded-full bg-[#6366F1]/20 border border-[#6366F1]/30 flex items-center justify-center text-[#818CF8] text-[11px] font-bold">
+                    {t.name.split(' ').map(n => n[0]).join('')}
                   </div>
                   <div>
-                    <p className="text-sm font-bold text-slate-900">{t.name}</p>
-                    <p className="text-xs text-slate-500">
-                      {t.role} · {t.company}
-                    </p>
+                    <div className="text-[13px] font-semibold text-white">{t.name}</div>
+                    <div className="text-[11px] text-white/30">{t.role} · {t.company}</div>
                   </div>
                 </div>
               </div>
@@ -485,162 +510,123 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── CRM COMPATIBILITY ────────────────────────────────── */}
-      <section className="bg-white py-24 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-4xl mx-auto space-y-10">
-          <div className="text-center space-y-4">
-            <SectionTitle center>
-              Votre CRM reste intact. Field Intelligence se connecte en{' '}
-              <span className="text-[#6366F1]">20 minutes.</span>
+      {/* ── PRICING ─────────────────────────────────────────── */}
+      <section id="pricing" className="relative border-t border-white/[0.06] py-24 sm:py-32 px-5 bg-[#0D0D0D] overflow-hidden">
+        <Grain />
+
+        {/* Glow */}
+        <div
+          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[300px] rounded-full pointer-events-none"
+          style={{ background: 'radial-gradient(ellipse, rgba(99,102,241,0.10) 0%, transparent 70%)' }}
+        />
+
+        <div className="relative z-10 max-w-lg mx-auto space-y-8">
+          <div className="text-center space-y-2">
+            <SectionLabel>Pricing</SectionLabel>
+            <SectionTitle className="text-center">
+              Simple.<br />
+              <span className="text-white/30">Tout inclus.</span>
             </SectionTitle>
           </div>
 
-          <CrmLogos />
+          <div className="rounded-2xl border border-[#6366F1]/25 bg-[#111111] overflow-hidden">
+            {/* Top badge */}
+            <div className="px-8 py-3 border-b border-white/[0.06] bg-[#6366F1]/[0.08] flex items-center justify-between">
+              <span className="text-[12px] font-semibold text-[#818CF8] uppercase tracking-widest">Tout inclus</span>
+              <span className="text-[11px] text-white/30">Sans engagement</span>
+            </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6">
-            {[
-              {
-                icon: <Shield className="w-5 h-5" />,
-                text: 'Connexion en lecture seule — vos données restent dans votre CRM',
-              },
-              {
-                icon: <Zap className="w-5 h-5" />,
-                text: 'Aucun logiciel à installer sur les postes des commerciaux',
-              },
-              {
-                icon: <Clock className="w-5 h-5" />,
-                text: 'Validation DSI non requise dans 80% des cas',
-              },
-            ].map((item, i) => (
-              <div key={i} className="flex items-start gap-3 p-4 rounded-xl bg-[#F9FAFB] border border-slate-200">
-                <div className="w-8 h-8 rounded-lg bg-[#EEF2FF] text-[#6366F1] flex items-center justify-center flex-shrink-0">
-                  {item.icon}
+            <div className="p-8 space-y-8">
+              {/* Price */}
+              <div>
+                <div className="flex items-end gap-2">
+                  <span
+                    className="text-[64px] font-extrabold text-white leading-none tracking-[-0.04em]"
+                    style={{ fontFamily: 'var(--font-syne), sans-serif' }}
+                  >
+                    199€
+                  </span>
+                  <span className="text-white/30 text-[14px] mb-2">/mois</span>
                 </div>
-                <p className="text-sm text-slate-700 font-medium leading-relaxed">{item.text}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── PRICING ──────────────────────────────────────────── */}
-      <section id="pricing" className="bg-[#F9FAFB] py-24 px-4 sm:px-6 lg:px-8 scroll-mt-16">
-        <div className="max-w-2xl mx-auto space-y-10">
-          <div className="text-center space-y-4">
-            <SectionTitle center>
-              Un seul accès. Un seul prix. Jusqu&apos;à 3 utilisateurs inclus.
-            </SectionTitle>
-          </div>
-
-          {/* Pricing card */}
-          <div className="relative">
-            <div className="absolute -inset-0.5 rounded-3xl bg-gradient-to-br from-[#6366F1] to-[#3730A3] blur-sm opacity-30" />
-            <div className="relative bg-white rounded-2xl border-2 border-[#6366F1]/20 shadow-xl overflow-hidden">
-              {/* Top banner */}
-              <div className="bg-gradient-to-r from-[#3730A3] to-[#6366F1] px-8 py-5 text-center">
-                <div className="text-xs font-bold text-indigo-200 uppercase tracking-widest mb-2">
-                  ACCÈS MARKETING
-                </div>
-                <div
-                  className="text-5xl font-extrabold text-white"
-                  style={{ fontFamily: 'var(--font-syne), sans-serif' }}
-                >
-                  199€
-                  <span className="text-xl font-normal text-indigo-200">/mois</span>
-                </div>
-                <p className="text-indigo-200 text-sm mt-1">jusqu&apos;à 3 utilisateurs</p>
+                <p className="text-[13px] text-white/35 mt-1">Utilisateurs illimités · Tous les modules · Support dédié</p>
               </div>
 
               {/* Features */}
-              <div className="p-8 grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <ul className="space-y-3">
                 {[
-                  'Dashboard temps réel',
-                  'Radar Concurrentiel',
-                  'Radar Prix & Offres',
-                  'Baromètre des Besoins',
-                  'Deals Gagnés / Perdus',
-                  'Analyse Géographique',
-                  'Sentiment Client',
-                  'Vocabulaire Client',
-                  'Battlecards automatiques',
-                  'Compatible tous CRM',
-                  'Onboarding inclus',
+                  '6 modules analytiques complets',
+                  'Sync CRM automatique (2 ans d\'historique)',
+                  'Utilisateurs illimités',
+                  'Alertes et notifications configurables',
+                  'Export CSV / PDF',
+                  'Support dédié sous 24h',
+                  'Hébergement Europe · RGPD',
                 ].map((f) => (
-                  <div key={f} className="flex items-center gap-2.5">
-                    <CheckCircle className="w-4 h-4 text-[#059669] flex-shrink-0" />
-                    <span className="text-sm text-slate-700">{f}</span>
-                  </div>
+                  <li key={f} className="flex items-center gap-3 text-[13px] text-white/60">
+                    <CheckCircle className="w-4 h-4 text-[#6366F1] flex-shrink-0" />
+                    {f}
+                  </li>
                 ))}
-              </div>
+              </ul>
 
               {/* CTA */}
-              <div className="px-8 pb-8 space-y-4">
-                <Link
-                  href="/auth/signup"
-                  className="block w-full py-4 bg-[#3730A3] hover:bg-[#6366F1] text-white font-bold text-base text-center rounded-xl shadow-lg shadow-indigo-200 transition-all hover:scale-[1.02]"
-                  style={{ fontFamily: 'var(--font-syne), sans-serif' }}
-                >
-                  Démarrer 30 jours gratuits
-                </Link>
-                <p className="text-center text-xs text-slate-400">
-                  Sans engagement · Sans carte bancaire pour le pilote · Annulation en 1 clic
-                </p>
-              </div>
+              <Link
+                href="/auth/signup"
+                className="flex items-center justify-center gap-2 w-full py-3.5 rounded-xl bg-white text-[#0A0A0A] font-semibold text-[14px] hover:bg-white/90 transition-colors"
+              >
+                Démarrer gratuitement <ArrowRight className="w-4 h-4" />
+              </Link>
+
+              <p className="text-center text-[11px] text-white/20">
+                14 jours d&apos;essai gratuit · Pas de carte bancaire requise
+              </p>
             </div>
           </div>
-
-          <p className="text-center text-sm text-slate-400">
-            Bientôt disponibles :{' '}
-            <span className="text-slate-600 font-medium">
-              Accès KAM et Accès Direction Commerciale
-            </span>
-          </p>
         </div>
       </section>
 
-      {/* ── CTA FINAL ────────────────────────────────────────── */}
-      <section className="bg-[#1E1B4B] py-28 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
-        {/* Background effect */}
-        <div className="absolute inset-0 bg-gradient-to-br from-[#3730A3]/40 via-transparent to-[#6366F1]/20 pointer-events-none" />
+      {/* ── FINAL CTA ───────────────────────────────────────── */}
+      <section className="relative border-t border-white/[0.06] py-24 sm:py-32 px-5 overflow-hidden">
+        <Grain />
+
+        {/* Big glow */}
         <div
-          className="absolute inset-0 opacity-[0.03]"
-          style={{
-            backgroundImage:
-              'radial-gradient(circle at 2px 2px, #6366F1 1px, transparent 0)',
-            backgroundSize: '32px 32px',
-          }}
+          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[500px] rounded-full pointer-events-none"
+          style={{ background: 'radial-gradient(ellipse, rgba(99,102,241,0.10) 0%, transparent 65%)' }}
         />
 
-        <div className="relative max-w-3xl mx-auto text-center space-y-8">
+        <div className="relative z-10 max-w-3xl mx-auto text-center space-y-8">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/[0.10] bg-white/[0.04] text-[12px] text-white/50">
+            <Zap className="w-3 h-3 text-[#6366F1]" />
+            Connectez votre CRM en 10 minutes
+          </div>
+
           <h2
-            className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-white leading-tight"
+            className="text-[clamp(36px,6vw,72px)] font-extrabold text-white leading-[1.05] tracking-[-0.04em]"
             style={{ fontFamily: 'var(--font-syne), sans-serif' }}
           >
-            La prochaine information critique sur votre marché est en train d&apos;être écrite dans
-            un CR que personne ne lira.
+            Vos commerciaux savent.<br />
+            <span className="text-white/25">Maintenant votre marketing aussi.</span>
           </h2>
 
-          <p className="text-xl text-indigo-300 font-medium">
-            Sauf si vous avez Field Intelligence.
-          </p>
-
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
             <Link
               href="/auth/signup"
-              className="inline-flex items-center gap-2 px-8 py-4 bg-white text-[#3730A3] font-bold text-base rounded-xl hover:bg-[#F9FAFB] transition-all shadow-2xl shadow-indigo-950/50 hover:scale-105"
-              style={{ fontFamily: 'var(--font-syne), sans-serif' }}
+              className="inline-flex items-center gap-2 px-6 py-3 bg-white text-[#0A0A0A] font-semibold text-[14px] rounded-lg hover:bg-white/90 transition-colors"
             >
-              <Zap className="w-5 h-5" />
-              Démarrer mon pilote gratuit 30 jours
+              Démarrer gratuitement <ArrowRight className="w-4 h-4" />
             </Link>
             <Link
               href="/demo"
-              className="text-indigo-300 hover:text-white text-sm font-medium flex items-center gap-1 transition-colors"
+              className="inline-flex items-center gap-2 px-6 py-3 border border-white/[0.12] text-white/60 hover:text-white hover:border-white/25 font-medium text-[14px] rounded-lg transition-colors"
             >
-              Réserver une démo personnalisée
-              <ArrowRight className="w-4 h-4" />
+              Voir une démo
             </Link>
           </div>
+
+          <p className="text-[12px] text-white/20">
+            Pas de carte bancaire · 14 jours d&apos;essai · Support dédié
+          </p>
         </div>
       </section>
     </>

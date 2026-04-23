@@ -6,8 +6,8 @@ import { Menu, X, Zap } from 'lucide-react';
 
 const links = [
   { label: 'Fonctionnalités', href: '/fonctionnalites' },
-  { label: 'Pourquoi Field Intelligence', href: '/pourquoi' },
-  { label: 'Comment ça marche', href: '/comment' },
+  { label: 'Pourquoi', href: '/pourquoi' },
+  { label: 'Comment', href: '/comment' },
   { label: 'Pricing', href: '/#pricing' },
   { label: 'Blog', href: '/blog' },
 ];
@@ -17,27 +17,27 @@ export function MarketingNav() {
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
-    const handler = () => setScrolled(window.scrollY > 16);
+    const handler = () => setScrolled(window.scrollY > 24);
     window.addEventListener('scroll', handler, { passive: true });
     return () => window.removeEventListener('scroll', handler);
   }, []);
 
   return (
     <header
-      className={`fixed top-0 inset-x-0 z-50 transition-all duration-300 ${
+      className={`fixed top-0 inset-x-0 z-50 transition-all duration-500 ${
         scrolled
-          ? 'bg-white/95 backdrop-blur-md border-b border-slate-200/80 shadow-sm'
+          ? 'bg-[#0A0A0A]/90 backdrop-blur-xl border-b border-white/[0.06]'
           : 'bg-transparent'
       }`}
     >
-      <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <nav className="max-w-6xl mx-auto px-5 sm:px-8 h-[60px] flex items-center justify-between">
         {/* Logo */}
-        <Link href="/" className="flex items-center gap-2 group">
-          <div className="w-8 h-8 rounded-lg bg-[#3730A3] flex items-center justify-center shadow-sm group-hover:bg-[#6366F1] transition-colors">
-            <Zap className="w-4 h-4 text-white" fill="currentColor" />
+        <Link href="/" className="flex items-center gap-2.5 group flex-shrink-0">
+          <div className="w-7 h-7 rounded-lg bg-[#6366F1] flex items-center justify-center">
+            <Zap className="w-3.5 h-3.5 text-white" fill="currentColor" />
           </div>
           <span
-            className="text-[#111827] font-bold text-lg tracking-tight"
+            className="text-white font-bold text-[15px] tracking-tight"
             style={{ fontFamily: 'var(--font-syne), sans-serif' }}
           >
             Field Intelligence
@@ -45,12 +45,12 @@ export function MarketingNav() {
         </Link>
 
         {/* Desktop links */}
-        <div className="hidden lg:flex items-center gap-1">
+        <div className="hidden lg:flex items-center gap-0.5">
           {links.map((l) => (
             <Link
               key={l.href}
               href={l.href}
-              className="px-3.5 py-2 text-sm font-medium text-slate-600 hover:text-[#3730A3] rounded-lg hover:bg-[#EEF2FF] transition-all"
+              className="px-3.5 py-2 text-[13px] font-medium text-white/50 hover:text-white rounded-lg transition-colors duration-200"
             >
               {l.label}
             </Link>
@@ -61,13 +61,13 @@ export function MarketingNav() {
         <div className="hidden lg:flex items-center gap-3">
           <Link
             href="/auth/login"
-            className="text-sm font-medium text-slate-600 hover:text-slate-900 px-3 py-2 transition-colors"
+            className="text-[13px] font-medium text-white/50 hover:text-white px-3 py-2 transition-colors"
           >
             Connexion
           </Link>
           <Link
             href="/auth/signup"
-            className="inline-flex items-center gap-2 px-4 py-2 bg-[#3730A3] text-white text-sm font-semibold rounded-lg hover:bg-[#6366F1] transition-colors shadow-sm"
+            className="inline-flex items-center gap-1.5 px-4 py-2 bg-white text-[#0A0A0A] text-[13px] font-semibold rounded-lg hover:bg-white/90 transition-colors"
           >
             Démarrer gratuitement
           </Link>
@@ -76,7 +76,7 @@ export function MarketingNav() {
         {/* Mobile burger */}
         <button
           onClick={() => setOpen(!open)}
-          className="lg:hidden p-2 rounded-lg text-slate-600 hover:bg-slate-100 transition-colors"
+          className="lg:hidden p-2 text-white/60 hover:text-white transition-colors"
           aria-label="Menu"
         >
           {open ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -85,30 +85,30 @@ export function MarketingNav() {
 
       {/* Mobile menu */}
       {open && (
-        <div className="lg:hidden bg-white border-b border-slate-200 shadow-lg">
-          <div className="max-w-7xl mx-auto px-4 py-4 flex flex-col gap-1">
+        <div className="lg:hidden bg-[#0A0A0A] border-b border-white/[0.08]">
+          <div className="max-w-6xl mx-auto px-5 py-4 flex flex-col gap-0.5">
             {links.map((l) => (
               <Link
                 key={l.href}
                 href={l.href}
                 onClick={() => setOpen(false)}
-                className="px-4 py-3 text-sm font-medium text-slate-700 hover:text-[#3730A3] rounded-lg hover:bg-[#EEF2FF] transition-all"
+                className="px-4 py-3 text-sm font-medium text-white/60 hover:text-white rounded-lg transition-colors"
               >
                 {l.label}
               </Link>
             ))}
-            <div className="pt-3 mt-2 border-t border-slate-100 flex flex-col gap-2">
+            <div className="pt-3 mt-2 border-t border-white/[0.08] flex flex-col gap-2">
               <Link
                 href="/auth/login"
                 onClick={() => setOpen(false)}
-                className="px-4 py-2.5 text-sm font-medium text-slate-600 text-center rounded-lg border border-slate-200 hover:bg-slate-50"
+                className="px-4 py-2.5 text-sm font-medium text-white/60 text-center rounded-lg border border-white/[0.10] hover:border-white/20"
               >
                 Connexion
               </Link>
               <Link
                 href="/auth/signup"
                 onClick={() => setOpen(false)}
-                className="px-4 py-2.5 text-sm font-semibold text-white bg-[#3730A3] text-center rounded-lg hover:bg-[#6366F1]"
+                className="px-4 py-2.5 text-sm font-semibold text-[#0A0A0A] bg-white text-center rounded-lg"
               >
                 Démarrer gratuitement
               </Link>

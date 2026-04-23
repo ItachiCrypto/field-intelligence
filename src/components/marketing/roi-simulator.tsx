@@ -17,25 +17,28 @@ function Slider({
   onChange: (v: number) => void;
   format: (v: number) => string;
 }) {
+  const pct = ((value - min) / (max - min)) * 100;
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <span className="text-sm font-medium text-slate-700">{label}</span>
-        <span className="text-sm font-bold text-[#3730A3] tabular-nums">{format(value)}</span>
+        <span className="text-[13px] text-white/50">{label}</span>
+        <span className="text-[13px] font-semibold text-white tabular-nums">{format(value)}</span>
       </div>
-      <input
-        type="range"
-        min={min}
-        max={max}
-        value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
-        className="w-full h-2 rounded-full appearance-none cursor-pointer"
-        style={{
-          background: `linear-gradient(to right, #6366F1 0%, #6366F1 ${((value - min) / (max - min)) * 100}%, #e2e8f0 ${((value - min) / (max - min)) * 100}%, #e2e8f0 100%)`,
-          accentColor: '#6366F1',
-        }}
-      />
-      <div className="flex justify-between text-xs text-slate-400">
+      <div className="relative">
+        <input
+          type="range"
+          min={min}
+          max={max}
+          value={value}
+          onChange={(e) => onChange(Number(e.target.value))}
+          className="w-full h-[3px] rounded-full appearance-none cursor-pointer relative z-10"
+          style={{
+            background: `linear-gradient(to right, #6366F1 0%, #6366F1 ${pct}%, rgba(255,255,255,0.08) ${pct}%, rgba(255,255,255,0.08) 100%)`,
+            WebkitAppearance: 'none',
+          }}
+        />
+      </div>
+      <div className="flex justify-between text-[11px] text-white/20 tabular-nums">
         <span>{format(min)}</span>
         <span>{format(max)}</span>
       </div>
@@ -48,99 +51,60 @@ export function RoiSimulator() {
   const [ca, setCa] = useState(80000);
   const [rdvSemaine, setRdvSemaine] = useState(60);
 
-  const { signaux, pertePct, etudes } = useMemo(() => {
-    // ~2 signaux par RDV en moyenne
+  const { signaux, pertePct, etudes, caPerdu } = useMemo(() => {
     const signaux = Math.round(rdvSemaine * 2.1);
-    // Taux de perte : dépend de la taille de l'équipe (moins de commerciaux = plus de perte relative)
     const pertePct = Math.min(94, Math.round(65 + (200 - rdvSemaine) * 0.1 + (200 - commerciaux) * 0.05));
-    // Équivalent études marché perdues / mois (1 étude ~ 150 signaux structurés)
     const etudes = Math.round((signaux * 4 * (pertePct / 100)) / 150);
-    return { signaux, pertePct, etudes };
-  }, [commerciaux, rdvSemaine]);
-
-  const caPerdu = useMemo(() => {
-    const dealsRates = 0.15; // 15% des signaux = opportunité de deal
     const signalsMensuel = signaux * 4;
     const signalsLost = signalsMensuel * (pertePct / 100);
-    const dealsLost = signalsLost * dealsRates;
-    return Math.round(dealsLost * ca * 0.08); // 8% de conversion
-  }, [signaux, pertePct, ca]);
+    const dealsLost = signalsLost * 0.15;
+    const caPerdu = Math.round(dealsLost * ca * 0.08);
+    return { signaux, pertePct, etudes, caPerdu };
+  }, [commerciaux, rdvSemaine, ca]);
 
   const fmt = (n: number) => n.toLocaleString('fr-FR');
-  const fmtEur = (n: number) =>
-    n >= 1000
-      ? `${Math.round(n / 1000)}K€`
-      : `${n}€`;
+  const fmtEur = (n: number) => n >= 1000 ? `${Math.round(n / 1000)}K€` : `${n}€`;
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-      <div className="p-6 lg:p-8 space-y-6">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-          <Slider
-            label="Commerciaux terrain"
-            min={5}
-            max={200}
-            value={commerciaux}
-            onChange={setCommerciaux}
-            format={(v) => `${v}`}
-          />
-          <Slider
-            label="CA moyen par client"
-            min={10000}
-            max={500000}
-            value={ca}
-            onChange={setCa}
-            format={(v) => fmtEur(v)}
-          />
-          <Slider
-            label="RDV par semaine"
-            min={20}
-            max={200}
-            value={rdvSemaine}
-            onChange={setRdvSemaine}
-            format={(v) => `${v}`}
-          />
+    <div className="rounded-2xl border border-white/[0.08] bg-[#111111] overflow-hidden">
+      <div className="p-8 space-y-8">
+        {/* Sliders */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
+          <Slider label="Commerciaux terrain" min={5} max={200} value={commerciaux} onChange={setCommerciaux} format={(v) => `${v}`} />
+          <Slider label="CA moyen / client" min={10000} max={500000} value={ca} onChange={setCa} format={fmtEur} />
+          <Slider label="RDV par semaine" min={20} max={200} value={rdvSemaine} onChange={setRdvSemaine} format={(v) => `${v}`} />
         </div>
 
-        {/* Result */}
-        <div className="rounded-xl bg-[#EEF2FF] border border-[#6366F1]/20 p-6 space-y-4">
-          <p className="text-sm text-slate-700 leading-relaxed">
-            Votre équipe génère environ{' '}
-            <strong className="text-[#3730A3]">{fmt(signaux)} signaux terrain</strong> par semaine.
+        {/* Divider */}
+        <div className="h-px bg-white/[0.06]" />
+
+        {/* Results */}
+        <div>
+          <p className="text-[13px] text-white/40 mb-6 leading-relaxed">
+            Votre équipe génère{' '}
+            <span className="text-white font-medium">{fmt(signaux)} signaux / semaine</span>.
             Sans Field Intelligence,{' '}
-            <strong className="text-red-600">{pertePct}%</strong> de cette intelligence marché
-            disparaît dans des CR non lus. Soit l&apos;équivalent de{' '}
-            <strong className="text-[#3730A3]">{etudes} études de marché</strong> perdues chaque mois.
+            <span className="text-red-400 font-medium">{pertePct}%</span>{' '}
+            disparaissent dans des CR non lus —{' '}
+            <span className="text-white font-medium">{etudes} études de marché</span> perdues / mois.
           </p>
 
-          <div className="grid grid-cols-3 gap-4 pt-2 border-t border-[#6366F1]/10">
-            <div className="text-center">
-              <div
-                className="text-2xl font-bold text-[#3730A3]"
-                style={{ fontFamily: 'var(--font-syne), sans-serif' }}
-              >
-                {fmt(signaux * 4)}
+          <div className="grid grid-cols-3 gap-4">
+            {[
+              { value: fmt(signaux * 4), label: 'signaux perdus / mois', color: 'text-white' },
+              { value: `${pertePct}%`, label: 'intel. marché perdue', color: 'text-red-400' },
+              { value: `~${fmtEur(caPerdu)}`, label: 'CA non capturé / mois', color: 'text-[#6366F1]' },
+            ].map((kpi) => (
+              <div key={kpi.label} className="rounded-xl bg-white/[0.03] border border-white/[0.06] p-4 text-center">
+                <div
+                  className={`text-2xl sm:text-3xl font-bold ${kpi.color} tabular-nums`}
+                  style={{ fontFamily: 'var(--font-syne), sans-serif' }}
+                >
+                  {kpi.value}
+                </div>
+                <div className="text-[11px] text-white/30 mt-1.5 leading-tight">{kpi.label}</div>
               </div>
-              <div className="text-xs text-slate-500 mt-1">signaux / mois non captés</div>
-            </div>
-            <div className="text-center">
-              <div
-                className="text-2xl font-bold text-red-600"
-                style={{ fontFamily: 'var(--font-syne), sans-serif' }}
-              >
-                {pertePct}%
-              </div>
-              <div className="text-xs text-slate-500 mt-1">intel. marché perdue</div>
-            </div>
-            <div className="text-center">
-              <div
-                className="text-2xl font-bold text-[#059669]"
-                style={{ fontFamily: 'var(--font-syne), sans-serif' }}
-              >
-                ~{fmtEur(caPerdu)}
-              </div>
-              <div className="text-xs text-slate-500 mt-1">CA potentiel non capturé / mois</div>
-            </div>
+            ))}
           </div>
         </div>
       </div>

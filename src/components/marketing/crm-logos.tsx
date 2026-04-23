@@ -9,23 +9,23 @@ const CRM_LOGOS = [
 
 export function CrmLogos() {
   return (
-    <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6">
+    <div className="flex flex-wrap items-center justify-center gap-3">
       {CRM_LOGOS.map((crm) => (
         <div
           key={crm.name}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 shadow-sm hover:shadow-md hover:border-slate-300 transition-all"
+          className="flex items-center gap-2 px-3.5 py-2 rounded-lg bg-white/[0.04] border border-white/[0.07] hover:border-white/[0.14] transition-colors"
         >
           <div
-            className="w-7 h-7 rounded-md flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
+            className="w-5 h-5 rounded flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0"
             style={{ backgroundColor: crm.color }}
           >
             {crm.abbr.slice(0, 2)}
           </div>
-          <span className="text-sm font-medium text-slate-700">{crm.name}</span>
+          <span className="text-[13px] font-medium text-white/50">{crm.name}</span>
         </div>
       ))}
-      <div className="px-4 py-2.5 rounded-xl border border-dashed border-slate-300 text-sm text-slate-500">
-        + tous les autres CRM
+      <div className="px-3.5 py-2 rounded-lg border border-dashed border-white/[0.10] text-[13px] text-white/25">
+        + autres
       </div>
     </div>
   );
