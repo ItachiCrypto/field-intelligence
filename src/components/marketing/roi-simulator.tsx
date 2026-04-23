@@ -97,7 +97,6 @@ export function RoiSimulator() {
               >
                 <div
                   className={`text-2xl sm:text-3xl font-bold tabular-nums ${kpi.color}`}
-                  style={{ fontFamily: 'var(--font-syne), sans-serif' }}
                 >
                   {kpi.value}
                 </div>

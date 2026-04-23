@@ -94,7 +94,6 @@ function ArticleCard({ article }: { article: typeof ARTICLES[0] }) {
           <div className="absolute inset-0 flex items-center justify-center">
             <span
               className="text-[80px] font-bold text-[#6366F1]/10 select-none"
-              style={{ fontFamily: 'var(--font-syne), sans-serif' }}
             >
               FI
             </span>
@@ -109,7 +108,6 @@ function ArticleCard({ article }: { article: typeof ARTICLES[0] }) {
         <div className="p-6 space-y-4">
           <h3
             className="text-lg font-bold text-[#111827] leading-snug group-hover:text-[#6366F1] transition-colors line-clamp-2"
-            style={{ fontFamily: 'var(--font-syne), sans-serif' }}
           >
             {article.title}
           </h3>
@@ -146,7 +144,6 @@ export default function BlogPage() {
           </span>
           <h1
             className="text-4xl sm:text-5xl font-bold text-white leading-tight"
-            style={{ fontFamily: 'var(--font-syne), sans-serif' }}
           >
             Intelligence terrain,
             <br />
@@ -190,7 +187,6 @@ export default function BlogPage() {
                   <div className="absolute inset-0 flex items-center justify-center">
                     <span
                       className="text-[120px] font-bold text-white/10 select-none"
-                      style={{ fontFamily: 'var(--font-syne), sans-serif' }}
                     >
                       FI
                     </span>
@@ -209,7 +205,6 @@ export default function BlogPage() {
                   </span>
                   <h2
                     className="text-2xl lg:text-3xl font-bold text-[#111827] leading-snug group-hover:text-[#6366F1] transition-colors"
-                    style={{ fontFamily: 'var(--font-syne), sans-serif' }}
                   >
                     {featured.title}
                   </h2>
@@ -243,7 +238,6 @@ export default function BlogPage() {
         <div className="max-w-2xl mx-auto text-center space-y-6">
           <h2
             className="text-3xl font-bold text-[#111827]"
-            style={{ fontFamily: 'var(--font-syne), sans-serif' }}
           >
             Recevez nos analyses chaque semaine
           </h2>
@@ -273,7 +267,6 @@ export default function BlogPage() {
           <div className="space-y-2 text-center sm:text-left">
             <h3
               className="text-xl font-bold text-white"
-              style={{ fontFamily: 'var(--font-syne), sans-serif' }}
             >
               Prêt à passer à l'action ?
             </h3>

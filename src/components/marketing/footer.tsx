@@ -43,7 +43,6 @@ export function MarketingFooter() {
               </div>
               <span
                 className="text-slate-900 font-bold text-[15px]"
-                style={{ fontFamily: 'var(--font-syne), sans-serif' }}
               >
                 Field Intelligence
               </span>
@@ -76,7 +75,6 @@ export function MarketingFooter() {
             <div key={col.label} className="space-y-3">
               <h4
                 className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest"
-                style={{ fontFamily: 'var(--font-syne), sans-serif' }}
               >
                 {col.label}
               </h4>

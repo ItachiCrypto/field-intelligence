@@ -107,7 +107,6 @@ export default function CommentPage() {
           </span>
           <h1
             className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white leading-tight"
-            style={{ fontFamily: 'var(--font-syne), sans-serif' }}
           >
             Opérationnel en
             <br />
@@ -132,7 +131,6 @@ export default function CommentPage() {
                 <div className="flex items-start gap-4">
                   <div
                     className="text-5xl font-bold text-slate-100 leading-none flex-shrink-0"
-                    style={{ fontFamily: 'var(--font-syne), sans-serif' }}
                   >
                     {step.num}
                   </div>
@@ -142,7 +140,6 @@ export default function CommentPage() {
                     </div>
                     <h3
                       className="text-2xl font-bold text-[#111827]"
-                      style={{ fontFamily: 'var(--font-syne), sans-serif' }}
                     >
                       {step.title}
                     </h3>
@@ -165,13 +162,12 @@ export default function CommentPage() {
                 <div className="rounded-2xl bg-[#F9FAFB] border border-slate-200 p-8 space-y-6">
                   {/* Step visual */}
                   <div className="flex items-center gap-4">
-                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${step.color} text-2xl font-bold`} style={{ fontFamily: 'var(--font-syne), sans-serif' }}>
+                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${step.color} text-2xl font-bold`}>
                       {step.num}
                     </div>
                     <div>
                       <div
                         className="text-xl font-bold text-[#111827]"
-                        style={{ fontFamily: 'var(--font-syne), sans-serif' }}
                       >
                         {step.duration}
                       </div>
@@ -253,7 +249,6 @@ export default function CommentPage() {
           <div className="text-center space-y-4">
             <h2
               className="text-3xl font-bold text-[#111827]"
-              style={{ fontFamily: 'var(--font-syne), sans-serif' }}
             >
               Questions fréquentes
             </h2>
@@ -266,7 +261,6 @@ export default function CommentPage() {
                   <HelpCircle className="w-5 h-5 text-[#6366F1] flex-shrink-0 mt-0.5" />
                   <h4
                     className="font-semibold text-[#111827]"
-                    style={{ fontFamily: 'var(--font-syne), sans-serif' }}
                   >
                     {item.q}
                   </h4>
@@ -283,7 +277,6 @@ export default function CommentPage() {
         <div className="max-w-3xl mx-auto text-center space-y-8">
           <h2
             className="text-3xl sm:text-4xl font-bold text-white leading-tight"
-            style={{ fontFamily: 'var(--font-syne), sans-serif' }}
           >
             Prêt à démarrer en 10 minutes ?
           </h2>

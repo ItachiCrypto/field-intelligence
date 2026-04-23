@@ -16,7 +16,6 @@ function SectionTitle({ children, center = false }: { children: React.ReactNode;
   return (
     <h2
       className={`text-3xl sm:text-4xl font-bold text-[#111827] leading-tight ${center ? 'text-center' : ''}`}
-      style={{ fontFamily: 'var(--font-syne), sans-serif' }}
     >
       {children}
     </h2>
@@ -154,7 +153,6 @@ export default function FonctionnalitesPage() {
           </span>
           <h1
             className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white leading-tight"
-            style={{ fontFamily: 'var(--font-syne), sans-serif' }}
           >
             Six modules.
             <br />
@@ -186,7 +184,6 @@ export default function FonctionnalitesPage() {
                     <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">{mod.tagline}</p>
                     <h3
                       className="text-2xl font-bold text-[#111827]"
-                      style={{ fontFamily: 'var(--font-syne), sans-serif' }}
                     >
                       {mod.title}
                     </h3>
@@ -210,7 +207,7 @@ export default function FonctionnalitesPage() {
                 <div className="rounded-2xl bg-[#F9FAFB] border border-slate-200 p-8 space-y-6">
                   {/* Simulated chart/metric card */}
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-semibold text-slate-600" style={{ fontFamily: 'var(--font-syne), sans-serif' }}>{mod.title}</span>
+                    <span className="text-sm font-semibold text-slate-600">{mod.title}</span>
                     <span className="text-xs text-slate-400">Derniers 30 jours</span>
                   </div>
 
@@ -263,7 +260,7 @@ export default function FonctionnalitesPage() {
                 <div className="w-10 h-10 rounded-xl bg-[#EEF2FF] text-[#6366F1] flex items-center justify-center">
                   {f.icon}
                 </div>
-                <h4 className="font-semibold text-[#111827]" style={{ fontFamily: 'var(--font-syne), sans-serif' }}>{f.label}</h4>
+                <h4 className="font-semibold text-[#111827]">{f.label}</h4>
                 <p className="text-sm text-slate-500 leading-relaxed">{f.desc}</p>
               </div>
             ))}
@@ -276,7 +273,6 @@ export default function FonctionnalitesPage() {
         <div className="max-w-3xl mx-auto text-center space-y-8">
           <h2
             className="text-3xl sm:text-4xl font-bold text-white leading-tight"
-            style={{ fontFamily: 'var(--font-syne), sans-serif' }}
           >
             Prêt à voir ces modules sur vos données ?
           </h2>

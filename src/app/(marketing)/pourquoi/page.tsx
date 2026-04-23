@@ -97,7 +97,6 @@ export default function PourquoiPage() {
           </span>
           <h1
             className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white leading-tight"
-            style={{ fontFamily: 'var(--font-syne), sans-serif' }}
           >
             Vos commerciaux savent.
             <br />
@@ -116,7 +115,6 @@ export default function PourquoiPage() {
           <div className="text-center space-y-4">
             <h2
               className="text-3xl sm:text-4xl font-bold text-[#111827] leading-tight"
-              style={{ fontFamily: 'var(--font-syne), sans-serif' }}
             >
               Le problème que personne ne résout vraiment
             </h2>
@@ -133,7 +131,6 @@ export default function PourquoiPage() {
                 </div>
                 <h3
                   className="text-xl font-bold text-[#111827]"
-                  style={{ fontFamily: 'var(--font-syne), sans-serif' }}
                 >
                   {p.title}
                 </h3>
@@ -152,7 +149,6 @@ export default function PourquoiPage() {
               <div key={s.value} className="text-center space-y-2">
                 <div
                   className="text-5xl font-bold text-[#3730A3]"
-                  style={{ fontFamily: 'var(--font-syne), sans-serif' }}
                 >
                   {s.value}
                 </div>
@@ -170,7 +166,6 @@ export default function PourquoiPage() {
           <div className="text-center space-y-4">
             <h2
               className="text-3xl sm:text-4xl font-bold text-[#111827] leading-tight"
-              style={{ fontFamily: 'var(--font-syne), sans-serif' }}
             >
               Ce n'est pas une étude de marché améliorée
             </h2>
@@ -186,7 +181,7 @@ export default function PourquoiPage() {
                 <span className="w-2 h-2 rounded-full bg-red-400" />
                 Étude de marché
               </div>
-              <div className="p-4 text-sm font-semibold text-[#3730A3] border-l border-slate-200 flex items-center gap-2" style={{ fontFamily: 'var(--font-syne), sans-serif' }}>
+              <div className="p-4 text-sm font-semibold text-[#3730A3] border-l border-slate-200 flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-[#6366F1]" />
                 Field Intelligence
               </div>
@@ -213,7 +208,6 @@ export default function PourquoiPage() {
         <div className="max-w-5xl mx-auto space-y-12">
           <h2
             className="text-3xl font-bold text-[#111827] text-center"
-            style={{ fontFamily: 'var(--font-syne), sans-serif' }}
           >
             Ce qu'en disent nos clients
           </h2>
@@ -244,7 +238,6 @@ export default function PourquoiPage() {
           <div className="text-center space-y-4">
             <h2
               className="text-3xl sm:text-4xl font-bold text-[#111827] leading-tight"
-              style={{ fontFamily: 'var(--font-syne), sans-serif' }}
             >
               Pour qui ?
             </h2>
@@ -277,7 +270,6 @@ export default function PourquoiPage() {
                 </div>
                 <h3
                   className="text-xl font-bold text-[#111827]"
-                  style={{ fontFamily: 'var(--font-syne), sans-serif' }}
                 >
                   {item.role}
                 </h3>
@@ -301,7 +293,6 @@ export default function PourquoiPage() {
         <div className="max-w-3xl mx-auto text-center space-y-8">
           <h2
             className="text-3xl sm:text-4xl font-bold text-white leading-tight"
-            style={{ fontFamily: 'var(--font-syne), sans-serif' }}
           >
             Commencez par brancher votre CRM.
             <br />
