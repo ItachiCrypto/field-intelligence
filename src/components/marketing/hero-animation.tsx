@@ -3,13 +3,13 @@
 import { useState, useEffect } from 'react';
 
 const CR_TEXT =
-  '"Le client mentionne qu\'Acme a proposé un bundle avec 3 mois offerts — prix 15% sous le nôtre. Il teste depuis 2 semaines et semble convaincu par l\'argument ROI."';
+  "Client mentionne qu'Acme a proposé un bundle avec 3 mois offerts — prix 15% sous le nôtre. Teste depuis 2 semaines, convaincu par l'argument ROI.";
 
 const TAGS = [
-  { label: 'CONCURRENT ACTIF', cls: 'bg-red-50 text-red-700 border-red-200',    dot: 'bg-red-500',    delay: 0 },
-  { label: 'OFFRE BUNDLE',      cls: 'bg-amber-50 text-amber-700 border-amber-200', dot: 'bg-amber-500',  delay: 300 },
-  { label: 'ÉCART PRIX −15%',   cls: 'bg-orange-50 text-orange-700 border-orange-200', dot: 'bg-orange-500', delay: 600 },
-  { label: 'RISQUE CHURN',      cls: 'bg-violet-50 text-violet-700 border-violet-200', dot: 'bg-violet-500', delay: 900 },
+  { label: 'CONCURRENT', sub: 'Acme Corp · actif', tone: '#CC3329', delay: 100 },
+  { label: 'PRIX', sub: 'écart −15,0%', tone: '#D4A017', delay: 380 },
+  { label: 'OFFRE', sub: '3 mois offerts', tone: '#4A6B3A', delay: 640 },
+  { label: 'CHURN', sub: 'probabilité élevée', tone: '#7A3B8F', delay: 900 },
 ];
 
 export function HeroAnimation() {
@@ -27,74 +27,210 @@ export function HeroAnimation() {
         setTimeout(() => {
           setPhase('tagged');
           TAGS.forEach((tag, idx) => {
-            setTimeout(() => setVisibleTags((prev) => [...prev, idx]), tag.delay);
+            setTimeout(
+              () => setVisibleTags((prev) => [...prev, idx]),
+              tag.delay
+            );
           });
         }, 450);
       }
-    }, 20);
+    }, 18);
     return () => clearInterval(interval);
   }, []);
 
   return (
-    <div className="w-full bg-white rounded-xl border border-slate-200 shadow-md overflow-hidden">
-      {/* Window chrome */}
-      <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 flex items-center gap-3">
-        <div className="flex gap-1.5">
-          <span className="w-2.5 h-2.5 rounded-full bg-slate-300" />
-          <span className="w-2.5 h-2.5 rounded-full bg-slate-300" />
-          <span className="w-2.5 h-2.5 rounded-full bg-slate-300" />
+    <div
+      className="relative w-full"
+      style={{
+        background: '#FBFAF6',
+        border: '1px solid #1A1510',
+        boxShadow: '8px 8px 0 #1A1510',
+        borderRadius: 2,
+      }}
+    >
+      {/* Ticker header */}
+      <div
+        className="flex items-center justify-between px-5 py-2.5 border-b"
+        style={{
+          borderColor: '#1A1510',
+          background: '#1A1510',
+          color: '#F4EFE6',
+          fontFamily: 'var(--font-mono)',
+        }}
+      >
+        <div className="flex items-center gap-3 text-[10.5px] tracking-[0.12em] uppercase">
+          <span className="flex items-center gap-1.5">
+            <span
+              className="w-1.5 h-1.5 rounded-full animate-pulse"
+              style={{ background: '#CC3329' }}
+            />
+            Salesforce
+          </span>
+          <span style={{ opacity: 0.5 }}>/</span>
+          <span>CR-2047</span>
         </div>
-        <span className="text-xs text-slate-500 font-medium">
-          Salesforce — Compte rendu de visite
+        <span
+          className="text-[10px] tabular-nums"
+          style={{ opacity: 0.7 }}
+        >
+          14.04 · 15:42
         </span>
       </div>
 
-      <div className="p-4 space-y-3">
-        {/* Meta */}
-        <div className="flex items-center justify-between">
-          <span className="text-[11px] text-slate-400 uppercase tracking-wider font-medium">
-            Description
+      {/* Dateline */}
+      <div
+        className="px-5 pt-4 pb-2 border-b flex items-baseline justify-between"
+        style={{ borderColor: 'rgba(26, 21, 16, 0.08)' }}
+      >
+        <div className="flex items-baseline gap-2">
+          <span
+            className="text-[10px] tracking-[0.14em] uppercase"
+            style={{
+              fontFamily: 'var(--font-mono)',
+              color: 'rgba(26, 21, 16, 0.5)',
+            }}
+          >
+            Commercial
           </span>
-          <span className="text-[11px] text-slate-400">Thomas D. · 14 avr.</span>
+          <span
+            className="text-[13px]"
+            style={{
+              fontFamily: 'var(--font-display)',
+              fontStyle: 'italic',
+              fontWeight: 500,
+              color: '#1A1510',
+            }}
+          >
+            Thomas D.
+          </span>
         </div>
+        <span
+          className="text-[10px] tabular-nums"
+          style={{
+            fontFamily: 'var(--font-mono)',
+            color: 'rgba(26, 21, 16, 0.5)',
+          }}
+        >
+          Région IDF
+        </span>
+      </div>
 
-        {/* Typed text */}
-        <p className="text-sm text-slate-700 leading-relaxed min-h-[72px] font-mono">
+      {/* Body */}
+      <div className="p-5 space-y-5">
+        <p
+          className="text-[14.5px] leading-[1.55] min-h-[92px]"
+          style={{
+            fontFamily: 'var(--font-display)',
+            fontWeight: 400,
+            color: '#1A1510',
+            letterSpacing: '-0.005em',
+          }}
+        >
+          <span style={{ fontStyle: 'italic', fontWeight: 500, color: '#CC3329' }}>
+            «&nbsp;
+          </span>
           {typed}
           {phase === 'typing' && (
-            <span className="inline-block w-0.5 h-[14px] ml-0.5 align-middle bg-indigo-500 animate-pulse" />
+            <span
+              className="inline-block w-[2px] h-[15px] ml-0.5 align-middle animate-pulse"
+              style={{ background: '#CC3329' }}
+            />
+          )}
+          {phase === 'tagged' && (
+            <span style={{ fontStyle: 'italic', fontWeight: 500, color: '#CC3329' }}>
+              &nbsp;»
+            </span>
           )}
         </p>
 
-        {/* Tags */}
-        <div className="flex flex-wrap gap-1.5 pt-1">
-          {TAGS.map((tag, idx) => (
-            <span
-              key={tag.label}
-              className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-semibold border transition-all duration-400 ${tag.cls}`}
-              style={{
-                opacity: visibleTags.includes(idx) ? 1 : 0,
-                transform: visibleTags.includes(idx) ? 'translateY(0)' : 'translateY(4px)',
-                transition: 'opacity 0.35s ease, transform 0.35s ease',
-              }}
-            >
-              <span className={`w-1.5 h-1.5 rounded-full ${tag.dot}`} />
-              {tag.label}
-            </span>
-          ))}
+        {/* Horizontal rule */}
+        <div
+          className="flex items-center gap-3 text-[9.5px] tracking-[0.18em] uppercase"
+          style={{
+            fontFamily: 'var(--font-mono)',
+            color: 'rgba(26, 21, 16, 0.45)',
+          }}
+        >
+          <span>Signaux extraits</span>
+          <div
+            className="flex-1 h-px"
+            style={{ background: 'rgba(26, 21, 16, 0.2)' }}
+          />
+          <span className="tabular-nums">{visibleTags.length} / 4</span>
+        </div>
+
+        {/* Tags grid */}
+        <div className="grid grid-cols-2 gap-2">
+          {TAGS.map((tag, idx) => {
+            const visible = visibleTags.includes(idx);
+            return (
+              <div
+                key={tag.label}
+                className="flex items-center gap-2.5 px-3 py-2.5"
+                style={{
+                  border: '1px solid rgba(26, 21, 16, 0.15)',
+                  borderLeft: `3px solid ${tag.tone}`,
+                  background: '#F4EFE6',
+                  opacity: visible ? 1 : 0,
+                  transform: visible ? 'translateY(0)' : 'translateY(6px)',
+                  transition: 'all 0.45s cubic-bezier(.22,1,.36,1)',
+                  borderRadius: 1,
+                }}
+              >
+                <div className="min-w-0">
+                  <div
+                    className="text-[10.5px] tracking-[0.14em] uppercase"
+                    style={{
+                      fontFamily: 'var(--font-mono)',
+                      color: tag.tone,
+                      fontWeight: 600,
+                    }}
+                  >
+                    {tag.label}
+                  </div>
+                  <div
+                    className="text-[12px] mt-0.5 truncate"
+                    style={{
+                      fontFamily: 'var(--font-display)',
+                      fontStyle: 'italic',
+                      color: '#1A1510',
+                      fontWeight: 500,
+                    }}
+                  >
+                    {tag.sub}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 
-      {/* Status footer */}
-      {visibleTags.length === TAGS.length && (
-        <div className="px-4 pb-4 border-t border-slate-100 pt-3 flex items-center justify-between">
-          <span className="text-[11px] text-slate-400">4 signaux extraits</span>
-          <span className="flex items-center gap-1.5 text-[11px] text-indigo-600 font-medium">
-            <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
-            Synchronisé · dashboard
-          </span>
-        </div>
-      )}
+      {/* Footer ticker */}
+      <div
+        className="flex items-center justify-between px-5 py-2.5 border-t text-[10px] tracking-[0.12em] uppercase"
+        style={{
+          fontFamily: 'var(--font-mono)',
+          borderColor: 'rgba(26, 21, 16, 0.12)',
+          color: 'rgba(26, 21, 16, 0.55)',
+        }}
+      >
+        <span>Dashboard · sync auto</span>
+        <span
+          className="flex items-center gap-1.5"
+          style={{
+            color: visibleTags.length === TAGS.length ? '#4A6B3A' : 'rgba(26, 21, 16, 0.5)',
+          }}
+        >
+          <span
+            className="w-1.5 h-1.5 rounded-full"
+            style={{
+              background: visibleTags.length === TAGS.length ? '#4A6B3A' : 'rgba(26, 21, 16, 0.3)',
+            }}
+          />
+          {visibleTags.length === TAGS.length ? 'Publié' : 'En cours'}
+        </span>
+      </div>
     </div>
   );
 }
