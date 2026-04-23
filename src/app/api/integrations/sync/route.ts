@@ -3,6 +3,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import {
   fetchCrmActivities,
+  fetchSalesforceTasks,
+  fetchSalesforceEvents,
+  fetchSalesforceAccounts,
+  fetchSalesforceContacts,
+  fetchSalesforceOpportunities,
+  fetchSalesforceUsers,
   refreshAccessToken,
 } from '@/lib/crm/salesforce';
 import { decrypt, encrypt } from '@/lib/crm/encryption';
@@ -15,7 +21,15 @@ import type { SalesforceActivity } from '@/lib/crm/types';
  *   - kind : 'task' | 'call' | 'email' | 'event' — enregistre dans raw_json
  *     pour retrouver la source en cas de debug
  */
-function mapActivityToRow(activity: SalesforceActivity, companyId: string, connectionId: string) {
+function mapActivityToRow(
+  activity: SalesforceActivity,
+  companyId: string,
+  connectionId: string,
+  maps?: {
+    sfAccountMap: Map<string, { name: string; region: string }>;
+    sfContactMap: Map<string, { name: string; accountSfId: string | null }>;
+  },
+) {
   const isEvent = activity._kind === 'event';
   // Extraire la partie date uniquement (la colonne visit_date est de type `date`)
   const rawDate = isEvent
@@ -25,6 +39,25 @@ function mapActivityToRow(activity: SalesforceActivity, companyId: string, conne
   const visitDate = rawDate
     ? (rawDate as string).slice(0, 10)
     : null;
+
+  // Resolve client_name: What.Name > sfAccountMap[WhatId] > sfContactMap[WhoId].accountName > Who.Name
+  const whatId = (activity as any).WhatId ?? null;
+  const whoId = (activity as any).WhoId ?? null;
+
+  let clientName = activity.What?.Name ?? null;
+  if (!clientName && whatId && maps?.sfAccountMap.has(whatId)) {
+    clientName = maps.sfAccountMap.get(whatId)!.name;
+  }
+  if (!clientName && whoId && maps?.sfContactMap.has(whoId)) {
+    const contact = maps.sfContactMap.get(whoId)!;
+    if (contact.accountSfId && maps.sfAccountMap.has(contact.accountSfId)) {
+      clientName = maps.sfAccountMap.get(contact.accountSfId)!.name;
+    } else {
+      clientName = contact.name; // fallback: contact name
+    }
+  }
+  if (!clientName) clientName = activity.Who?.Name ?? null;
+
   return {
     company_id: companyId,
     crm_connection_id: connectionId,
@@ -34,7 +67,7 @@ function mapActivityToRow(activity: SalesforceActivity, companyId: string, conne
     subject: activity.Subject ?? null,
     commercial_email: activity.Owner?.Email ?? null,
     commercial_name: activity.Owner?.Name ?? null,
-    client_name: activity.What?.Name ?? activity.Who?.Name ?? null,
+    client_name: clientName,
     visit_date: visitDate,
     raw_json: {
       ...activity,
@@ -44,11 +77,25 @@ function mapActivityToRow(activity: SalesforceActivity, companyId: string, conne
     synced_at: new Date().toISOString(),
   };
 }
+
 import {
   isUuid,
   verifyCronBearer,
   verifyCronHeader,
 } from '@/lib/auth/cron';
+
+// SF industry → secteur mapping
+const industrySectorMap: Record<string, string> = {
+  'Pharmaceuticals': 'Pharma',
+  'Manufacturing': 'Industrie',
+  'Technology': 'Tech',
+  'Construction': 'BTP',
+  'Food & Beverage': 'Agroalimentaire',
+  'Retail': 'Distribution',
+  'Energy': 'Energie',
+  'Transportation': 'Transport',
+  'Automotive': 'Automobile',
+};
 
 export async function POST(request: NextRequest) {
   try {
@@ -148,25 +195,152 @@ export async function POST(request: NextRequest) {
         .eq('id', connection.id);
     }
 
-    // Fetch toutes les activites CRM.
+    const instanceUrl = connection.instance_url!;
+
     // Si jamais synchronisé : remonter 2 ans en arrière pour tout récupérer.
     const since = connection.last_sync_at
       || new Date(Date.now() - 2 * 365 * 24 * 60 * 60 * 1000).toISOString();
-    const activities: SalesforceActivity[] = await fetchCrmActivities(
-      accessToken,
-      connection.instance_url!,
-      since
-    );
 
-    // Upsert each activity into raw_visit_reports (table generique cote nous :
-    // elle porte toutes les activites CRM, pas seulement les CR).
+    // Fetch toutes les données SF en parallèle
+    const [accounts, contacts, opportunities, users, tasks, events] = await Promise.all([
+      fetchSalesforceAccounts(accessToken, instanceUrl, since),
+      fetchSalesforceContacts(accessToken, instanceUrl, since),
+      fetchSalesforceOpportunities(accessToken, instanceUrl, since),
+      fetchSalesforceUsers(accessToken, instanceUrl),
+      fetchSalesforceTasks(accessToken, instanceUrl, since),
+      fetchSalesforceEvents(accessToken, instanceUrl, since),
+    ]);
+
     let syncedCount = 0;
+
+    // ── Upsert users → commercials (avant accounts pour avoir les IDs) ──────
+    // ignoreDuplicates: true pour ne pas écraser cr_total/cr_week existants
+    for (const user of users) {
+      const userName = [user.FirstName, user.LastName].filter(Boolean).join(' ');
+      // Try insert first (ignoreDuplicates=true preserves cr_total/cr_week)
+      const { error: insertErr } = await serviceClient.from('commercials' as any).upsert({
+        company_id: companyId,
+        name: userName,
+        email: user.Email,
+        sf_id: user.Id,
+        region: user.Territory__c ?? '',
+        quality_score: 50,
+        quality_trend: 0,
+        cr_total: 0,
+        cr_week: 0,
+      }, { onConflict: 'company_id,sf_id', ignoreDuplicates: true });
+      if (insertErr) {
+        // On conflict, update only metadata (not cr_total/cr_week)
+        await serviceClient.from('commercials' as any)
+          .update({ name: userName, email: user.Email, region: user.Territory__c ?? '' })
+          .eq('company_id', companyId)
+          .eq('sf_id', user.Id);
+      }
+      syncedCount++;
+    }
+
+    // ── Upsert accounts ──────────────────────────────────────────────────────
+    for (const acc of accounts) {
+      const sector = industrySectorMap[acc.Industry ?? ''] ?? acc.Industry ?? 'Autre';
+      const region = acc.BillingState ?? acc.BillingCity ?? '';
+      await serviceClient.from('accounts' as any).upsert({
+        company_id: companyId,
+        sf_id: acc.Id,
+        name: acc.Name ?? '',
+        sector,
+        region,
+        ca_annual: acc.AnnualRevenue ? Math.round(acc.AnnualRevenue) : null,
+        nb_employees: acc.NumberOfEmployees ?? null,
+        account_type: acc.Type ?? null,
+        sf_owner_id: acc.OwnerId ?? null,
+        risk_score: 0,
+        risk_trend: 0,
+      }, { onConflict: 'company_id,sf_id', ignoreDuplicates: false });
+      syncedCount++;
+    }
+
+    // ── Build lookup maps pour résoudre WhatId/WhoId des activités ───────────
+    const sfAccountMap = new Map<string, { name: string; region: string }>();
+    for (const acc of accounts) {
+      sfAccountMap.set(acc.Id, {
+        name: acc.Name ?? '',
+        region: acc.BillingState ?? acc.BillingCity ?? '',
+      });
+    }
+
+    const sfContactMap = new Map<string, { name: string; accountSfId: string | null }>();
+    for (const c of contacts) {
+      sfContactMap.set(c.Id, {
+        name: [c.FirstName, c.LastName].filter(Boolean).join(' '),
+        accountSfId: c.AccountId ?? null,
+      });
+    }
+
+    // ── Upsert contacts ──────────────────────────────────────────────────────
+    for (const c of contacts) {
+      // Try to find account_id from our local accounts table
+      const { data: localAcc } = await serviceClient
+        .from('accounts' as any)
+        .select('id')
+        .eq('company_id', companyId)
+        .eq('sf_id', c.AccountId ?? '')
+        .maybeSingle();
+
+      await serviceClient.from('contacts' as any).upsert({
+        company_id: companyId,
+        sf_id: c.Id,
+        name: [c.FirstName, c.LastName].filter(Boolean).join(' '),
+        role: c.Title ?? null,
+        email: c.Email ?? null,
+        sf_account_id: c.AccountId ?? null,
+        account_id: localAcc?.id ?? null,
+        is_new: false,
+        first_detected: c.CreatedDate.slice(0, 10),
+      }, { onConflict: 'company_id,sf_id', ignoreDuplicates: false });
+      syncedCount++;
+    }
+
+    // ── Upsert opportunities ─────────────────────────────────────────────────
+    for (const opp of opportunities) {
+      const accInfo = opp.AccountId ? sfAccountMap.get(opp.AccountId) : null;
+      await serviceClient.from('opportunities' as any).upsert({
+        company_id: companyId,
+        sf_id: opp.Id,
+        name: opp.Name ?? '',
+        amount: opp.Amount ?? null,
+        stage: opp.StageName ?? null,
+        close_date: opp.CloseDate ?? null,
+        is_won: opp.IsWon,
+        is_closed: opp.IsClosed,
+        loss_reason: opp.Loss_Reason__c ?? null,
+        account_sf_id: opp.AccountId ?? null,
+        account_name: opp.Account?.Name ?? accInfo?.name ?? null,
+        commercial_name: opp.Owner?.Name ?? null,
+        commercial_sf_id: opp.OwnerId ?? null,
+        region: accInfo?.region ?? null,
+        probability: opp.Probability ?? null,
+        lead_source: opp.LeadSource ?? null,
+        competitor_name: (opp as any).Concurrent_Principal__c ?? null,
+        sf_created_date: opp.CreatedDate,
+        sf_modified_date: opp.LastModifiedDate,
+      }, { onConflict: 'company_id,sf_id', ignoreDuplicates: false });
+      syncedCount++;
+    }
+
+    // ── Upsert activités (tasks + events) dans raw_visit_reports ────────────
+    const maps = { sfAccountMap, sfContactMap };
+
+    // Combine tasks + events into unified activities list
+    const activities: SalesforceActivity[] = [
+      ...tasks.map((t) => ({ ...t, _kind: (['call', 'Call'].includes(t.TaskSubtype ?? '') ? 'call' : ['email', 'Email', 'List Email'].includes(t.TaskSubtype ?? '') ? 'email' : 'task') as 'task' | 'call' | 'email' })),
+      ...events.map((e) => ({ ...e, _kind: 'event' as const })),
+    ];
 
     for (const activity of activities) {
       const { error: upsertError } = await serviceClient
         .from('raw_visit_reports' as any)
         .upsert(
-          mapActivityToRow(activity, companyId, connection.id),
+          mapActivityToRow(activity, companyId, connection.id, maps),
           // ignoreDuplicates=true → INSERT … ON CONFLICT DO NOTHING
           // Les records déjà traités (done/skipped) ne sont PAS remis en pending.
           // Seuls les nouveaux records sont insérés comme 'pending'.
@@ -193,7 +367,17 @@ export async function POST(request: NextRequest) {
       })
       .eq('id', connection.id);
 
-    return NextResponse.json({ success: true, synced: syncedCount });
+    return NextResponse.json({
+      success: true,
+      synced: syncedCount,
+      breakdown: {
+        users: users.length,
+        accounts: accounts.length,
+        contacts: contacts.length,
+        opportunities: opportunities.length,
+        activities: activities.length,
+      },
+    });
   } catch (error: any) {
     const msg = error?.message ?? String(error) ?? 'unknown';
     console.error('[sync] error:', msg);
@@ -243,7 +427,7 @@ export async function GET(request: NextRequest) {
         await serviceClient
           .from('raw_visit_reports')
           .upsert(
-            mapActivityToRow(activity, conn.company_id, conn.id),
+            mapActivityToRow(activity, conn.company_id, conn.id, undefined),
             { onConflict: 'company_id,external_id' }
           );
       }

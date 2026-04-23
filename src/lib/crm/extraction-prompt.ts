@@ -45,6 +45,7 @@ Extrayez en JSON strict (pas de texte avant/apres, uniquement le JSON) :
 
 {
   "region": "IDF|Nord|Sud|Est|Ouest|Sud-Ouest|Sud-Est|Nord-Est ou null",
+  "client_name": "nom exact du client/pharmacie/entreprise mentionné dans le CR, ou null",
   "secteur": "Pharma|Industrie|Tech|BTP|Agroalimentaire|Distribution|Services|Energie|Transport|Automobile|Autre",
   "signals": [
     {
@@ -183,6 +184,7 @@ const CompetitorMentionSchema = z.object({
 
 const ExtractedCRSchema = z.object({
   region: SHORT_TEXT.nullable().optional(),
+  client_name: SHORT_TEXT.nullable().optional(),
   secteur: SHORT_TEXT.optional(),
   signals: CAP_LIST(SignalSchema).default([]),
   deals: CAP_LIST(DealSchema).default([]),
@@ -213,6 +215,7 @@ export function parseExtractionResponse(responseText: string): ExtractedCRData |
     // Best-effort fallback: keep valid arrays, discard invalid items
     const fallback: ExtractedCRData = {
       region: typeof raw.region === 'string' ? raw.region : null,
+      client_name: typeof raw.client_name === 'string' ? raw.client_name : null,
       secteur: typeof raw.secteur === 'string' ? raw.secteur : undefined,
       signals: Array.isArray(raw.signals)
         ? raw.signals.filter((s: any) => s?.type && s?.severity && s?.title && s?.content)

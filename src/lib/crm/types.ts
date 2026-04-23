@@ -94,6 +94,68 @@ export type SalesforceActivity =
   | ({ _kind: 'task' | 'call' | 'email' } & SalesforceTask)
   | ({ _kind: 'event' } & SalesforceEvent);
 
+export interface SalesforceAccount {
+  Id: string;
+  Name: string | null;
+  Industry: string | null;
+  NumberOfEmployees: number | null;
+  AnnualRevenue: number | null;
+  BillingCity: string | null;
+  BillingState: string | null;
+  OwnerId: string | null;
+  Type: string | null;
+  CreatedDate: string;
+  LastModifiedDate: string;
+  Owner?: { Name?: string; Email?: string };
+}
+
+export interface SalesforceContact {
+  Id: string;
+  FirstName: string | null;
+  LastName: string;
+  Title: string | null;
+  Email: string | null;
+  AccountId: string | null;
+  Department: string | null;
+  CreatedDate: string;
+  LastModifiedDate: string;
+  Account?: { Name?: string };
+}
+
+export interface SalesforceOpportunity {
+  Id: string;
+  Name: string | null;
+  Amount: number | null;
+  StageName: string | null;
+  CloseDate: string | null;
+  IsWon: boolean;
+  IsClosed: boolean;
+  Probability: number | null;
+  LeadSource: string | null;
+  AccountId: string | null;
+  OwnerId: string | null;
+  CreatedDate: string;
+  LastModifiedDate: string;
+  Loss_Reason__c?: string | null;
+  Concurrent_Principal__c?: string | null;
+  Account?: { Name?: string };
+  Owner?: { Name?: string; Email?: string };
+}
+
+export interface SalesforceUser {
+  Id: string;
+  FirstName: string | null;
+  LastName: string;
+  Email: string;
+  IsActive: boolean;
+  UserRoleId: string | null;
+  ManagerId: string | null;
+  Territory__c?: string | null;
+  CreatedDate: string;
+  LastModifiedDate: string;
+  UserRole?: { Name?: string };
+}
+
 // What the NLP extraction returns
 export interface ExtractedCRData {
   signals: {

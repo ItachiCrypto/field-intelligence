@@ -4,6 +4,10 @@ import type {
   SalesforceEvent,
   SalesforceActivity,
   SalesforceTokenResponse,
+  SalesforceAccount,
+  SalesforceContact,
+  SalesforceOpportunity,
+  SalesforceUser,
 } from './types';
 import crypto from 'crypto';
 
@@ -99,6 +103,76 @@ async function soqlQuery<T>(
   }
   const data = await res.json();
   return data.records ?? [];
+}
+
+export async function fetchSalesforceAccounts(
+  accessToken: string,
+  instanceUrl: string,
+  since: string,
+  limit = 500,
+): Promise<SalesforceAccount[]> {
+  const soql = `
+    SELECT Id, Name, Industry, NumberOfEmployees, AnnualRevenue,
+           BillingCity, BillingState, OwnerId, Type, CreatedDate, LastModifiedDate,
+           Owner.Name, Owner.Email
+    FROM Account
+    WHERE LastModifiedDate >= ${since}
+    ORDER BY LastModifiedDate DESC
+    LIMIT ${limit}
+  `;
+  return soqlQuery<SalesforceAccount>(accessToken, instanceUrl, soql);
+}
+
+export async function fetchSalesforceContacts(
+  accessToken: string,
+  instanceUrl: string,
+  since: string,
+  limit = 500,
+): Promise<SalesforceContact[]> {
+  const soql = `
+    SELECT Id, FirstName, LastName, Title, Email, AccountId,
+           Department, CreatedDate, LastModifiedDate,
+           Account.Name
+    FROM Contact
+    WHERE LastModifiedDate >= ${since}
+    ORDER BY LastModifiedDate DESC
+    LIMIT ${limit}
+  `;
+  return soqlQuery<SalesforceContact>(accessToken, instanceUrl, soql);
+}
+
+export async function fetchSalesforceOpportunities(
+  accessToken: string,
+  instanceUrl: string,
+  since: string,
+  limit = 500,
+): Promise<SalesforceOpportunity[]> {
+  const soql = `
+    SELECT Id, Name, Amount, StageName, CloseDate, IsWon, IsClosed,
+           Probability, LeadSource, AccountId, OwnerId, CreatedDate, LastModifiedDate,
+           Account.Name, Owner.Name, Owner.Email
+    FROM Opportunity
+    WHERE LastModifiedDate >= ${since}
+    ORDER BY LastModifiedDate DESC
+    LIMIT ${limit}
+  `;
+  return soqlQuery<SalesforceOpportunity>(accessToken, instanceUrl, soql);
+}
+
+export async function fetchSalesforceUsers(
+  accessToken: string,
+  instanceUrl: string,
+  limit = 200,
+): Promise<SalesforceUser[]> {
+  const soql = `
+    SELECT Id, FirstName, LastName, Email, IsActive,
+           UserRoleId, ManagerId, CreatedDate, LastModifiedDate,
+           UserRole.Name
+    FROM User
+    WHERE IsActive = true
+    LIMIT ${limit}
+  `;
+  return soqlQuery<SalesforceUser>(accessToken, instanceUrl, soql);
 }
 
 /**

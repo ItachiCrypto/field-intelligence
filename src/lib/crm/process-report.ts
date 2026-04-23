@@ -163,6 +163,17 @@ export async function processReport(report: RawVisitReport): Promise<{ success: 
       }
     }
 
+    // Résoudre client_name : priorité report.client_name, puis extraction IA
+    const effectiveClientName = report.client_name?.trim() || (extracted as any).client_name?.trim() || null;
+
+    // Si client_name était null dans raw_visit_reports, le mettre à jour
+    // pour que les futurs enrichissements en bénéficient
+    if (effectiveClientName && !report.client_name?.trim()) {
+      await supabase.from('raw_visit_reports' as any)
+        .update({ client_name: effectiveClientName })
+        .eq('id', report.id);
+    }
+
     // Insert deals
     const motifToCommercial: Record<string, string> = {
       prix: 'prix_non_competitif',
@@ -183,7 +194,7 @@ export async function processReport(report: RawVisitReport): Promise<{ success: 
           resultat: deal.resultat,
           concurrent_nom: deal.concurrent_nom ?? null,
           commercial_name: report.commercial_name ?? '',
-          client_name: report.client_name ?? '',
+          client_name: effectiveClientName ?? '',
           region: extracted.region ?? '',
           verbatim: deal.verbatim,
           date: report.visit_date ?? new Date().toISOString().split('T')[0],
@@ -197,7 +208,7 @@ export async function processReport(report: RawVisitReport): Promise<{ success: 
           resultat: deal.resultat,
           concurrent_nom: deal.concurrent_nom ?? null,
           commercial_name: report.commercial_name ?? '',
-          client_name: report.client_name ?? '',
+          client_name: effectiveClientName ?? '',
           region: extracted.region ?? '',
           verbatim: deal.verbatim,
           date: report.visit_date ?? new Date().toISOString().split('T')[0],
@@ -216,7 +227,7 @@ export async function processReport(report: RawVisitReport): Promise<{ success: 
         ecart_type: px.ecart_type,
         statut_deal: 'en_cours',
         commercial_name: report.commercial_name ?? '',
-        client_name: report.client_name ?? '',
+        client_name: effectiveClientName ?? '',
         region: extracted.region ?? '',
         verbatim: px.verbatim,
         date: report.visit_date ?? new Date().toISOString().split('T')[0],
@@ -230,7 +241,7 @@ export async function processReport(report: RawVisitReport): Promise<{ success: 
       await supabase.from('cr_objectifs' as any).insert({
         company_id: report.company_id,
         commercial_name: report.commercial_name ?? '',
-        client_name: report.client_name ?? '',
+        client_name: effectiveClientName ?? '',
         objectif_type: obj.type,
         resultat: obj.resultat,
         cause_echec: obj.cause_echec ?? null,
@@ -282,11 +293,11 @@ export async function processReport(report: RawVisitReport): Promise<{ success: 
     }
 
     // ── Auto-upsert account (client) ────────────────────────────────────
-    if (report.client_name?.trim()) {
+    if (effectiveClientName) {
       await supabase.from('accounts' as any).upsert(
         {
           company_id: report.company_id,
-          name: report.client_name.trim(),
+          name: effectiveClientName,
           sector: (extracted as any).secteur ?? 'Autre',
           region: extracted.region ?? '',
           last_rdv: report.visit_date ?? null,
@@ -317,7 +328,7 @@ export async function processReport(report: RawVisitReport): Promise<{ success: 
             status: 'nouveau',
             source_report_id: report.id,
             content: sig.content ?? null,
-            client_name: report.client_name ?? null,
+            client_name: effectiveClientName ?? null,
           });
         }
       }
