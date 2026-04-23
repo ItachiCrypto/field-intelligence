@@ -27,9 +27,6 @@ import { recomputeAnalytics } from '@/lib/analytics/recompute';
 import type { SalesforceActivity, RawVisitReport } from '@/lib/crm/types';
 
 export const maxDuration = 300;
-// SSE nécessite un runtime sans Edge (Node.js pour crypto / supabase-js)
-export const runtime = 'nodejs';
-
 const CONCURRENCY = 5;
 
 // ── SF industry → secteur ────────────────────────────────────────────────────

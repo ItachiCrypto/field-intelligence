@@ -93,64 +93,59 @@ export default function IntegrationsPage() {
       const reader = res.body!.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
+      let currentEvent = '';
+      let finished = false;
 
-      while (true) {
+      const handlePayload = async (eventType: string, payload: any) => {
+        if (eventType === 'error' || payload.error) {
+          setPipeline(null);
+          setBanner({ type: 'error', message: payload.message || 'Erreur pipeline.' });
+          finished = true;
+        } else if (eventType === 'done' || payload.step === 'done') {
+          setPipeline(null);
+          await fetchStatus();
+          setBanner({ type: 'success', message: payload.message || 'Pipeline terminé.' });
+          finished = true;
+        } else if (payload.message !== undefined || payload.progress !== undefined) {
+          setPipeline(p => p ? {
+            ...p,
+            step: payload.step ?? p.step,
+            message: payload.message ?? p.message,
+            progress: payload.progress ?? p.progress,
+            total: payload.total ?? p.total,
+            processed: payload.processed ?? p.processed,
+            errors: payload.errors ?? p.errors,
+          } : null);
+        }
+      };
+
+      while (!finished) {
         const { done, value } = await reader.read();
         if (done) break;
         buffer += decoder.decode(value, { stream: true });
+
+        // Process complete lines
         const lines = buffer.split('\n');
         buffer = lines.pop() ?? '';
 
         for (const line of lines) {
           if (line.startsWith('event: ')) {
-            // event type handled by next data line
+            currentEvent = line.slice(7).trim();
           } else if (line.startsWith('data: ')) {
             try {
               const payload = JSON.parse(line.slice(6));
-
-              if (payload.step === 'done' || payload.processed !== undefined && payload.total !== undefined && payload.progress === 100) {
-                // Done
-                setPipeline(null);
-                await fetchStatus();
-                setBanner({ type: 'success', message: payload.message || 'Pipeline terminé.' });
-              } else if (payload.message && payload.progress !== undefined) {
-                setPipeline(p => p ? {
-                  ...p,
-                  step: payload.step ?? p.step,
-                  message: payload.message,
-                  progress: payload.progress,
-                  total: payload.total ?? p.total,
-                  processed: payload.processed ?? p.processed,
-                  errors: payload.errors ?? p.errors,
-                } : null);
-              }
-            } catch { /* ignore malformed */ }
-          } else if (line.startsWith('event: error')) {
-            // handled by next data line
-          } else if (line.startsWith('data: ') && buffer.includes('"error"')) {
-            // already handled above
+              await handlePayload(currentEvent, payload);
+            } catch { /* ignore malformed JSON */ }
+          } else if (line === '') {
+            currentEvent = ''; // reset after blank line (SSE message separator)
           }
         }
       }
 
-      // Handle any remaining buffer
-      if (buffer.startsWith('data: ')) {
-        try {
-          const payload = JSON.parse(buffer.slice(6));
-          if (payload.message) {
-            setPipeline(null);
-            await fetchStatus();
-            if (payload.error || payload.step === 'error') {
-              setBanner({ type: 'error', message: payload.message });
-            } else {
-              setBanner({ type: 'success', message: payload.message });
-            }
-          }
-        } catch { /* ignore */ }
+      if (!finished) {
+        setPipeline(null);
+        await fetchStatus();
       }
-
-      setPipeline(null);
-      await fetchStatus();
     } catch (e: any) {
       setBanner({ type: 'error', message: e?.message || 'Erreur réseau.' });
       setPipeline(null);
