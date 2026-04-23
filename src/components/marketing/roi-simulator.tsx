@@ -19,31 +19,23 @@ function Slider({
 }) {
   const pct = ((value - min) / (max - min)) * 100;
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <span className="text-[13px] text-white/45">{label}</span>
-        <span
-          className="text-[14px] font-bold text-white tabular-nums"
-          style={{ fontFamily: 'var(--font-syne), sans-serif' }}
-        >
-          {format(value)}
-        </span>
+        <span className="text-sm text-slate-600">{label}</span>
+        <span className="text-sm font-semibold text-slate-900 tabular-nums">{format(value)}</span>
       </div>
-      <div className="relative">
-        <input
-          type="range"
-          min={min}
-          max={max}
-          value={value}
-          onChange={(e) => onChange(Number(e.target.value))}
-          className="w-full h-[3px] rounded-full appearance-none cursor-pointer relative z-10"
-          style={{
-            background: `linear-gradient(to right, #6366F1 0%, #6366F1 ${pct}%, rgba(255,255,255,0.07) ${pct}%, rgba(255,255,255,0.07) 100%)`,
-            WebkitAppearance: 'none',
-          }}
-        />
-      </div>
-      <div className="flex justify-between text-[11px] text-white/20 tabular-nums">
+      <input
+        type="range"
+        min={min}
+        max={max}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="w-full h-1.5 rounded-full appearance-none cursor-pointer"
+        style={{
+          background: `linear-gradient(to right, #4f46e5 0%, #4f46e5 ${pct}%, #e2e8f0 ${pct}%, #e2e8f0 100%)`,
+        }}
+      />
+      <div className="flex justify-between text-[11px] text-slate-400 tabular-nums">
         <span>{format(min)}</span>
         <span>{format(max)}</span>
       </div>
@@ -71,97 +63,68 @@ export function RoiSimulator() {
   const fmtEur = (n: number) => (n >= 1000 ? `${Math.round(n / 1000)}K€` : `${n}€`);
 
   return (
-    <div
-      className="overflow-hidden"
-      style={{
-        background: '#0C1018',
-        border: '1px solid rgba(255,255,255,0.07)',
-        borderRadius: '16px',
-      }}
-    >
-      <div className="p-8 space-y-8">
+    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="p-6 space-y-6">
         {/* Sliders */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
-          <Slider
-            label="Commerciaux terrain"
-            min={5}
-            max={200}
-            value={commerciaux}
-            onChange={setCommerciaux}
-            format={(v) => `${v}`}
-          />
-          <Slider
-            label="CA moyen / client"
-            min={10000}
-            max={500000}
-            value={ca}
-            onChange={setCa}
-            format={fmtEur}
-          />
-          <Slider
-            label="RDV par semaine"
-            min={20}
-            max={200}
-            value={rdvSemaine}
-            onChange={setRdvSemaine}
-            format={(v) => `${v}`}
-          />
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+          <Slider label="Commerciaux terrain" min={5} max={200} value={commerciaux} onChange={setCommerciaux} format={(v) => `${v}`} />
+          <Slider label="CA moyen / client" min={10000} max={500000} value={ca} onChange={setCa} format={fmtEur} />
+          <Slider label="RDV par semaine" min={20} max={200} value={rdvSemaine} onChange={setRdvSemaine} format={(v) => `${v}`} />
         </div>
 
-        <div style={{ height: 1, background: 'rgba(255,255,255,0.05)' }} />
+        <div className="border-t border-slate-100" />
 
         {/* Results */}
         <div>
-          <p className="text-[13px] text-white/35 mb-6 leading-relaxed">
+          <p className="text-sm text-slate-500 mb-4 leading-relaxed">
             Votre équipe génère{' '}
-            <span className="text-white font-medium">{fmt(signaux)} signaux / semaine</span>.
+            <span className="text-slate-900 font-semibold">{fmt(signaux)} signaux / semaine</span>.
             Sans Field Intelligence,{' '}
-            <span className="font-medium" style={{ color: '#EF4444' }}>{pertePct}%</span>
+            <span className="text-red-600 font-semibold">{pertePct}%</span>
             {' '}disparaissent dans des CR non lus —{' '}
-            <span className="text-white font-medium">{etudes} études de marché</span> perdues / mois.
+            <span className="text-slate-900 font-semibold">{etudes} études de marché</span> perdues / mois.
           </p>
 
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-3 gap-3">
             {[
-              { value: fmt(signaux * 4), label: 'signaux perdus / mois', color: 'rgba(255,255,255,0.85)' },
-              { value: `${pertePct}%`, label: 'intel. marché perdue', color: '#EF4444' },
-              { value: `~${fmtEur(caPerdu)}`, label: 'CA non capturé / mois', color: '#6366F1' },
+              { value: fmt(signaux * 4), label: 'signaux perdus / mois', color: 'text-slate-900' },
+              { value: `${pertePct}%`,   label: 'intel. marché perdue',   color: 'text-red-600' },
+              { value: `~${fmtEur(caPerdu)}`, label: 'CA non capturé / mois', color: 'text-indigo-600' },
             ].map((kpi) => (
               <div
                 key={kpi.label}
-                className="rounded-xl p-4 text-center"
-                style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}
+                className="bg-slate-50 rounded-lg border border-slate-200 p-4 text-center"
               >
                 <div
-                  className="text-2xl sm:text-3xl font-bold tabular-nums"
-                  style={{ fontFamily: 'var(--font-syne), sans-serif', color: kpi.color }}
+                  className={`text-2xl sm:text-3xl font-bold tabular-nums ${kpi.color}`}
+                  style={{ fontFamily: 'var(--font-syne), sans-serif' }}
                 >
                   {kpi.value}
                 </div>
-                <div className="text-[11px] text-white/25 mt-1.5 leading-tight">{kpi.label}</div>
+                <div className="text-[11px] text-slate-500 mt-1 leading-tight">{kpi.label}</div>
               </div>
             ))}
           </div>
         </div>
       </div>
 
-      {/* Slider thumb styles */}
       <style>{`
         input[type=range]::-webkit-slider-thumb {
           -webkit-appearance: none;
-          width: 16px; height: 16px;
+          width: 14px; height: 14px;
           border-radius: 50%;
-          background: white;
+          background: #4f46e5;
           cursor: pointer;
-          box-shadow: 0 0 0 3px rgba(245,158,11,0.35);
+          border: 2px solid white;
+          box-shadow: 0 0 0 1px #4f46e5, 0 1px 3px rgba(0,0,0,0.15);
         }
         input[type=range]::-moz-range-thumb {
-          width: 16px; height: 16px;
+          width: 14px; height: 14px;
           border-radius: 50%;
-          background: white;
+          background: #4f46e5;
           cursor: pointer;
-          border: none;
-          box-shadow: 0 0 0 3px rgba(245,158,11,0.35);
+          border: 2px solid white;
+          box-shadow: 0 0 0 1px #4f46e5;
         }
       `}</style>
     </div>

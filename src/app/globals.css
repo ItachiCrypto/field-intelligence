@@ -23,9 +23,9 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Marketing pages: override body background to full dark navy-black */
+/* Marketing pages: light theme matching app */
 body:has([data-marketing]) {
-  background: #06090F;
+  background: #f8fafc;
 }
 
 /* Smooth scroll */

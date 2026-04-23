@@ -3,13 +3,13 @@
 import { useState, useEffect } from 'react';
 
 const CR_TEXT =
-  '"Le client mentionne qu\'Acme a proposé un bundle — 3 mois offerts, prix 15% sous le nôtre. Il teste depuis 2 semaines et semble convaincu par l\'argument ROI."';
+  '"Le client mentionne qu\'Acme a proposé un bundle avec 3 mois offerts — prix 15% sous le nôtre. Il teste depuis 2 semaines et semble convaincu par l\'argument ROI."';
 
 const TAGS = [
-  { label: 'CONCURRENT ACTIF', color: '#EF4444', r: 239, g: 68, b: 68, delay: 0 },
-  { label: 'OFFRE BUNDLE', color: '#FBBF24', r: 251, g: 191, b: 36, delay: 300 },
-  { label: 'ÉCART PRIX −15%', color: '#F97316', r: 249, g: 115, b: 22, delay: 600 },
-  { label: 'RISQUE CHURN', color: '#A78BFA', r: 167, g: 139, b: 250, delay: 900 },
+  { label: 'CONCURRENT ACTIF', cls: 'bg-red-50 text-red-700 border-red-200',    dot: 'bg-red-500',    delay: 0 },
+  { label: 'OFFRE BUNDLE',      cls: 'bg-amber-50 text-amber-700 border-amber-200', dot: 'bg-amber-500',  delay: 300 },
+  { label: 'ÉCART PRIX −15%',   cls: 'bg-orange-50 text-orange-700 border-orange-200', dot: 'bg-orange-500', delay: 600 },
+  { label: 'RISQUE CHURN',      cls: 'bg-violet-50 text-violet-700 border-violet-200', dot: 'bg-violet-500', delay: 900 },
 ];
 
 export function HeroAnimation() {
@@ -36,161 +36,65 @@ export function HeroAnimation() {
   }, []);
 
   return (
-    <div className="relative w-full select-none">
-      {/* Ambient amber glow */}
-      <div
-        className="absolute pointer-events-none"
-        style={{
-          inset: '-40px',
-          background: 'radial-gradient(ellipse at 60% 45%, rgba(99,102,241,0.12) 0%, transparent 68%)',
-        }}
-      />
-
-      {/* Card */}
-      <div
-        className="relative overflow-hidden"
-        style={{
-          background: '#0C1018',
-          border: '1px solid rgba(255,255,255,0.08)',
-          borderRadius: '14px',
-          transform: 'perspective(1000px) rotateY(-5deg) rotateX(1.5deg)',
-          boxShadow: '0 32px 64px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.04), 0 8px 32px rgba(245,158,11,0.05)',
-        }}
-      >
-        {/* Chrome bar */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            padding: '12px 16px',
-            borderBottom: '1px solid rgba(255,255,255,0.06)',
-            background: 'rgba(255,255,255,0.02)',
-          }}
-        >
-          <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#FF5F56', display: 'block' }} />
-          <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#FFBD2E', display: 'block' }} />
-          <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#27C93F', display: 'block' }} />
-          <div style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
-            <span style={{ fontSize: 11, fontFamily: 'monospace', color: 'rgba(255,255,255,0.22)' }}>
-              Salesforce — Compte rendu de visite
-            </span>
-          </div>
+    <div className="w-full bg-white rounded-xl border border-slate-200 shadow-md overflow-hidden">
+      {/* Window chrome */}
+      <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 flex items-center gap-3">
+        <div className="flex gap-1.5">
+          <span className="w-2.5 h-2.5 rounded-full bg-slate-300" />
+          <span className="w-2.5 h-2.5 rounded-full bg-slate-300" />
+          <span className="w-2.5 h-2.5 rounded-full bg-slate-300" />
         </div>
-
-        <div style={{ padding: '20px' }}>
-          {/* Meta row */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
-            <span style={{ fontSize: 10, fontFamily: 'monospace', color: 'rgba(255,255,255,0.20)', textTransform: 'uppercase', letterSpacing: '0.12em' }}>
-              Description
-            </span>
-            <span style={{ fontSize: 10, fontFamily: 'monospace', color: 'rgba(255,255,255,0.15)' }}>
-              Thomas D. · 14 avr.
-            </span>
-          </div>
-
-          {/* Typed text */}
-          <p
-            style={{
-              fontSize: 13,
-              fontFamily: 'monospace',
-              lineHeight: 1.7,
-              color: 'rgba(255,255,255,0.62)',
-              minHeight: 72,
-              marginBottom: 16,
-            }}
-          >
-            {typed}
-            {phase === 'typing' && (
-              <span
-                style={{
-                  display: 'inline-block',
-                  width: 2,
-                  height: 13,
-                  marginLeft: 2,
-                  verticalAlign: 'middle',
-                  background: '#6366F1',
-                  animation: 'blink 1s step-end infinite',
-                }}
-              />
-            )}
-          </p>
-
-          {/* Tags */}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
-            {TAGS.map((tag, idx) => (
-              <span
-                key={tag.label}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 5,
-                  padding: '4px 10px',
-                  fontSize: 10,
-                  fontFamily: 'monospace',
-                  fontWeight: 700,
-                  letterSpacing: '0.1em',
-                  borderRadius: 5,
-                  color: tag.color,
-                  background: `rgba(${tag.r},${tag.g},${tag.b},0.12)`,
-                  border: `1px solid rgba(${tag.r},${tag.g},${tag.b},0.22)`,
-                  opacity: visibleTags.includes(idx) ? 1 : 0,
-                  transform: visibleTags.includes(idx) ? 'translateY(0)' : 'translateY(5px)',
-                  transition: 'opacity 0.4s ease, transform 0.4s ease',
-                }}
-              >
-                <span
-                  style={{
-                    width: 5,
-                    height: 5,
-                    borderRadius: '50%',
-                    background: tag.color,
-                    flexShrink: 0,
-                  }}
-                />
-                {tag.label}
-              </span>
-            ))}
-          </div>
-        </div>
-
-        {/* Status footer */}
-        {visibleTags.length === TAGS.length && (
-          <div style={{ padding: '0 20px 16px' }}>
-            <div style={{ height: 1, background: 'rgba(255,255,255,0.05)', marginBottom: 12 }} />
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: 10, fontFamily: 'monospace', color: 'rgba(255,255,255,0.18)' }}>
-                4 signaux extraits
-              </span>
-              <span
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  fontSize: 10,
-                  fontFamily: 'monospace',
-                  color: '#6366F1',
-                }}
-              >
-                <span
-                  style={{
-                    width: 6,
-                    height: 6,
-                    borderRadius: '50%',
-                    background: '#6366F1',
-                    animation: 'pulse 2s infinite',
-                  }}
-                />
-                Synchronisé · dashboard
-              </span>
-            </div>
-          </div>
-        )}
+        <span className="text-xs text-slate-500 font-medium">
+          Salesforce — Compte rendu de visite
+        </span>
       </div>
 
-      <style>{`
-        @keyframes blink { 50% { opacity: 0; } }
-      `}</style>
+      <div className="p-4 space-y-3">
+        {/* Meta */}
+        <div className="flex items-center justify-between">
+          <span className="text-[11px] text-slate-400 uppercase tracking-wider font-medium">
+            Description
+          </span>
+          <span className="text-[11px] text-slate-400">Thomas D. · 14 avr.</span>
+        </div>
+
+        {/* Typed text */}
+        <p className="text-sm text-slate-700 leading-relaxed min-h-[72px] font-mono">
+          {typed}
+          {phase === 'typing' && (
+            <span className="inline-block w-0.5 h-[14px] ml-0.5 align-middle bg-indigo-500 animate-pulse" />
+          )}
+        </p>
+
+        {/* Tags */}
+        <div className="flex flex-wrap gap-1.5 pt-1">
+          {TAGS.map((tag, idx) => (
+            <span
+              key={tag.label}
+              className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-semibold border transition-all duration-400 ${tag.cls}`}
+              style={{
+                opacity: visibleTags.includes(idx) ? 1 : 0,
+                transform: visibleTags.includes(idx) ? 'translateY(0)' : 'translateY(4px)',
+                transition: 'opacity 0.35s ease, transform 0.35s ease',
+              }}
+            >
+              <span className={`w-1.5 h-1.5 rounded-full ${tag.dot}`} />
+              {tag.label}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {/* Status footer */}
+      {visibleTags.length === TAGS.length && (
+        <div className="px-4 pb-4 border-t border-slate-100 pt-3 flex items-center justify-between">
+          <span className="text-[11px] text-slate-400">4 signaux extraits</span>
+          <span className="flex items-center gap-1.5 text-[11px] text-indigo-600 font-medium">
+            <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
+            Synchronisé · dashboard
+          </span>
+        </div>
+      )}
     </div>
   );
 }
