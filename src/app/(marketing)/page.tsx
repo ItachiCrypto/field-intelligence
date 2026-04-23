@@ -7,20 +7,20 @@ import { HeroAnimation } from '@/components/marketing/hero-animation';
 import { RoiSimulator } from '@/components/marketing/roi-simulator';
 import { CrmLogos } from '@/components/marketing/crm-logos';
 
-/* ─── Design tokens ────────────────────────────────────────── */
-const BG = '#06090F';
-const BG_RAISED = '#0C1018';
-const BORDER = 'rgba(255,255,255,0.06)';
-const AMBER = '#F59E0B';
-const AMBER_DIM = 'rgba(245,158,11,0.12)';
+/* ─── Design tokens — cohérent avec l'app (indigo family) ──── */
+const BG       = '#06090F';
+const BG_RAISED = '#0D1117';
+const BORDER   = 'rgba(255,255,255,0.07)';
+const INDIGO   = '#6366F1';
+const INDIGO_DIM = 'rgba(99,102,241,0.12)';
 
-/* ─── Dot grid background ──────────────────────────────────── */
-function DotGrid({ opacity = 0.55 }: { opacity?: number }) {
+/* ─── Dot grid ─────────────────────────────────────────────── */
+function DotGrid({ opacity = 0.5 }: { opacity?: number }) {
   return (
     <div
       className="absolute inset-0 pointer-events-none"
       style={{
-        backgroundImage: 'radial-gradient(rgba(255,255,255,0.055) 1px, transparent 1px)',
+        backgroundImage: 'radial-gradient(rgba(255,255,255,0.05) 1px, transparent 1px)',
         backgroundSize: '28px 28px',
         opacity,
       }}
@@ -29,17 +29,14 @@ function DotGrid({ opacity = 0.55 }: { opacity?: number }) {
   );
 }
 
-/* ─── Section chrome ───────────────────────────────────────── */
+/* ─── Section chrome ────────────────────────────────────────── */
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex items-center gap-2 mb-4">
-      <span
-        className="inline-block w-4 h-px"
-        style={{ background: AMBER }}
-      />
+      <span className="inline-block w-4 h-px" style={{ background: INDIGO }} />
       <span
         className="text-[11px] font-semibold uppercase tracking-[0.15em]"
-        style={{ color: AMBER }}
+        style={{ color: INDIGO }}
       >
         {children}
       </span>
@@ -64,7 +61,7 @@ function SectionTitle({
   );
 }
 
-/* ─── Feature data ─────────────────────────────────────────── */
+/* ─── Features ──────────────────────────────────────────────── */
 const FEATURES = [
   {
     icon: <Sword className="w-4 h-4" />,
@@ -75,7 +72,7 @@ const FEATURES = [
   },
   {
     icon: <DollarSign className="w-4 h-4" />,
-    accentColor: AMBER,
+    accentColor: '#6366F1',
     title: 'Radar Prix',
     desc: "L'écart de prix réel perçu terrain — pas les grilles affichées. Détecté automatiquement.",
     stat: '−15% détecté vs. Acme',
@@ -84,7 +81,7 @@ const FEATURES = [
     icon: <Package className="w-4 h-4" />,
     accentColor: '#F87171',
     title: 'Offres Concurrentes',
-    desc: 'Chaque bundle, essai gratuit ou condition spéciale détectée lors d\'un RDV client.',
+    desc: "Chaque bundle, essai gratuit ou condition spéciale détectée lors d'un RDV client.",
     stat: '3 bundles actifs repérés',
   },
   {
@@ -98,7 +95,7 @@ const FEATURES = [
     icon: <TrendingUp className="w-4 h-4" />,
     accentColor: '#60A5FA',
     title: 'Deals Gagnés / Perdus',
-    desc: 'Pourquoi vous gagnez et pourquoi vous perdez — depuis les verbatims terrain de vos commerciaux.',
+    desc: 'Pourquoi vous gagnez et perdez — depuis les verbatims terrain de vos commerciaux.',
     stat: '+18% closing identifié',
   },
   {
@@ -110,37 +107,34 @@ const FEATURES = [
   },
 ];
 
-/* ─── Comparison data ──────────────────────────────────────── */
+/* ─── Comparison ────────────────────────────────────────────── */
 const COMPARISON = [
-  { aspect: 'Fraîcheur', before: '6 à 12 mois de délai de production', after: 'Signal terrain en temps réel' },
-  { aspect: 'Source', before: 'Sondages, panels, cabinets coûteux', after: 'Verbatims de vos propres RDV clients' },
-  { aspect: 'Coût', before: '15 000€ – 80 000€ par étude', after: 'Abonnement mensuel prévisible' },
-  { aspect: 'Biais', before: 'Déclaratif, questions orientées', after: 'Comportemental, non sollicité' },
-  { aspect: 'Couverture', before: 'Échantillon représentatif', after: '100% de vos RDV analysés' },
-  { aspect: 'Format', before: 'Rapport PDF + réunion de restitution', after: 'Dashboard filtrable + alertes push' },
+  { aspect: 'Fraîcheur',  before: '6 à 12 mois de délai de production',    after: 'Signal terrain en temps réel' },
+  { aspect: 'Source',     before: 'Sondages, panels, cabinets coûteux',     after: 'Verbatims de vos propres RDV' },
+  { aspect: 'Coût',       before: '15 000€ – 80 000€ par étude',            after: 'Abonnement mensuel prévisible' },
+  { aspect: 'Biais',      before: 'Déclaratif, questions orientées',         after: 'Comportemental, non sollicité' },
+  { aspect: 'Couverture', before: 'Échantillon représentatif',               after: '100% de vos RDV analysés' },
+  { aspect: 'Format',     before: 'Rapport PDF + réunion de restitution',    after: 'Dashboard filtrable + alertes push' },
 ];
 
-/* ─── Testimonials ─────────────────────────────────────────── */
+/* ─── Testimonials ──────────────────────────────────────────── */
 const TESTIMONIALS = [
   {
-    quote:
-      'On avait des battlecards basées sur les comms publiques d\'Acme. Avec Field Intelligence, on a découvert 3 offres bundle qu\'on ignorait complètement — et nos commerciaux gagnent plus.',
+    quote: "On avait des battlecards basées sur les comms publiques d'Acme. Avec Field Intelligence, on a découvert 3 offres bundle qu'on ignorait — et nos commerciaux gagnent plus.",
     name: 'C. Martin',
     role: 'Directrice Marketing',
     company: 'Éditeur SaaS B2B, 80M€ ARR',
     featured: true,
   },
   {
-    quote:
-      'Field Intelligence a remplacé notre réunion mensuelle avec les KAM par un dashboard consulté chaque matin. Le delta de réactivité est énorme.',
+    quote: "Field Intelligence a remplacé notre réunion mensuelle avec les KAM par un dashboard consulté chaque matin. Le delta de réactivité est énorme.",
     name: 'L. Bernard',
     role: 'Head of Product Marketing',
     company: 'Scale-up industrielle, 40 commerciaux',
     featured: false,
   },
   {
-    quote:
-      'Pour la première fois, notre brief produit est basé sur ce que les clients disent réellement en RDV — pas sur ce qu\'ils répondent à nos sondages.',
+    quote: "Pour la première fois, notre brief produit est basé sur ce que les clients disent en RDV — pas sur ce qu'ils répondent à nos sondages.",
     name: 'A. Dupont',
     role: 'VP Marketing',
     company: 'Groupe B2B, 120M€ CA',
@@ -161,46 +155,31 @@ export default function HomePage() {
           from { opacity: 0; }
           to   { opacity: 1; }
         }
-        .fi-1 { animation: fi-up 0.75s cubic-bezier(.22,1,.36,1) 0.05s both; }
-        .fi-2 { animation: fi-up 0.75s cubic-bezier(.22,1,.36,1) 0.18s both; }
-        .fi-3 { animation: fi-up 0.75s cubic-bezier(.22,1,.36,1) 0.30s both; }
-        .fi-4 { animation: fi-up 0.75s cubic-bezier(.22,1,.36,1) 0.42s both; }
-        .fi-5 { animation: fi-up 0.75s cubic-bezier(.22,1,.36,1) 0.56s both; }
-        .fi-6 { animation: fi-fade 0.9s cubic-bezier(.22,1,.36,1) 0.70s both; }
+        .fi-1 { animation: fi-up 0.7s cubic-bezier(.22,1,.36,1) 0.05s both; }
+        .fi-2 { animation: fi-up 0.7s cubic-bezier(.22,1,.36,1) 0.17s both; }
+        .fi-3 { animation: fi-up 0.7s cubic-bezier(.22,1,.36,1) 0.29s both; }
+        .fi-4 { animation: fi-up 0.7s cubic-bezier(.22,1,.36,1) 0.41s both; }
+        .fi-5 { animation: fi-up 0.7s cubic-bezier(.22,1,.36,1) 0.55s both; }
+        .fi-6 { animation: fi-fade 0.9s cubic-bezier(.22,1,.36,1) 0.65s both; }
       `}</style>
 
-      {/* ═══════════════════════════════════════════════════════
-          HERO — 2-column left-aligned
-      ═══════════════════════════════════════════════════════ */}
+      {/* ══ HERO ══════════════════════════════════════════════ */}
       <section
         className="relative min-h-[100svh] flex items-center px-5 sm:px-8 pt-24 pb-20 overflow-hidden"
         style={{ background: BG }}
       >
-        <DotGrid opacity={0.55} />
+        <DotGrid />
 
-        {/* Amber glow — upper right */}
+        {/* Indigo glow — upper right */}
         <div
           className="absolute pointer-events-none"
           style={{
-            top: '-10%',
-            right: '-5%',
+            top: '-5%',
+            right: '-8%',
             width: '55%',
-            paddingBottom: '55%',
+            paddingBottom: '45%',
             borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(245,158,11,0.07) 0%, transparent 65%)',
-          }}
-          aria-hidden="true"
-        />
-        {/* Subtle lower left glow */}
-        <div
-          className="absolute pointer-events-none"
-          style={{
-            bottom: '5%',
-            left: '-5%',
-            width: '40%',
-            paddingBottom: '40%',
-            borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(129,140,248,0.05) 0%, transparent 65%)',
+            background: 'radial-gradient(circle, rgba(99,102,241,0.10) 0%, transparent 65%)',
           }}
           aria-hidden="true"
         />
@@ -208,57 +187,60 @@ export default function HomePage() {
         <div className="relative z-10 max-w-6xl mx-auto w-full">
           <div className="grid grid-cols-1 lg:grid-cols-[1fr_440px] gap-14 xl:gap-20 items-center">
 
-            {/* ── Left column ── */}
+            {/* Left */}
             <div className="space-y-8 max-w-2xl">
               {/* Badge */}
               <div
                 className="fi-1 inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-[12px]"
                 style={{
-                  border: `1px solid rgba(245,158,11,0.25)`,
-                  background: 'rgba(245,158,11,0.07)',
-                  color: 'rgba(245,158,11,0.85)',
+                  border: `1px solid rgba(99,102,241,0.30)`,
+                  background: 'rgba(99,102,241,0.08)',
+                  color: '#818CF8',
                 }}
               >
-                <span
-                  className="w-1.5 h-1.5 rounded-full animate-pulse"
-                  style={{ background: AMBER }}
-                />
+                <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: INDIGO }} />
                 Intelligence terrain en temps réel
               </div>
 
-              {/* Headline — Cormorant Garamond italic */}
+              {/* Headline — Syne bold, cohérent avec l'app */}
               <h1
-                className="fi-2 text-white font-semibold italic leading-[1.0]"
+                className="fi-2 text-white font-extrabold leading-[1.0] tracking-[-0.04em]"
                 style={{
-                  fontFamily: 'var(--font-cormorant), Georgia, serif',
-                  fontSize: 'clamp(52px, 8.5vw, 108px)',
-                  letterSpacing: '-0.015em',
+                  fontFamily: 'var(--font-syne), sans-serif',
+                  fontSize: 'clamp(44px, 7.5vw, 96px)',
                 }}
               >
                 Votre marketing<br />
                 mérite mieux<br />
-                <span style={{ color: AMBER }}>que la veille web.</span>
+                <span style={{ color: INDIGO }}>que la veille web.</span>
               </h1>
 
               {/* Body */}
-              <p className="fi-3 text-[16px] leading-[1.85] max-w-lg" style={{ color: 'rgba(255,255,255,0.40)' }}>
+              <p
+                className="fi-3 text-[16px] leading-[1.8] max-w-lg"
+                style={{ color: 'rgba(255,255,255,0.42)' }}
+              >
                 Vos commerciaux entendent ce que les études de marché ne captent jamais.
                 Field Intelligence transforme chaque compte rendu CRM en signal marché
                 exploitable — automatiquement.
               </p>
 
-              {/* CTAs */}
-              <div className="fi-4 flex flex-wrap items-center gap-4">
+              {/* CTAs — style cohérent avec app (indigo primary) */}
+              <div className="fi-4 flex flex-wrap items-center gap-3">
                 <Link
                   href="/auth/signup"
-                  className="inline-flex items-center gap-2 px-6 py-3.5 bg-white text-[#06090F] text-[14px] font-semibold rounded-lg transition-colors hover:bg-amber-50"
+                  className="inline-flex items-center gap-2 px-6 py-3 rounded-lg text-[14px] font-semibold text-white transition-colors"
+                  style={{ background: INDIGO }}
                 >
                   Démarrer gratuitement <ArrowRight className="w-4 h-4" />
                 </Link>
                 <Link
                   href="/demo"
-                  className="inline-flex items-center gap-2 text-[14px] font-medium transition-colors"
-                  style={{ color: 'rgba(255,255,255,0.38)' }}
+                  className="inline-flex items-center gap-2 px-5 py-3 rounded-lg text-[14px] font-medium transition-colors"
+                  style={{
+                    border: `1px solid rgba(255,255,255,0.10)`,
+                    color: 'rgba(255,255,255,0.50)',
+                  }}
                 >
                   Voir une démo <ChevronRight className="w-4 h-4" />
                 </Link>
@@ -267,9 +249,9 @@ export default function HomePage() {
               {/* Stats strip */}
               <div className="fi-5 flex items-center gap-6 pt-1">
                 {[
-                  { n: '85%', label: 'signaux perdus / semaine', amber: false },
-                  { n: '2×', label: 'plus rapide que les études', amber: true },
-                  { n: '100%', label: 'de vos RDV analysés', amber: false },
+                  { n: '85%',  label: 'signaux perdus / semaine',  highlight: false },
+                  { n: '2×',   label: 'plus rapide que les études', highlight: true  },
+                  { n: '100%', label: 'de vos RDV analysés',       highlight: false },
                 ].map((stat, i) => (
                   <>
                     {i > 0 && (
@@ -281,15 +263,18 @@ export default function HomePage() {
                     )}
                     <div key={stat.n}>
                       <span
-                        className="block text-[26px] font-bold tabular-nums"
+                        className="block text-[24px] font-bold tabular-nums"
                         style={{
                           fontFamily: 'var(--font-syne), sans-serif',
-                          color: stat.amber ? AMBER : 'rgba(255,255,255,0.90)',
+                          color: stat.highlight ? '#818CF8' : 'rgba(255,255,255,0.88)',
                         }}
                       >
                         {stat.n}
                       </span>
-                      <span className="text-[11px] leading-tight" style={{ color: 'rgba(255,255,255,0.27)' }}>
+                      <span
+                        className="text-[11px] leading-tight"
+                        style={{ color: 'rgba(255,255,255,0.28)' }}
+                      >
                         {stat.label}
                       </span>
                     </div>
@@ -298,7 +283,7 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* ── Right column — Hero animation ── */}
+            {/* Right — hero animation */}
             <div className="fi-6 hidden lg:block">
               <HeroAnimation />
             </div>
@@ -306,9 +291,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ═══════════════════════════════════════════════════════
-          CRM TRUST BAND
-      ═══════════════════════════════════════════════════════ */}
+      {/* ══ CRM TRUST BAND ════════════════════════════════════ */}
       <section
         className="px-5 sm:px-8 py-8"
         style={{ borderTop: `1px solid ${BORDER}`, borderBottom: `1px solid ${BORDER}`, background: BG }}
@@ -324,9 +307,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ═══════════════════════════════════════════════════════
-          PROBLEM — 3 cards
-      ═══════════════════════════════════════════════════════ */}
+      {/* ══ PROBLEM ═══════════════════════════════════════════ */}
       <section
         className="relative py-24 sm:py-32 px-5 sm:px-8 overflow-hidden"
         style={{ background: BG }}
@@ -344,21 +325,21 @@ export default function HomePage() {
             {[
               {
                 n: '01',
-                accentColor: '#EF4444',
+                accentColor: '#F87171',
                 title: "L'étude est déjà périmée",
-                desc: '6 à 12 mois pour produire. Les concurrents ont bougé. Vous briefez vos équipes avec des données d\'hier.',
+                desc: "6 à 12 mois pour produire. Les concurrents ont bougé. Vous briefez vos équipes avec des données d'hier.",
               },
               {
                 n: '02',
-                accentColor: AMBER,
+                accentColor: '#FBBF24',
                 title: 'Le CR ne remonte jamais',
                 desc: '3 à 5 CR par semaine dans le CRM. Chacun contient des signaux priceless sur la concurrence et les prix. Personne ne les lit.',
               },
               {
                 n: '03',
-                accentColor: '#818CF8',
+                accentColor: INDIGO,
                 title: 'Vos battlecards sont du vent',
-                desc: 'Basées sur ce que les concurrents affichent — pas ce qu\'ils font sur le terrain. Le décalage se voit dans vos taux de closing.',
+                desc: "Basées sur ce que les concurrents affichent — pas ce qu'ils font sur le terrain. Le décalage se voit dans vos taux de closing.",
               },
             ].map((p) => (
               <div
@@ -370,7 +351,6 @@ export default function HomePage() {
                   borderRadius: '12px',
                 }}
               >
-                {/* Top accent bar */}
                 <div style={{ height: 2, background: p.accentColor }} />
                 <div className="p-6 space-y-4">
                   <span
@@ -380,12 +360,15 @@ export default function HomePage() {
                     {p.n}
                   </span>
                   <h3
-                    className="text-[16px] font-bold text-white leading-snug"
+                    className="text-[15px] font-bold text-white leading-snug"
                     style={{ fontFamily: 'var(--font-syne), sans-serif' }}
                   >
                     {p.title}
                   </h3>
-                  <p className="text-[13px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.37)' }}>
+                  <p
+                    className="text-[13px] leading-relaxed"
+                    style={{ color: 'rgba(255,255,255,0.38)' }}
+                  >
                     {p.desc}
                   </p>
                 </div>
@@ -395,9 +378,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ═══════════════════════════════════════════════════════
-          FEATURES — 3-column grid with accent bars
-      ═══════════════════════════════════════════════════════ */}
+      {/* ══ FEATURES ══════════════════════════════════════════ */}
       <section
         className="relative py-24 sm:py-32 px-5 sm:px-8 overflow-hidden"
         style={{ background: BG_RAISED, borderTop: `1px solid ${BORDER}` }}
@@ -411,51 +392,47 @@ export default function HomePage() {
             </SectionTitle>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {FEATURES.map((f) => (
               <div
                 key={f.title}
-                className="overflow-hidden group cursor-default hover:border-white/[0.14] transition-colors duration-300"
+                className="overflow-hidden hover:border-white/[0.14] transition-colors duration-200"
                 style={{
                   background: BG,
                   border: `1px solid ${BORDER}`,
-                  borderRadius: '12px',
+                  borderRadius: '10px',
                 }}
               >
-                {/* Colored top bar */}
                 <div style={{ height: 2, background: f.accentColor }} />
-                <div className="p-6 space-y-4 h-full flex flex-col">
-                  {/* Icon + title */}
+                <div className="p-5 space-y-4">
                   <div className="flex items-center gap-3">
                     <div
-                      className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                      className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
                       style={{
-                        background: `${f.accentColor}14`,
+                        background: `${f.accentColor}18`,
                         color: f.accentColor,
                       }}
                     >
                       {f.icon}
                     </div>
                     <h3
-                      className="text-[15px] font-bold text-white"
+                      className="text-[14px] font-bold text-white"
                       style={{ fontFamily: 'var(--font-syne), sans-serif' }}
                     >
                       {f.title}
                     </h3>
                   </div>
-                  {/* Description */}
                   <p
-                    className="text-[13px] leading-relaxed flex-1"
-                    style={{ color: 'rgba(255,255,255,0.37)' }}
+                    className="text-[13px] leading-relaxed"
+                    style={{ color: 'rgba(255,255,255,0.38)' }}
                   >
                     {f.desc}
                   </p>
-                  {/* Stat badge */}
                   <div
-                    className="inline-flex self-start items-center text-[12px] font-semibold px-3 py-1 rounded-md"
+                    className="inline-flex items-center text-[11px] font-semibold px-2.5 py-1 rounded-md"
                     style={{
                       background: `${f.accentColor}12`,
-                      border: `1px solid ${f.accentColor}22`,
+                      border: `1px solid ${f.accentColor}20`,
                       color: f.accentColor,
                     }}
                   >
@@ -478,9 +455,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ═══════════════════════════════════════════════════════
-          BEFORE / AFTER — VS layout
-      ═══════════════════════════════════════════════════════ */}
+      {/* ══ BEFORE / AFTER ════════════════════════════════════ */}
       <section
         className="relative py-24 sm:py-32 px-5 sm:px-8 overflow-hidden"
         style={{ background: BG, borderTop: `1px solid ${BORDER}` }}
@@ -494,33 +469,36 @@ export default function HomePage() {
             </SectionTitle>
           </div>
 
-          {/* VS panels */}
           <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-0 md:gap-4 items-stretch">
-            {/* Left — avant */}
+            {/* Avant */}
             <div
               className="overflow-hidden"
               style={{
                 background: 'rgba(239,68,68,0.03)',
                 border: '1px solid rgba(239,68,68,0.12)',
-                borderRadius: '14px',
+                borderRadius: '12px',
               }}
             >
               <div
-                className="px-6 py-4 flex items-center gap-2"
+                className="px-5 py-3.5 flex items-center gap-2"
                 style={{ borderBottom: '1px solid rgba(239,68,68,0.10)' }}
               >
-                <XCircle className="w-4 h-4" style={{ color: 'rgba(239,68,68,0.7)' }} />
+                <XCircle className="w-4 h-4" style={{ color: 'rgba(239,68,68,0.65)' }} />
                 <span
-                  className="text-[12px] font-semibold uppercase tracking-widest"
-                  style={{ color: 'rgba(239,68,68,0.6)', fontFamily: 'var(--font-syne), sans-serif' }}
+                  className="text-[11px] font-semibold uppercase tracking-widest"
+                  style={{ color: 'rgba(239,68,68,0.55)', fontFamily: 'var(--font-syne), sans-serif' }}
                 >
                   Étude de marché
                 </span>
               </div>
-              <ul className="divide-y" style={{ borderColor: 'rgba(239,68,68,0.07)' }}>
-                {COMPARISON.map((row) => (
-                  <li key={row.aspect} className="px-6 py-4 flex items-start gap-3">
-                    <XCircle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" style={{ color: 'rgba(239,68,68,0.45)' }} />
+              <ul>
+                {COMPARISON.map((row, i) => (
+                  <li
+                    key={row.aspect}
+                    className="px-5 py-3.5 flex items-start gap-3"
+                    style={i > 0 ? { borderTop: '1px solid rgba(239,68,68,0.07)' } : {}}
+                  >
+                    <XCircle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" style={{ color: 'rgba(239,68,68,0.40)' }} />
                     <div>
                       <span
                         className="block text-[10px] uppercase tracking-wider mb-0.5"
@@ -540,14 +518,14 @@ export default function HomePage() {
               </ul>
             </div>
 
-            {/* VS badge */}
+            {/* VS */}
             <div className="hidden md:flex items-center justify-center">
               <div
-                className="w-10 h-10 rounded-full flex items-center justify-center text-[12px] font-bold z-10 flex-shrink-0"
+                className="w-9 h-9 rounded-full flex items-center justify-center text-[11px] font-bold flex-shrink-0"
                 style={{
                   background: BG_RAISED,
                   border: `1px solid ${BORDER}`,
-                  color: 'rgba(255,255,255,0.30)',
+                  color: 'rgba(255,255,255,0.28)',
                   fontFamily: 'var(--font-syne), sans-serif',
                 }}
               >
@@ -555,31 +533,35 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* Right — après */}
+            {/* Après */}
             <div
               className="overflow-hidden mt-4 md:mt-0"
               style={{
-                background: 'rgba(16,185,129,0.03)',
-                border: '1px solid rgba(16,185,129,0.15)',
-                borderRadius: '14px',
+                background: 'rgba(99,102,241,0.04)',
+                border: '1px solid rgba(99,102,241,0.18)',
+                borderRadius: '12px',
               }}
             >
               <div
-                className="px-6 py-4 flex items-center gap-2"
-                style={{ borderBottom: '1px solid rgba(16,185,129,0.10)' }}
+                className="px-5 py-3.5 flex items-center gap-2"
+                style={{ borderBottom: '1px solid rgba(99,102,241,0.10)' }}
               >
-                <CheckCircle className="w-4 h-4 text-emerald-400" />
+                <CheckCircle className="w-4 h-4" style={{ color: '#818CF8' }} />
                 <span
-                  className="text-[12px] font-semibold uppercase tracking-widest text-emerald-400"
-                  style={{ fontFamily: 'var(--font-syne), sans-serif' }}
+                  className="text-[11px] font-semibold uppercase tracking-widest"
+                  style={{ color: '#818CF8', fontFamily: 'var(--font-syne), sans-serif' }}
                 >
                   Field Intelligence
                 </span>
               </div>
-              <ul className="divide-y" style={{ borderColor: 'rgba(16,185,129,0.07)' }}>
-                {COMPARISON.map((row) => (
-                  <li key={row.aspect} className="px-6 py-4 flex items-start gap-3">
-                    <CheckCircle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-emerald-500" />
+              <ul>
+                {COMPARISON.map((row, i) => (
+                  <li
+                    key={row.aspect}
+                    className="px-5 py-3.5 flex items-start gap-3"
+                    style={i > 0 ? { borderTop: '1px solid rgba(99,102,241,0.07)' } : {}}
+                  >
+                    <CheckCircle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" style={{ color: '#818CF8' }} />
                     <div>
                       <span
                         className="block text-[10px] uppercase tracking-wider mb-0.5"
@@ -587,7 +569,12 @@ export default function HomePage() {
                       >
                         {row.aspect}
                       </span>
-                      <span className="text-[13px] font-medium text-emerald-300">{row.after}</span>
+                      <span
+                        className="text-[13px] font-medium"
+                        style={{ color: '#a5b4fc' }}
+                      >
+                        {row.after}
+                      </span>
                     </div>
                   </li>
                 ))}
@@ -597,26 +584,22 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ═══════════════════════════════════════════════════════
-          ROI SIMULATOR
-      ═══════════════════════════════════════════════════════ */}
+      {/* ══ ROI SIMULATOR ═════════════════════════════════════ */}
       <section
         id="simulator"
         className="relative py-24 sm:py-32 px-5 sm:px-8 overflow-hidden"
         style={{ background: BG_RAISED, borderTop: `1px solid ${BORDER}` }}
       >
-        {/* Amber glow center */}
         <div
           className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none"
           style={{
             width: 500,
             height: 300,
             borderRadius: '50%',
-            background: 'radial-gradient(ellipse, rgba(245,158,11,0.07) 0%, transparent 70%)',
+            background: 'radial-gradient(ellipse, rgba(99,102,241,0.08) 0%, transparent 70%)',
           }}
           aria-hidden="true"
         />
-
         <div className="relative z-10 max-w-4xl mx-auto space-y-12">
           <div className="text-center space-y-1">
             <SectionLabel>Simulateur</SectionLabel>
@@ -629,9 +612,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ═══════════════════════════════════════════════════════
-          TESTIMONIALS — editorial style
-      ═══════════════════════════════════════════════════════ */}
+      {/* ══ TESTIMONIALS ══════════════════════════════════════ */}
       <section
         className="relative py-24 sm:py-32 px-5 sm:px-8 overflow-hidden"
         style={{ background: BG, borderTop: `1px solid ${BORDER}` }}
@@ -645,37 +626,26 @@ export default function HomePage() {
             </SectionTitle>
           </div>
 
-          {/* Featured testimonial */}
+          {/* Featured */}
           <div
-            className="relative overflow-hidden p-8 sm:p-10"
+            className="p-8 sm:p-10"
             style={{
               background: BG_RAISED,
               border: `1px solid ${BORDER}`,
-              borderLeft: `3px solid ${AMBER}`,
-              borderRadius: '14px',
+              borderLeft: `3px solid ${INDIGO}`,
+              borderRadius: '12px',
             }}
           >
-            <div
-              className="absolute top-6 right-8 text-[80px] leading-none font-serif select-none pointer-events-none"
-              style={{
-                fontFamily: 'var(--font-cormorant), Georgia, serif',
-                color: 'rgba(245,158,11,0.10)',
-                lineHeight: 1,
-              }}
-              aria-hidden="true"
-            >
-              &ldquo;
-            </div>
             <p
-              className="text-[17px] sm:text-[19px] leading-[1.75] text-white/70 italic relative z-10 max-w-3xl"
-              style={{ fontFamily: 'var(--font-cormorant), Georgia, serif' }}
+              className="text-[16px] sm:text-[18px] leading-[1.8] italic max-w-3xl"
+              style={{ color: 'rgba(255,255,255,0.65)' }}
             >
-              {TESTIMONIALS[0].quote}
+              &ldquo;{TESTIMONIALS[0].quote}&rdquo;
             </p>
             <div className="mt-6 flex items-center gap-3">
               <div
                 className="w-9 h-9 rounded-full flex items-center justify-center text-[12px] font-bold flex-shrink-0"
-                style={{ background: AMBER_DIM, border: `1px solid rgba(245,158,11,0.25)`, color: AMBER }}
+                style={{ background: INDIGO_DIM, border: `1px solid rgba(99,102,241,0.28)`, color: '#818CF8' }}
               >
                 {TESTIMONIALS[0].name.split(' ').map((n) => n[0]).join('')}
               </div>
@@ -688,12 +658,12 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* 2 smaller testimonials */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          {/* 2 smaller */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {TESTIMONIALS.slice(1).map((t, i) => (
               <div
                 key={i}
-                className="p-7 flex flex-col gap-5"
+                className="p-6 flex flex-col gap-5"
                 style={{
                   background: BG_RAISED,
                   border: `1px solid ${BORDER}`,
@@ -702,16 +672,12 @@ export default function HomePage() {
               >
                 <div className="flex gap-0.5">
                   {Array.from({ length: 5 }).map((_, si) => (
-                    <span key={si} style={{ color: AMBER, fontSize: 13 }}>★</span>
+                    <span key={si} style={{ color: '#818CF8', fontSize: 13 }}>★</span>
                   ))}
                 </div>
                 <p
                   className="text-[13px] leading-[1.75] flex-1 italic"
-                  style={{
-                    color: 'rgba(255,255,255,0.45)',
-                    fontFamily: 'var(--font-cormorant), Georgia, serif',
-                    fontSize: 15,
-                  }}
+                  style={{ color: 'rgba(255,255,255,0.45)' }}
                 >
                   &ldquo;{t.quote}&rdquo;
                 </p>
@@ -721,7 +687,7 @@ export default function HomePage() {
                 >
                   <div
                     className="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-bold flex-shrink-0"
-                    style={{ background: AMBER_DIM, border: `1px solid rgba(245,158,11,0.20)`, color: AMBER }}
+                    style={{ background: INDIGO_DIM, border: `1px solid rgba(99,102,241,0.22)`, color: '#818CF8' }}
                   >
                     {t.name.split(' ').map((n) => n[0]).join('')}
                   </div>
@@ -738,27 +704,24 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ═══════════════════════════════════════════════════════
-          PRICING
-      ═══════════════════════════════════════════════════════ */}
+      {/* ══ PRICING ═══════════════════════════════════════════ */}
       <section
         id="pricing"
         className="relative py-24 sm:py-32 px-5 sm:px-8 overflow-hidden"
         style={{ background: BG_RAISED, borderTop: `1px solid ${BORDER}` }}
       >
-        {/* Amber glow */}
         <div
           className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none"
           style={{
             width: 480,
             height: 280,
             borderRadius: '50%',
-            background: 'radial-gradient(ellipse, rgba(245,158,11,0.08) 0%, transparent 70%)',
+            background: 'radial-gradient(ellipse, rgba(99,102,241,0.09) 0%, transparent 70%)',
           }}
           aria-hidden="true"
         />
 
-        <div className="relative z-10 max-w-lg mx-auto space-y-8">
+        <div className="relative z-10 max-w-md mx-auto space-y-8">
           <div className="text-center space-y-1">
             <SectionLabel>Pricing</SectionLabel>
             <SectionTitle className="text-center">
@@ -771,22 +734,21 @@ export default function HomePage() {
             className="overflow-hidden"
             style={{
               background: BG,
-              border: `1px solid rgba(245,158,11,0.28)`,
-              borderRadius: '16px',
-              boxShadow: '0 0 60px rgba(245,158,11,0.06)',
+              border: `1px solid rgba(99,102,241,0.30)`,
+              borderRadius: '14px',
+              boxShadow: '0 0 60px rgba(99,102,241,0.06)',
             }}
           >
-            {/* Top badge */}
             <div
               className="px-8 py-3 flex items-center justify-between"
               style={{
-                borderBottom: `1px solid rgba(245,158,11,0.14)`,
-                background: 'rgba(245,158,11,0.05)',
+                borderBottom: `1px solid rgba(99,102,241,0.12)`,
+                background: 'rgba(99,102,241,0.06)',
               }}
             >
               <span
                 className="text-[11px] font-semibold uppercase tracking-widest"
-                style={{ color: AMBER, fontFamily: 'var(--font-syne), sans-serif' }}
+                style={{ color: '#818CF8', fontFamily: 'var(--font-syne), sans-serif' }}
               >
                 Tout inclus
               </span>
@@ -796,19 +758,15 @@ export default function HomePage() {
             </div>
 
             <div className="p-8 space-y-8">
-              {/* Price */}
               <div>
                 <div className="flex items-end gap-2">
                   <span
                     className="font-extrabold text-white leading-none tracking-[-0.04em]"
-                    style={{
-                      fontFamily: 'var(--font-syne), sans-serif',
-                      fontSize: 64,
-                    }}
+                    style={{ fontFamily: 'var(--font-syne), sans-serif', fontSize: 60 }}
                   >
                     199€
                   </span>
-                  <span className="mb-2 text-[14px]" style={{ color: 'rgba(255,255,255,0.30)' }}>
+                  <span className="mb-1.5 text-[14px]" style={{ color: 'rgba(255,255,255,0.30)' }}>
                     /mois
                   </span>
                 </div>
@@ -817,28 +775,32 @@ export default function HomePage() {
                 </p>
               </div>
 
-              {/* Features */}
               <ul className="space-y-3">
                 {[
                   '6 modules analytiques complets',
-                  'Sync CRM automatique (2 ans d\'historique)',
+                  "Sync CRM automatique (2 ans d'historique)",
                   'Utilisateurs illimités',
                   'Alertes et notifications configurables',
                   'Export CSV / PDF',
                   'Support dédié sous 24h',
                   'Hébergement Europe · RGPD',
                 ].map((f) => (
-                  <li key={f} className="flex items-center gap-3 text-[13px]" style={{ color: 'rgba(255,255,255,0.55)' }}>
-                    <CheckCircle className="w-4 h-4 flex-shrink-0" style={{ color: AMBER }} />
+                  <li
+                    key={f}
+                    className="flex items-center gap-3 text-[13px]"
+                    style={{ color: 'rgba(255,255,255,0.55)' }}
+                  >
+                    <CheckCircle className="w-4 h-4 flex-shrink-0" style={{ color: INDIGO }} />
                     {f}
                   </li>
                 ))}
               </ul>
 
-              {/* CTA */}
+              {/* Primary CTA — indigo, matching app's bg-indigo-600 */}
               <Link
                 href="/auth/signup"
-                className="flex items-center justify-center gap-2 w-full py-3.5 rounded-xl bg-white text-[#06090F] font-semibold text-[14px] hover:bg-amber-50 transition-colors"
+                className="flex items-center justify-center gap-2 w-full py-3 rounded-lg font-semibold text-[14px] text-white transition-colors"
+                style={{ background: INDIGO }}
               >
                 Démarrer gratuitement <ArrowRight className="w-4 h-4" />
               </Link>
@@ -851,58 +813,53 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ═══════════════════════════════════════════════════════
-          FINAL CTA — serif editorial headline
-      ═══════════════════════════════════════════════════════ */}
+      {/* ══ FINAL CTA ═════════════════════════════════════════ */}
       <section
         className="relative py-28 sm:py-36 px-5 sm:px-8 overflow-hidden"
         style={{ background: BG, borderTop: `1px solid ${BORDER}` }}
       >
-        <DotGrid opacity={0.45} />
-
-        {/* Center glow */}
+        <DotGrid opacity={0.4} />
         <div
           className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none"
           style={{
             width: 700,
             height: 400,
             borderRadius: '50%',
-            background: 'radial-gradient(ellipse, rgba(245,158,11,0.07) 0%, transparent 65%)',
+            background: 'radial-gradient(ellipse, rgba(99,102,241,0.08) 0%, transparent 65%)',
           }}
           aria-hidden="true"
         />
 
         <div className="relative z-10 max-w-3xl mx-auto text-center space-y-8">
-          {/* Big serif headline */}
           <h2
-            className="text-white font-semibold italic leading-[1.0]"
+            className="text-white font-extrabold leading-[1.05] tracking-[-0.04em]"
             style={{
-              fontFamily: 'var(--font-cormorant), Georgia, serif',
-              fontSize: 'clamp(42px, 7vw, 88px)',
-              letterSpacing: '-0.015em',
+              fontFamily: 'var(--font-syne), sans-serif',
+              fontSize: 'clamp(36px, 6vw, 72px)',
             }}
           >
-            Il est temps d&apos;écouter{' '}
-            <span style={{ color: AMBER }}>le terrain.</span>
+            Vos commerciaux savent.<br />
+            <span style={{ color: '#818CF8' }}>Maintenant votre marketing aussi.</span>
           </h2>
 
           <p
             className="text-[16px] leading-[1.8] max-w-lg mx-auto"
             style={{ color: 'rgba(255,255,255,0.38)' }}
           >
-            Vos commerciaux savent. Maintenant votre marketing aussi.
+            Connectez votre CRM en 10 minutes. Premiers signaux dans la journée.
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
             <Link
               href="/auth/signup"
-              className="inline-flex items-center gap-2 px-7 py-3.5 bg-white text-[#06090F] font-semibold text-[14px] rounded-lg hover:bg-amber-50 transition-colors"
+              className="inline-flex items-center gap-2 px-7 py-3.5 rounded-lg font-semibold text-[14px] text-white transition-colors"
+              style={{ background: INDIGO }}
             >
               Démarrer gratuitement <ArrowRight className="w-4 h-4" />
             </Link>
             <Link
               href="/demo"
-              className="inline-flex items-center gap-2 px-7 py-3.5 text-[14px] font-medium rounded-lg transition-colors"
+              className="inline-flex items-center gap-2 px-7 py-3.5 rounded-lg text-[14px] font-medium transition-colors"
               style={{
                 border: `1px solid rgba(255,255,255,0.11)`,
                 color: 'rgba(255,255,255,0.50)',

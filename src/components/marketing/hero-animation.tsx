@@ -7,7 +7,7 @@ const CR_TEXT =
 
 const TAGS = [
   { label: 'CONCURRENT ACTIF', color: '#EF4444', r: 239, g: 68, b: 68, delay: 0 },
-  { label: 'OFFRE BUNDLE', color: '#F59E0B', r: 245, g: 158, b: 11, delay: 300 },
+  { label: 'OFFRE BUNDLE', color: '#FBBF24', r: 251, g: 191, b: 36, delay: 300 },
   { label: 'ÉCART PRIX −15%', color: '#F97316', r: 249, g: 115, b: 22, delay: 600 },
   { label: 'RISQUE CHURN', color: '#A78BFA', r: 167, g: 139, b: 250, delay: 900 },
 ];
@@ -42,7 +42,7 @@ export function HeroAnimation() {
         className="absolute pointer-events-none"
         style={{
           inset: '-40px',
-          background: 'radial-gradient(ellipse at 60% 45%, rgba(245,158,11,0.13) 0%, transparent 68%)',
+          background: 'radial-gradient(ellipse at 60% 45%, rgba(99,102,241,0.12) 0%, transparent 68%)',
         }}
       />
 
@@ -109,7 +109,7 @@ export function HeroAnimation() {
                   height: 13,
                   marginLeft: 2,
                   verticalAlign: 'middle',
-                  background: '#F59E0B',
+                  background: '#6366F1',
                   animation: 'blink 1s step-end infinite',
                 }}
               />
@@ -169,7 +169,7 @@ export function HeroAnimation() {
                   gap: 6,
                   fontSize: 10,
                   fontFamily: 'monospace',
-                  color: '#F59E0B',
+                  color: '#6366F1',
                 }}
               >
                 <span
@@ -177,7 +177,7 @@ export function HeroAnimation() {
                     width: 6,
                     height: 6,
                     borderRadius: '50%',
-                    background: '#F59E0B',
+                    background: '#6366F1',
                     animation: 'pulse 2s infinite',
                   }}
                 />

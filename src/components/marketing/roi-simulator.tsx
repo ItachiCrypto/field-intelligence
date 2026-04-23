@@ -38,7 +38,7 @@ function Slider({
           onChange={(e) => onChange(Number(e.target.value))}
           className="w-full h-[3px] rounded-full appearance-none cursor-pointer relative z-10"
           style={{
-            background: `linear-gradient(to right, #F59E0B 0%, #F59E0B ${pct}%, rgba(255,255,255,0.07) ${pct}%, rgba(255,255,255,0.07) 100%)`,
+            background: `linear-gradient(to right, #6366F1 0%, #6366F1 ${pct}%, rgba(255,255,255,0.07) ${pct}%, rgba(255,255,255,0.07) 100%)`,
             WebkitAppearance: 'none',
           }}
         />
@@ -125,7 +125,7 @@ export function RoiSimulator() {
             {[
               { value: fmt(signaux * 4), label: 'signaux perdus / mois', color: 'rgba(255,255,255,0.85)' },
               { value: `${pertePct}%`, label: 'intel. marché perdue', color: '#EF4444' },
-              { value: `~${fmtEur(caPerdu)}`, label: 'CA non capturé / mois', color: '#F59E0B' },
+              { value: `~${fmtEur(caPerdu)}`, label: 'CA non capturé / mois', color: '#6366F1' },
             ].map((kpi) => (
               <div
                 key={kpi.label}

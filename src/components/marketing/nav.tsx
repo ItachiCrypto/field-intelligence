@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Menu, X, Activity } from 'lucide-react';
+import { Menu, X, Zap } from 'lucide-react';
 
 const links = [
   { label: 'Fonctionnalités', href: '/fonctionnalites' },
@@ -36,9 +36,9 @@ export function MarketingNav() {
         <Link href="/" className="flex items-center gap-2.5 flex-shrink-0">
           <div
             className="w-7 h-7 rounded-lg flex items-center justify-center"
-            style={{ background: '#F59E0B' }}
+            style={{ background: '#6366F1' }}
           >
-            <Activity className="w-3.5 h-3.5 text-white" strokeWidth={2.5} />
+            <Zap className="w-3.5 h-3.5 text-white" fill="currentColor" />
           </div>
           <span
             className="text-white font-bold text-[15px] tracking-tight"
