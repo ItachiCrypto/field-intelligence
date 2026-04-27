@@ -137,7 +137,6 @@ export default function HomePage() {
               <h1
                 className="fi-2 text-slate-900 font-extrabold leading-[1.05] tracking-[-0.03em]"
                 style={{
-                  fontFamily: 'var(--font-syne), sans-serif',
                   fontSize: 'clamp(36px, 6vw, 64px)',
                 }}
               >
@@ -179,7 +178,6 @@ export default function HomePage() {
                     <div key={stat.n}>
                       <div
                         className={`text-2xl font-bold tabular-nums ${stat.cls}`}
-                        style={{ fontFamily: 'var(--font-syne), sans-serif' }}
                       >
                         {stat.n}
                       </div>
@@ -215,7 +213,6 @@ export default function HomePage() {
             <p className="text-xs font-semibold text-indigo-600 uppercase tracking-widest mb-3">Le problème</p>
             <h2
               className="text-3xl sm:text-4xl font-bold text-slate-900 leading-tight tracking-tight"
-              style={{ fontFamily: 'var(--font-syne), sans-serif' }}
             >
               85% des signaux terrain disparaissent chaque semaine.
             </h2>
@@ -255,7 +252,6 @@ export default function HomePage() {
                   </span>
                   <h3
                     className="text-base font-semibold text-slate-900"
-                    style={{ fontFamily: 'var(--font-syne), sans-serif' }}
                   >
                     {p.title}
                   </h3>
@@ -274,7 +270,6 @@ export default function HomePage() {
             <p className="text-xs font-semibold text-indigo-600 uppercase tracking-widest mb-3">Fonctionnalités</p>
             <h2
               className="text-3xl sm:text-4xl font-bold text-slate-900 leading-tight tracking-tight"
-              style={{ fontFamily: 'var(--font-syne), sans-serif' }}
             >
               Six radars. Une seule source de vérité.
             </h2>
@@ -292,7 +287,6 @@ export default function HomePage() {
                   </div>
                   <h3
                     className="text-[14px] font-semibold text-slate-900"
-                    style={{ fontFamily: 'var(--font-syne), sans-serif' }}
                   >
                     {f.title}
                   </h3>
@@ -321,7 +315,6 @@ export default function HomePage() {
             <p className="text-xs font-semibold text-indigo-600 uppercase tracking-widest mb-3">Avant / Après</p>
             <h2
               className="text-3xl sm:text-4xl font-bold text-slate-900 leading-tight tracking-tight"
-              style={{ fontFamily: 'var(--font-syne), sans-serif' }}
             >
               Ce n&apos;est pas une étude de marché améliorée.
             </h2>
@@ -368,7 +361,6 @@ export default function HomePage() {
             <p className="text-xs font-semibold text-indigo-600 uppercase tracking-widest mb-3">Simulateur</p>
             <h2
               className="text-3xl sm:text-4xl font-bold text-slate-900 leading-tight tracking-tight"
-              style={{ fontFamily: 'var(--font-syne), sans-serif' }}
             >
               Calculez ce que vous perdez chaque semaine.
             </h2>
@@ -384,7 +376,6 @@ export default function HomePage() {
             <p className="text-xs font-semibold text-indigo-600 uppercase tracking-widest mb-3">Témoignages</p>
             <h2
               className="text-3xl sm:text-4xl font-bold text-slate-900 leading-tight tracking-tight"
-              style={{ fontFamily: 'var(--font-syne), sans-serif' }}
             >
               Ce qu&apos;en disent nos clients.
             </h2>
@@ -426,7 +417,6 @@ export default function HomePage() {
             <p className="text-xs font-semibold text-indigo-600 uppercase tracking-widest mb-3">Pricing</p>
             <h2
               className="text-3xl sm:text-4xl font-bold text-slate-900 leading-tight tracking-tight"
-              style={{ fontFamily: 'var(--font-syne), sans-serif' }}
             >
               Simple. Tout inclus.
             </h2>
@@ -446,7 +436,6 @@ export default function HomePage() {
                 <div className="flex items-end gap-1.5">
                   <span
                     className="text-5xl font-extrabold text-slate-900 leading-none tracking-tight"
-                    style={{ fontFamily: 'var(--font-syne), sans-serif' }}
                   >
                     199€
                   </span>
@@ -495,7 +484,6 @@ export default function HomePage() {
           <h2
             className="text-white font-extrabold leading-tight tracking-tight"
             style={{
-              fontFamily: 'var(--font-syne), sans-serif',
               fontSize: 'clamp(28px, 5vw, 52px)',
             }}
           >

@@ -36,7 +36,6 @@ export function MarketingNav() {
           </div>
           <span
             className="text-slate-900 font-bold text-[15px] tracking-tight"
-            style={{ fontFamily: 'var(--font-syne), sans-serif' }}
           >
             Field Intelligence
           </span>
