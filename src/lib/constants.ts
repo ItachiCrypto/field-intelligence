@@ -80,6 +80,7 @@ export const NAV_BY_ROLE: Record<UserRole, NavSection[]> = {
     {
       items: [
         { label: 'Abbreviations', href: '/abbreviations', icon: 'BookOpen' },
+        { label: 'Guide CR', href: '/guide-cr', icon: 'GraduationCap' },
         { label: 'Parametres', href: '/settings', icon: 'Settings' },
       ],
     },
@@ -114,6 +115,7 @@ export const NAV_BY_ROLE: Record<UserRole, NavSection[]> = {
     {
       items: [
         { label: 'Abbreviations', href: '/abbreviations', icon: 'BookOpen' },
+        { label: 'Guide CR', href: '/guide-cr', icon: 'GraduationCap' },
         { label: 'Parametres', href: '/settings', icon: 'Settings' },
       ],
     },
@@ -124,6 +126,7 @@ export const NAV_BY_ROLE: Record<UserRole, NavSection[]> = {
         { label: 'Dashboard', href: '/dashboard', icon: 'LayoutDashboard' },
         { label: 'Portefeuille', href: '/portfolio', icon: 'Briefcase' },
         { label: 'Centre d\'Alertes', href: '/alerts', icon: 'Bell' },
+        { label: 'Guide CR', href: '/guide-cr', icon: 'GraduationCap' },
         { label: 'Parametres', href: '/settings', icon: 'Settings' },
       ],
     },
@@ -149,6 +152,7 @@ export const NAV_BY_ROLE: Record<UserRole, NavSection[]> = {
     {
       items: [
         { label: 'Abbreviations', href: '/abbreviations', icon: 'BookOpen' },
+        { label: 'Guide CR', href: '/guide-cr', icon: 'GraduationCap' },
         { label: 'Parametres', href: '/settings', icon: 'Settings' },
       ],
     },
