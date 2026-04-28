@@ -73,7 +73,7 @@ export async function updateSession(request: NextRequest) {
   const isAdminRoute = pathname.startsWith('/admin');
   const isAdminApi = pathname.startsWith('/api/admin');
   const isPublicApi = isApiRoute && isPublicApiRoute(pathname);
-  const MARKETING_ROUTES = ['/fonctionnalites', '/pourquoi', '/comment', '/blog', '/demo'];
+  const MARKETING_ROUTES = ['/fonctionnalites', '/pourquoi', '/comment', '/guide-cr', '/blog', '/demo'];
   const isMarketingRoute = pathname === '/' || MARKETING_ROUTES.some(r => pathname === r || pathname.startsWith(r + '/'));
   const isPublicRoute = isMarketingRoute || isAuthRoute;
 
