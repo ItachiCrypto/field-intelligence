@@ -167,7 +167,7 @@ export default function PourquoiPage() {
             <h2
               className="text-3xl sm:text-4xl font-bold text-[#111827] leading-tight"
             >
-              Ce n'est pas une étude de marché améliorée
+              Le terrain au cœur de votre performance marketing
             </h2>
             <p className="text-slate-600 max-w-2xl mx-auto">
               C'est une catégorie différente. L'intelligence terrain est continue, non sollicitée et ancrée dans votre propre portefeuille client.

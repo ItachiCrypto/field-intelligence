@@ -8,6 +8,7 @@ const links = [
   { label: 'Fonctionnalités', href: '/fonctionnalites' },
   { label: 'Pourquoi', href: '/pourquoi' },
   { label: 'Comment', href: '/comment' },
+  { label: 'Guide CR', href: '/guide-cr' },
   { label: 'Pricing', href: '/#pricing' },
   { label: 'Blog', href: '/blog' },
 ];

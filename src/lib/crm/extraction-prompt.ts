@@ -11,10 +11,16 @@ import type { ExtractedCRData } from './types';
 // ---------------------------------------------------------------------------
 const MAX_CR_INPUT_CHARS = 32_000;
 
+// Hard cap on the company-supplied business context. The user fills this in
+// at signup time; cap it before injection so a 50k-char paste cannot blow up
+// every prompt for the lifetime of the account.
+const MAX_BUSINESS_CONTEXT_CHARS = 4_000;
+
 export function buildExtractionPrompt(
   crText: string,
   knownCompetitors: string[],
   knownAbbreviations: { short: string; full: string }[],
+  businessContext?: string | null,
 ): string {
   const safeCr =
     typeof crText === 'string'
@@ -30,10 +36,27 @@ export function buildExtractionPrompt(
     ? `Abbreviations : ${knownAbbreviations.map(a => `${a.short}=${a.full}`).join(', ')}`
     : '';
 
+  const trimmedContext = (businessContext ?? '').trim();
+  const safeContext =
+    trimmedContext.length > MAX_BUSINESS_CONTEXT_CHARS
+      ? trimmedContext.slice(0, MAX_BUSINESS_CONTEXT_CHARS) + '\n[... tronque]'
+      : trimmedContext;
+
+  // Block injected only when the company actually filled it in. Empty/null
+  // context means we omit the section entirely so the prompt stays concise.
+  const contextBlock = safeContext
+    ? `CONTEXTE DE L'ENTREPRISE UTILISATRICE (a utiliser pour mieux interpreter le CR : secteur, produits, concurrents, jargon metier, KPIs prioritaires) :
+"""
+${safeContext}
+"""
+
+`
+    : '';
+
   return `Vous etes un expert en analyse de comptes rendus de visite commerciale francais.
 Analysez ce compte-rendu et extrayez TOUTES les informations structurees en JSON strict.
 
-${competitorsList}
+${contextBlock}${competitorsList}
 ${abbrList}
 
 COMPTE-RENDU:

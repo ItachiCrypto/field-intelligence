@@ -140,7 +140,7 @@ export default function HomePage() {
                   fontSize: 'clamp(36px, 6vw, 64px)',
                 }}
               >
-                Votre marketing mérite mieux que la veille web.
+                Propulsez votre marketing grâce à l&apos;intelligence du terrain.
               </h1>
 
               {/* Body */}
@@ -316,7 +316,7 @@ export default function HomePage() {
             <h2
               className="text-3xl sm:text-4xl font-bold text-slate-900 leading-tight tracking-tight"
             >
-              Ce n&apos;est pas une étude de marché améliorée.
+              Le terrain au cœur de votre performance marketing.
             </h2>
           </div>
 

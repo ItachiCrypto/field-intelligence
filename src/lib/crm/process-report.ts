@@ -34,11 +34,17 @@ export async function processReport(report: RawVisitReport): Promise<{ success: 
       .from('competitors' as any).select('name').eq('company_id', report.company_id);
     const { data: abbreviations } = await supabase
       .from('abbreviations' as any).select('short, "full"').eq('company_id', report.company_id);
+    // business_context is the free-text description the admin fills in at signup
+    // (what the company does, sector, KPIs...). Inject it so the LLM has the
+    // domain background while reading the CR.
+    const { data: companyRow } = await supabase
+      .from('companies' as any).select('business_context').eq('id', report.company_id).maybeSingle() as any;
 
     const prompt = buildExtractionPrompt(
       truncatedContent,
       (competitors ?? []).map(c => c.name),
       (abbreviations ?? []).map(a => ({ short: a.short, full: a.full })),
+      companyRow?.business_context ?? null,
     );
 
     // Call AI API — try Anthropic first, fall back to OpenAI
