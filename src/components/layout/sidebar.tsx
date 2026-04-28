@@ -10,7 +10,7 @@ import {
   Briefcase, Bell, Users, Map, LogOut, BookOpen, Zap,
   DollarSign, TrendingUp, Target, Package, MapPin, Megaphone,
   GitCompare, PieChart, TrendingDown, Brain, Gauge,
-  Smile, CreditCard, Link2, GraduationCap,
+  Smile, CreditCard, Link2, GraduationCap, Sparkles,
 } from 'lucide-react';
 
 const ICON_MAP: Record<string, React.ElementType> = {
@@ -18,7 +18,7 @@ const ICON_MAP: Record<string, React.ElementType> = {
   Briefcase, Bell, Users, Map, BookOpen,
   DollarSign, TrendingUp, Target, Package, MapPin, Megaphone,
   GitCompare, PieChart, TrendingDown, Brain, Smile, CreditCard, Link2, Gauge,
-  GraduationCap,
+  GraduationCap, Sparkles,
 };
 
 export function Sidebar() {
