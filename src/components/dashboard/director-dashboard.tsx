@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react';
 import { KpiCard } from '@/components/shared/kpi-card';
+import { QualityScoreInfo } from '@/components/shared/quality-score-info';
 import { SignalCard } from '@/components/shared/signal-card';
 import { useAppData } from '@/lib/data';
 import { getISOWeekNumber } from '@/lib/date-utils';
@@ -111,6 +112,7 @@ export function DirectorDashboard() {
           suffix="/100"
           icon={<Star className="w-5 h-5" />}
           iconColor="text-amber-600 bg-amber-50"
+          info={<QualityScoreInfo />}
         />
         <KpiCard
           label="Commerciaux actifs"

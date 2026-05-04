@@ -1,5 +1,7 @@
+import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 import { ArrowUpRight, ArrowDownRight, Minus } from 'lucide-react';
+import { InfoPopover } from './info-popover';
 
 interface KpiCardProps {
   label: string;
@@ -10,14 +12,19 @@ interface KpiCardProps {
   suffix?: string;
   icon?: React.ReactNode;
   iconColor?: string;
+  /** Optional info content shown via a (?) icon next to the label. */
+  info?: ReactNode;
 }
 
-export function KpiCard({ label, value, change, invertChange, suffix, icon, iconColor = 'text-slate-600 bg-slate-50' }: KpiCardProps) {
+export function KpiCard({ label, value, change, invertChange, suffix, icon, iconColor = 'text-slate-600 bg-slate-50', info }: KpiCardProps) {
   const goodUp = !invertChange;
   return (
     <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm hover:shadow-md transition-shadow">
       <div className="flex items-start justify-between mb-4">
-        <span className="text-sm font-medium text-slate-500">{label}</span>
+        <div className="flex items-center gap-1.5">
+          <span className="text-sm font-medium text-slate-500">{label}</span>
+          {info && <InfoPopover ariaLabel={`Explications : ${label}`}>{info}</InfoPopover>}
+        </div>
         {icon && (
           <div
             className={cn(

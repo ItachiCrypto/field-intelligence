@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react';
 import { KpiCard } from '@/components/shared/kpi-card';
+import { QualityScoreInfo } from '@/components/shared/quality-score-info';
 import { SignalCard } from '@/components/shared/signal-card';
 import { SeverityIndicator } from '@/components/shared/severity-indicator';
 import { useAppData } from '@/lib/data';
@@ -162,6 +163,7 @@ export function MarketingDashboard() {
           suffix="/100"
           icon={<Gauge className="w-5 h-5" />}
           iconColor="text-emerald-600 bg-emerald-50"
+          info={<QualityScoreInfo />}
         />
       </div>
 

@@ -6,6 +6,7 @@ import { useAppData } from '@/lib/data';
 import { SEVERITY_CONFIG, REGIONS } from '@/lib/constants';
 import { qualityScoreToSeverity, cn } from '@/lib/utils';
 import { KpiCard } from '@/components/shared/kpi-card';
+import { QualityScoreInfo } from '@/components/shared/quality-score-info';
 import { SeverityIndicator } from '@/components/shared/severity-indicator';
 import { Modal } from '@/components/shared/modal';
 import { ConfirmDialog } from '@/components/shared/confirm-dialog';
@@ -183,6 +184,7 @@ export default function TeamPage() {
           label="Score qualite moyen"
           value={avgScore}
           suffix="%"
+          info={<QualityScoreInfo />}
         />
         <KpiCard
           label="CR analyses (total)"
