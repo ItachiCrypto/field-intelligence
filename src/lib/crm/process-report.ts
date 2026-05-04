@@ -94,7 +94,9 @@ export async function processReport(report: RawVisitReport): Promise<{ success: 
         },
         body: JSON.stringify({
           model: modelUsed,
-          max_tokens: 2000,
+          // Voir commentaire du path OpenAI : 4k tokens pour absorber un JSON
+          // dense (plusieurs signals + deals + prix_signals + needs).
+          max_tokens: 4000,
           temperature: 0.1,
           system: 'Vous etes un expert en analyse de comptes rendus de visite commerciale. Repondez uniquement en JSON valide, sans texte avant ou apres.',
           messages: [{ role: 'user', content: prompt }],
@@ -111,8 +113,12 @@ export async function processReport(report: RawVisitReport): Promise<{ success: 
       responseText = anthropicData.content?.[0]?.text ?? '';
       tokensUsedRaw = (anthropicData.usage?.input_tokens ?? 0) + (anthropicData.usage?.output_tokens ?? 0);
     } else if (openaiKey && !openaiKey.includes('xxx')) {
-      // Fallback to OpenAI
-      modelUsed = 'gpt-4o-mini';
+      // OpenAI path. gpt-4.1-mini est le bon tier cout/qualite pour cette
+      // tache structuree FR (~$0.40/$1.60 par MTok, soit ~10x moins cher que
+      // gpt-4o et bien meilleur que gpt-4o-mini sur l'instruction-following
+      // requis par la canonicalisation et la capture des prix). Override via
+      // OPENAI_MODEL (ex. "gpt-5-mini" ou "gpt-4.1") quand disponible.
+      modelUsed = process.env.OPENAI_MODEL?.trim() || 'gpt-4.1-mini';
       const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -121,8 +127,15 @@ export async function processReport(report: RawVisitReport): Promise<{ success: 
         },
         body: JSON.stringify({
           model: modelUsed,
-          max_tokens: 2000,
+          // Le prompt grossit (canonicalisation + table villes + bloc account)
+          // et l'output JSON peut etre dense pour les CRs riches : 4k tokens
+          // donne de la marge pour ne pas tronquer.
+          max_tokens: 4000,
           temperature: 0.1,
+          // Force OpenAI a renvoyer un JSON syntaxiquement valide. Notre
+          // parser tolere du texte autour mais autant supprimer la classe
+          // d'erreur "le modele a oublie une accolade".
+          response_format: { type: 'json_object' },
           messages: [
             { role: 'system', content: 'Vous etes un expert en analyse de comptes rendus de visite commerciale. Repondez uniquement en JSON valide, sans texte avant ou apres.' },
             { role: 'user', content: prompt },
