@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { createServiceClient } from '@/lib/supabase/server';
 import { buildExtractionPrompt, parseExtractionResponse } from './extraction-prompt';
+import { buildCanonicalResolver, canonicalizeExtraction } from './canonicalize';
 import type { RawVisitReport, ExtractedCRData } from './types';
 
 export async function processReport(report: RawVisitReport): Promise<{ success: boolean; error?: string }> {
@@ -40,11 +41,34 @@ export async function processReport(report: RawVisitReport): Promise<{ success: 
     const { data: companyRow } = await supabase
       .from('companies' as any).select('business_context').eq('id', report.company_id).maybeSingle() as any;
 
+    // Lookup the linked Account by client_name to surface its city/region/sector
+    // to the prompt. Salesforce sync fills accounts.region from BillingState ??
+    // BillingCity, so even if the CR text doesn't repeat the location, the AI
+    // gets it from the CRM-linked account. Best-effort: missing match is fine.
+    let accountCtx: { name?: string | null; city?: string | null; region?: string | null; sector?: string | null } | null = null;
+    if (report.client_name?.trim()) {
+      const { data: acc } = await supabase
+        .from('accounts' as any)
+        .select('name, region, sector')
+        .eq('company_id', report.company_id)
+        .ilike('name', report.client_name.trim())
+        .maybeSingle() as any;
+      if (acc) {
+        accountCtx = {
+          name: acc.name ?? null,
+          city: null,
+          region: acc.region ?? null,
+          sector: acc.sector ?? null,
+        };
+      }
+    }
+
     const prompt = buildExtractionPrompt(
       truncatedContent,
       (competitors ?? []).map(c => c.name),
       (abbreviations ?? []).map(a => ({ short: a.short, full: a.full })),
       companyRow?.business_context ?? null,
+      accountCtx,
     );
 
     // Call AI API — try Anthropic first, fall back to OpenAI
@@ -56,8 +80,11 @@ export async function processReport(report: RawVisitReport): Promise<{ success: 
     const openaiKey = process.env.OPENAI_API_KEY;
 
     if (anthropicKey && anthropicKey !== 'sk-xxx') {
-      // Use Anthropic Claude
-      modelUsed = 'claude-sonnet-4-20250514';
+      // Use Anthropic Claude. Sonnet 4.5 is the right cost/quality tier for
+      // this French structured-extraction task — meaningfully better than the
+      // older Sonnet 4 (May 2024) on instruction following and canonicalisation,
+      // similar pricing (~3$/MTok input). Override via ANTHROPIC_MODEL env var.
+      modelUsed = process.env.ANTHROPIC_MODEL?.trim() || 'claude-sonnet-4-5-20250929';
       const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
@@ -119,6 +146,18 @@ export async function processReport(report: RawVisitReport): Promise<{ success: 
     if (!extracted) {
       throw new Error('Failed to parse OpenAI extraction response');
     }
+
+    // Server-side canonicalization (filet de securite). Le prompt demande deja
+    // a l'IA d'utiliser des noms canoniques mais on s'assure que "OneTouch",
+    // "Lifescan" et "LS" se resolvent au meme concurrent meme si l'IA echoue
+    // a appliquer la regle. Sources : abbreviations table + alias-groups
+    // detectes dans business_context + competitors deja en base.
+    const canonResolver = buildCanonicalResolver({
+      abbreviations: (abbreviations ?? []).map((a) => ({ short: a.short, full: a.full })),
+      businessContext: companyRow?.business_context ?? null,
+      knownCompetitors: (competitors ?? []).map((c) => c.name),
+    });
+    canonicalizeExtraction(extracted, canonResolver);
 
     const tokensUsed = tokensUsedRaw;
     let signalsCreated = 0;

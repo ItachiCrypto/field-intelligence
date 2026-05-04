@@ -1,6 +1,8 @@
 // @ts-nocheck
 // Prompt d'extraction enrichi (audit 2026-04-15) : region, secteur, type_offre,
 // type_action_communication, equilibrage marketing/commercial et positif/negatif.
+// Refonte 2026-05-04 : canonicalization concurrents, capture des prix concurrents
+// sans comparaison explicite, table villes->regions etendue, account context.
 import { z } from 'zod';
 import type { ExtractedCRData } from './types';
 
@@ -11,16 +13,26 @@ import type { ExtractedCRData } from './types';
 // ---------------------------------------------------------------------------
 const MAX_CR_INPUT_CHARS = 32_000;
 
-// Hard cap on the company-supplied business context. The user fills this in
-// at signup time; cap it before injection so a 50k-char paste cannot blow up
-// every prompt for the lifetime of the account.
+// Hard cap on the company-supplied business context.
 const MAX_BUSINESS_CONTEXT_CHARS = 4_000;
+
+export interface AccountContext {
+  /** Account name as known in the CRM (Salesforce Account.Name) */
+  name?: string | null;
+  /** Account billing city — used for region inference */
+  city?: string | null;
+  /** Account billing state / region — preferred over city */
+  region?: string | null;
+  /** Account industry, already mapped to internal sector enum */
+  sector?: string | null;
+}
 
 export function buildExtractionPrompt(
   crText: string,
   knownCompetitors: string[],
   knownAbbreviations: { short: string; full: string }[],
   businessContext?: string | null,
+  accountContext?: AccountContext | null,
 ): string {
   const safeCr =
     typeof crText === 'string'
@@ -28,13 +40,17 @@ export function buildExtractionPrompt(
         ? crText.slice(0, MAX_CR_INPUT_CHARS) + '\n[... tronque]'
         : crText
       : '';
-  const competitorsList = knownCompetitors.length > 0
-    ? `Concurrents connus de cette entreprise : ${knownCompetitors.join(', ')}`
-    : 'Aucun concurrent connu.';
+  const competitorsList =
+    knownCompetitors.length > 0
+      ? `Concurrents connus de cette entreprise (a utiliser comme noms canoniques) : ${knownCompetitors.join(', ')}`
+      : 'Aucun concurrent connu pour le moment.';
 
-  const abbrList = knownAbbreviations.length > 0
-    ? `Abbreviations : ${knownAbbreviations.map(a => `${a.short}=${a.full}`).join(', ')}`
-    : '';
+  const abbrList =
+    knownAbbreviations.length > 0
+      ? `Abbreviations / glossaire (left=alias dans le CR, right=forme canonique a utiliser dans tes outputs) :\n${knownAbbreviations
+          .map((a) => `  - ${a.short} = ${a.full}`)
+          .join('\n')}`
+      : '';
 
   const trimmedContext = (businessContext ?? '').trim();
   const safeContext =
@@ -42,8 +58,6 @@ export function buildExtractionPrompt(
       ? trimmedContext.slice(0, MAX_BUSINESS_CONTEXT_CHARS) + '\n[... tronque]'
       : trimmedContext;
 
-  // Block injected only when the company actually filled it in. Empty/null
-  // context means we omit the section entirely so the prompt stays concise.
   const contextBlock = safeContext
     ? `CONTEXTE DE L'ENTREPRISE UTILISATRICE (a utiliser pour mieux interpreter le CR : secteur, produits, concurrents, jargon metier, KPIs prioritaires) :
 """
@@ -53,10 +67,24 @@ ${safeContext}
 `
     : '';
 
+  // Account context (city/region/sector) — quand le CR est rattache a un Account
+  // dans le CRM, on remonte les meta-donnees du compte au prompt. Permet a l'IA
+  // de fixer la region meme quand le CR ne mentionne pas la ville en clair.
+  let accountBlock = '';
+  if (accountContext && (accountContext.city || accountContext.region || accountContext.sector)) {
+    const parts: string[] = [];
+    if (accountContext.name) parts.push(`Compte CRM : ${accountContext.name}`);
+    if (accountContext.city) parts.push(`Ville : ${accountContext.city}`);
+    if (accountContext.region) parts.push(`Region (CRM) : ${accountContext.region}`);
+    if (accountContext.sector) parts.push(`Secteur (CRM) : ${accountContext.sector}`);
+    accountBlock = `CONTEXTE DU COMPTE CRM LIE A CE CR (priorite haute pour fixer region et secteur) :\n${parts.join('\n')}\n\n`;
+  }
+
   return `Vous etes un expert en analyse de comptes rendus de visite commerciale francais.
 Analysez ce compte-rendu et extrayez TOUTES les informations structurees en JSON strict.
 
-${contextBlock}${competitorsList}
+${contextBlock}${accountBlock}${competitorsList}
+
 ${abbrList}
 
 COMPTE-RENDU:
@@ -76,7 +104,7 @@ Extrayez en JSON strict (pas de texte avant/apres, uniquement le JSON) :
       "severity": "rouge|orange|jaune|vert",
       "title": "titre court du signal",
       "content": "description du signal",
-      "competitor_name": "nom du concurrent ou null",
+      "competitor_name": "nom CANONIQUE du concurrent (voir REGLE DE CANONICALISATION) ou null",
       "price_delta": "ecart prix en % ou null",
       "region": "region (heritee du CR si non specifique)"
     }
@@ -86,7 +114,7 @@ Extrayez en JSON strict (pas de texte avant/apres, uniquement le JSON) :
       "view": "marketing|commercial",
       "motif": "prix|produit|offre|timing|concurrent|relation|budget|autre",
       "resultat": "gagne|perdu|en_cours",
-      "concurrent_nom": "nom ou null",
+      "concurrent_nom": "nom CANONIQUE ou null",
       "type_offre": "remise|bundle|gratuit|upgrade|sav|autre",
       "verbatim": "extrait du CR",
       "region": "region (heritee du CR si non specifique)"
@@ -94,10 +122,10 @@ Extrayez en JSON strict (pas de texte avant/apres, uniquement le JSON) :
   ],
   "prix_signals": [
     {
-      "concurrent_nom": "nom",
-      "ecart_pct": 12,
-      "ecart_type": "inferieur|superieur",
-      "verbatim": "extrait",
+      "concurrent_nom": "nom CANONIQUE du concurrent",
+      "ecart_pct": null,
+      "ecart_type": null,
+      "verbatim": "extrait du CR (citation EXACTE de la mention de prix/remise/offre concurrent)",
       "region": "region (heritee du CR si non specifique)"
     }
   ],
@@ -111,37 +139,142 @@ Extrayez en JSON strict (pas de texte avant/apres, uniquement le JSON) :
   ],
   "sentiment": "positif|negatif|neutre|interesse",
   "needs": [
-    { "label": "formulation concise du besoin exprime par le client (ex: 'formation produit', 'delai livraison trop long')", "trend": "up|down|stable|new", "region": "region" }
+    { "label": "formulation concise du besoin exprime par le client", "trend": "up|down|stable|new", "region": "region" }
   ],
   "competitors_mentioned": [
-    { "name": "nom", "mention_type": "description courte", "type_action_communication": "remise|campagne|event|partenariat|autre" }
+    { "name": "nom CANONIQUE", "mention_type": "description courte", "type_action_communication": "remise|campagne|event|partenariat|autre" }
   ]
 }
 
-Regles :
+═════════════════════════════════════════════════════════════════════════════
+REGLE DE CANONICALISATION DES NOMS DE CONCURRENTS — TRES IMPORTANTE
+═════════════════════════════════════════════════════════════════════════════
+
+Quand tu mentionnes un concurrent dans n'importe quel champ
+(competitor_name, concurrent_nom, competitors_mentioned[].name), tu DOIS
+utiliser le NOM CANONIQUE et UN SEUL nom canonique meme s'il est appelle
+de plusieurs facons dans le CR ou la base.
+
+Source de verite pour le nom canonique, dans cet ordre de priorite :
+
+  1. Si le CR ou le contexte d'entreprise contient une ligne du type
+     "Lifescan = OneTouch = LS"  ou  "Abbott = Freestyle = AbbVie",
+     alors TOUS ces termes designent une SEULE entite. Le canonique est
+     LE PREMIER terme de la ligne (ici "Lifescan", "Abbott").
+
+  2. Si le terme apparait dans la liste "Concurrents connus" plus haut,
+     utilise EXACTEMENT cette graphie comme canonique.
+
+  3. Si le terme apparait dans le glossaire d'abbreviations sous forme
+     "X = Y", utilise Y comme canonique.
+
+  4. Sinon, choisis la forme la plus complete observee dans le CR
+     (ex. "OneTouch Verio" plutot que "OneTouch", "FreeStyle Libre"
+     plutot que "Abbott").
+
+Exemples :
+  - CR mentionne "Lifescan", "OneTouch" et "LS" pour la meme entite ?
+    → Tu sors UN seul concurrent_name = "Lifescan" (ou la forme du
+       contexte, peu importe laquelle, mais TOUJOURS la meme).
+  - CR mentionne "BD" et "Becton Dickinson" pour la meme entite ?
+    → Tu sors un seul concurrent_name = "BD" (le canonique connu).
+  - Tu n'inventes JAMAIS un concurrent absent du CR.
+
+Cette regle s'applique aussi a competitors_mentioned (pas de doublons :
+si OneTouch et Lifescan sont la meme boite, une SEULE entree).
+
+═════════════════════════════════════════════════════════════════════════════
+EXTRACTION DES PRIX_SIGNALS — TRES IMPORTANTE
+═════════════════════════════════════════════════════════════════════════════
+
+prix_signals capture TOUTE mention de TARIFICATION concurrente, qu'elle
+soit comparative ou non. INCLURE notamment :
+
+  ✓ Comparaisons explicites : "Acme est 15% moins cher que nous" →
+       ecart_pct=15, ecart_type="inferieur"
+  ✓ Remises concurrents : "Lifescan fait -18% sur volume" →
+       ecart_pct=18, ecart_type="inferieur" (la remise rapproche du concurrent)
+  ✓ Prix absolus concurrent : "BD vend a 4€ net la boite" →
+       ecart_pct=null, ecart_type=null, verbatim contient "4€ net"
+  ✓ Offres promotionnelles : "Pic offre 5 boites + 1 gratuite" →
+       ecart_pct=null, ecart_type=null, verbatim cite l'offre
+  ✓ Marges : "Marque Verte garantit 40% de marge" →
+       ecart_pct=null, ecart_type=null, verbatim cite la marge
+  ✓ Vente flash, prix discount, contrat exclusif a tarif preferentiel.
+
+Regles de remplissage :
+  - concurrent_nom : OBLIGATOIRE, nom canonique du concurrent (voir regle
+    canonicalisation). Si pas de concurrent identifiable, n'extrais PAS
+    le prix_signal.
+  - ecart_pct : nombre entier positif quand un % est cite, sinon null.
+  - ecart_type : "inferieur" si la remise/prix concurrent est plus bas
+    que le notre OU si le concurrent annonce une baisse, "superieur" si
+    plus haut. null quand l'information ne permet pas de trancher.
+  - verbatim : OBLIGATOIRE. Cite TEXTUELLEMENT la phrase du CR qui
+    mentionne le prix/remise/offre.
+
+NE PAS extraire de prix_signal pour les remises/marges sur NOTRE PROPRE
+gamme (ce sont des deals, pas des signaux concurrents).
+
+═════════════════════════════════════════════════════════════════════════════
+REGLES GENERALES
+═════════════════════════════════════════════════════════════════════════════
+
 - Soyez conservateur : n'inventez pas d'information absente du CR.
 - Si aucun signal d'un type, retournez un tableau vide.
-- Les prix doivent etre en pourcentage (ecart_pct est un nombre, pas une string).
 - Le sentiment est une evaluation globale du ton du CR.
 - Chaque deal detecte doit avoir un verbatim extrait directement du CR.
 
 EQUILIBRAGE MARKETING/COMMERCIAL :
-- Si un deal concerne le positionnement produit, l'offre/packaging, le canal de distribution,
-  la communication/marque, l'image, la visibilite -> view="marketing".
-- Sinon, view="commercial" (processus de vente, relation client, negociation, suivi, timing).
-- Visez un equilibre realiste : ~30% des deals doivent etre "marketing" si les signaux le permettent.
+- Si un deal concerne le positionnement produit, l'offre/packaging, le canal
+  de distribution, la communication/marque, l'image, la visibilite -> view="marketing".
+- Sinon, view="commercial" (processus de vente, relation client, negociation,
+  suivi, timing).
+- Visez un equilibre realiste : ~30% des deals doivent etre "marketing"
+  si les signaux le permettent.
 
 EQUILIBRAGE POSITIF/NEGATIF :
-- Meme dans les CRs positifs (deals gagnes, satisfaction), extraire les signaux verts
-  (type=satisfaction, opportunite), les facteurs de succes, les innovations mentionnees.
+- Meme dans les CRs positifs (deals gagnes, satisfaction), extraire les
+  signaux verts (type=satisfaction, opportunite), les facteurs de succes,
+  les innovations mentionnees.
 
-EXTRACTION GEOGRAPHIQUE (region) :
-- Paris->IDF, Lille->Nord, Lyon->Sud-Est, Nantes->Ouest, Bordeaux->Sud-Ouest,
-  Strasbourg->Est, Marseille->Sud, Toulouse->Sud-Ouest.
+═════════════════════════════════════════════════════════════════════════════
+EXTRACTION GEOGRAPHIQUE (region) — table villes->regions etendue
+═════════════════════════════════════════════════════════════════════════════
+
+PRIORITE 1 : si le CONTEXTE DU COMPTE CRM (plus haut) donne une region
+            ou une ville, utilise-la directement.
+PRIORITE 2 : si le CR cite une ville, deduis la region :
+
+  IDF       : Paris, Versailles, Saint-Denis, Boulogne, Nanterre, Saclay, Meudon,
+              Vincennes, Creteil, Cergy, Saint-Germain-en-Laye, Issy
+  Nord      : Lille, Roubaix, Tourcoing, Dunkerque, Arras, Calais, Valenciennes,
+              Cambrai, Amiens, Beauvais
+  Est       : Strasbourg, Metz, Nancy, Mulhouse, Reims, Troyes, Colmar, Belfort,
+              Besancon, Dijon
+  Nord-Est  : Charleville, Sedan, Verdun
+  Ouest     : Nantes, Rennes, Brest, Lorient, Quimper, Vannes, Saint-Nazaire,
+              Saint-Brieuc, Angers, Le Mans, Tours, Caen, Le Havre, Cherbourg,
+              Rouen, Saint-Malo, La Rochelle, Niort, Poitiers
+  Sud-Ouest : Bordeaux, Toulouse, Bayonne, Biarritz, Pau, Tarbes, Agen, Perigueux,
+              Limoges, Brive
+  Sud       : Marseille, Aix-en-Provence, Toulon, Cannes, Antibes, Nice, Avignon,
+              Arles, Nimes, Montpellier, Beziers, Perpignan, Carcassonne
+  Sud-Est   : Lyon, Saint-Etienne, Grenoble, Annecy, Chambery, Valence,
+              Clermont-Ferrand, Saint-Chamond, Aurillac, Chamonix
+
+- Si le CR cite plusieurs villes, choisir la principale (lieu du RDV).
+- Si la region n'est pas determinable, mettre null.
 - Propager la region sur chaque signal/deal/prix_signal/need.
+- Si le CR ne mentionne aucune ville mais que le compte CRM en donne une,
+  utilise celle-la.
 
-EXTRACTION SECTORIELLE :
+═════════════════════════════════════════════════════════════════════════════
+EXTRACTION SECTORIELLE
+═════════════════════════════════════════════════════════════════════════════
+
 - Deduire le secteur a partir du contexte (produits, terminologie).
+- PRIORITE au secteur du compte CRM s'il est fourni (CONTEXTE DU COMPTE).
 - Valeurs valides : Pharma, Industrie, Tech, BTP, Agroalimentaire, Distribution,
   Services, Energie, Transport, Automobile, Autre.
 
@@ -178,10 +311,14 @@ const DealSchema = z.object({
   region: SHORT_TEXT.optional(),
 }).passthrough();
 
+// Refonte 2026-05-04 : ecart_pct et ecart_type deviennent optionnels +
+// nullables pour capturer les remises/offres/prix concurrents qui ne sont
+// pas exprimes en comparaison directe. concurrent_nom et verbatim restent
+// obligatoires : pas de prix_signal sans concurrent identifie ni citation.
 const PrixSignalSchema = z.object({
   concurrent_nom: SHORT_TEXT,
-  ecart_pct: z.number().finite().min(-100).max(1000),
-  ecart_type: z.enum(['inferieur', 'superieur']),
+  ecart_pct: z.union([z.number().finite().min(-100).max(1000), z.null()]).optional(),
+  ecart_type: z.union([z.enum(['inferieur', 'superieur']), z.null()]).optional(),
   verbatim: MEDIUM_TEXT,
   region: SHORT_TEXT.optional(),
 }).passthrough();
@@ -247,12 +384,15 @@ export function parseExtractionResponse(responseText: string): ExtractedCRData |
         ? raw.deals.filter((d: any) => d?.motif && d?.resultat && d?.verbatim)
         : [],
       prix_signals: Array.isArray(raw.prix_signals)
-        ? raw.prix_signals.filter((p: any) => p?.concurrent_nom)
+        ? raw.prix_signals.filter((p: any) => p?.concurrent_nom && p?.verbatim)
             .map((p: any) => ({
               ...p,
-              ecart_pct: typeof p.ecart_pct === 'number' ? p.ecart_pct
-                : typeof p.ecart_pct === 'string' ? parseFloat(p.ecart_pct) || 0
-                : 0,
+              ecart_pct:
+                typeof p.ecart_pct === 'number' ? p.ecart_pct
+                : typeof p.ecart_pct === 'string' && !isNaN(parseFloat(p.ecart_pct)) ? parseFloat(p.ecart_pct)
+                : null,
+              ecart_type:
+                p.ecart_type === 'inferieur' || p.ecart_type === 'superieur' ? p.ecart_type : null,
             }))
         : [],
       objectifs: Array.isArray(raw.objectifs)

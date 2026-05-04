@@ -205,9 +205,22 @@ export default function ContexteIaPage() {
               <textarea
                 value={businessContext}
                 onChange={(e) => setBusinessContext(e.target.value)}
-                rows={14}
+                rows={18}
                 className="w-full px-3.5 py-3 text-sm bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-slate-900 placeholder:text-slate-400 resize-y leading-relaxed"
-                placeholder="Ex : Nous distribuons du matériel de diagnostic glycémique aux pharmacies françaises. Nos commerciaux visitent ~200 pharmacies/mois en région IDF, Sud-Est et Ouest. Nos principaux concurrents sont Abbott, Dexcom et Ypsomed. Le cycle de vente moyen est de 45 jours. KPIs prioritaires : PDM, rotation B7/K7/L7, signature offre AF."
+                placeholder={`Ex :
+Activité : Distributeur de matériel de diagnostic glycémique aux pharmacies françaises.
+Géographie : ~200 pharmacies/mois (IDF, Sud-Est, Ouest, Sud-Ouest).
+Concurrents principaux : Abbott, Dexcom, Ypsomed, BD, Lifescan.
+
+Aliases concurrents (UN GROUPE PAR LIGNE, séparé par "=" ; le PREMIER est le canonique) :
+Lifescan = OneTouch = LS
+Abbott = FreeStyle = FreeStyle Libre
+BD = Becton Dickinson = Micro-Fine
+Ascensia = Contour = Contour Next
+
+Produits / SKU : lecteurs Accu-Chek B7, K7, L7, B7P. Aiguilles Accu-Fine 4mm/5mm/8mm. Auto-Piqueurs FastClix.
+KPIs prioritaires : PDM (Part de Marché), rotation B7/K7/L7, signature offre AF, taux de switch.
+Cycle de vente moyen : 45 jours. Stages pipeline : prospection → démo → contrat → réassort.`}
               />
               <div className="flex items-center justify-between mt-3">
                 <div className="text-xs text-slate-400">
@@ -276,6 +289,16 @@ export default function ContexteIaPage() {
           <li>
             <span className="font-semibold">Concurrents :</span> noms exacts des principaux
             acteurs (Abbott, Dexcom, Ypsomed…). L&apos;IA les reconnaîtra dans les CR.
+          </li>
+          <li>
+            <span className="font-semibold">Aliases concurrents :</span> une ligne par
+            groupe, termes séparés par <code className="font-mono bg-indigo-100 px-1 rounded">=</code>.
+            Le 1<sup>er</sup> est le nom canonique. Ex.{' '}
+            <code className="font-mono bg-indigo-100 px-1 rounded">Lifescan = OneTouch = LS</code>.
+            <br />
+            <span className="text-indigo-700/80">
+              Sans ça l&apos;IA crée 3 concurrents distincts là où il n&apos;y en a qu&apos;un.
+            </span>
           </li>
           <li>
             <span className="font-semibold">Produits :</span> gamme et codes internes (B7,
