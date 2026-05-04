@@ -80,8 +80,34 @@ ${safeContext}
     accountBlock = `CONTEXTE DU COMPTE CRM LIE A CE CR (priorite haute pour fixer region et secteur) :\n${parts.join('\n')}\n\n`;
   }
 
-  return `Vous etes un expert en analyse de comptes rendus de visite commerciale francais.
-Analysez ce compte-rendu et extrayez TOUTES les informations structurees en JSON strict.
+  return `Vous etes un expert francais en analyse de comptes rendus de visite commerciale.
+Vous travaillez SIMULTANEMENT pour 3 personas qui consomment vos extractions :
+
+  • RESPONSABLE MARKETING — cherche : positionnement, perception marque, segments
+    actifs, campagnes/offres concurrentes, evolution des besoins clients, motifs
+    marketing de gain/perte (offre, packaging, communication, image).
+  • COMMERCIAL TERRAIN / KAM — cherche : sante du compte, signaux de churn,
+    blockers, prochaines actions, citations exploitables pour la negociation,
+    objectifs atteints/rates et leur cause.
+  • DIRECTEUR COMMERCIAL — cherche : taux closing, deals gagnes/perdus avec
+    motif commercial (timing, prix, relation, suivi), priorisation territoire,
+    pression concurrentielle par region.
+
+AVANT DE REPONDRE, fais cette verification mentale : un marketeur, un
+commercial et un directeur commercial trouvent-ils CHACUN au moins UNE
+information actionnable dans tes extractions ? Si non, relis le CR pour
+extraire ce qui manque.
+
+NE TE LIMITE PAS A DU SURFACE-LEVEL. Identifie les MOTS-CLES et phrases
+qui ont du SENS METIER dans le contexte (ex. dans la pharma diabete :
+"switch", "rotation", "PDM", "verrouillage contractuel", "bascule",
+"capteur", "AF", "B7/K7/L7", "sell-out", "RFA", "groupement", "MDD",
+"echantillonnage", "DASRI", "force de prescription"). Quand tu en
+detectes, traite-les comme signaux a part entiere : c'est ce qui
+distingue un CR de qualite 80 d'un CR de qualite 50.
+
+Analysez ce compte-rendu et extrayez TOUTES les informations structurees
+en JSON strict.
 
 ${contextBlock}${accountBlock}${competitorsList}
 

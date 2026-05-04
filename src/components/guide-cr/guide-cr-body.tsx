@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { cn } from '@/lib/utils';
 import {
   CheckCircle2,
   XCircle,
@@ -89,6 +90,30 @@ const PITFALLS = [
     bad: '"Dirco a dit que…"',
     why: "Les abréviations non standard ne sont pas comprises. Définissez-les dans votre glossaire (Dirco = Directeur Commercial).",
   },
+];
+
+// Mirror exact des criteres de quality-score.ts (cote serveur). Garder
+// les deux synchros : si on touche aux poids ici il faut toucher aussi
+// quality-score.ts. Total des poids = 100 par construction.
+const QUALITY_CRITERIA = [
+  { label: 'Client identifié dans le CRM', weight: 8, hint: 'Nom EXACT du client tel qu\'il apparaît dans Salesforce.' },
+  { label: 'Commercial assigné (Owner)', weight: 5, hint: 'Le CR doit être rattaché à un Owner Salesforce.' },
+  { label: 'Date de visite (ActivityDate)', weight: 5, hint: 'Sans date, impossible de tracer la fraîcheur.' },
+  { label: 'CR détaillé (≥ 40 mots)', weight: 8, hint: 'Étoffe le contenu — minimum 40 mots utiles.' },
+  { label: 'Au moins 1 concurrent nommé', weight: 12, hint: 'Cite par nom : Abbott, Lifescan… pas "un autre fournisseur".' },
+  { label: 'Au moins 1 verbatim / citation directe', weight: 12, hint: 'Mets entre guillemets ce que le client a dit textuellement.' },
+  { label: 'Chiffres concrets (rotations, %, volumes, prix)', weight: 10, hint: 'PDM, rotations B7/K7/L7, écarts prix, volumes.' },
+  { label: 'Information de prix / remise / offre concurrent', weight: 10, hint: 'Remises, offres, prix concurrents (ex. "−15% Abbott").' },
+  { label: 'Objectif explicitement atteint ou raté', weight: 10, hint: '"Objectif AF → Atteint (+20)" / "Objectif tests → Non atteint, cause : surstock".' },
+  { label: 'Au moins 1 besoin client OU signal terrain', weight: 10, hint: 'Formation, animation, document patient, demande de PLV…' },
+  { label: 'Prochaine action concrète (next step)', weight: 10, hint: '"Next rdv le 14/05", "Envoi mail argumentaire AF".' },
+];
+
+const QUALITY_BANDS = [
+  { range: '0 – 49', label: 'Faible', color: 'bg-rose-50 text-rose-800 border-rose-200', desc: 'CR vague, peu d\'info exploitable. L\'IA peine à générer des signaux.' },
+  { range: '50 – 69', label: 'Moyen', color: 'bg-amber-50 text-amber-800 border-amber-200', desc: 'Quelques faits mais manque verbatims, chiffres ou next steps.' },
+  { range: '70 – 84', label: 'Bon', color: 'bg-sky-50 text-sky-800 border-sky-200', desc: 'CR structuré : verbatim + chiffres + concurrents nommés + actions.' },
+  { range: '85 – 100', label: 'Excellent', color: 'bg-emerald-50 text-emerald-800 border-emerald-200', desc: 'Toutes les dimensions servies : marketeur, commercial et KAM en tirent valeur.' },
 ];
 
 interface GuideCRBodyProps {
@@ -320,6 +345,122 @@ Next rdv le 14/05 à 10h30. Envoi argumentaire AF.`}
                   rouge churn, 2 objectifs analysés, 1 next step.
                 </p>
               </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── SCORE DE QUALITE ──────────────────────────────────── */}
+      <section
+        className={
+          variant === 'marketing'
+            ? 'bg-white border-y border-slate-200 px-5 sm:px-8 py-16 sm:py-24'
+            : 'mt-10'
+        }
+      >
+        <div className={variant === 'marketing' ? 'max-w-5xl mx-auto' : ''}>
+          <p className="text-xs font-semibold text-indigo-600 uppercase tracking-widest mb-3">
+            Score de qualité
+          </p>
+          <h2 className="text-xl sm:text-2xl font-bold text-slate-900 mb-2 tracking-tight">
+            Comment passer d&apos;un CR à 50 à un CR à 80.
+          </h2>
+          <p className="text-sm text-slate-500 mb-8 max-w-2xl leading-relaxed">
+            Chaque CR analysé reçoit un score 0–100 calculé sur 11 critères
+            objectifs. Le score moyen d&apos;un commercial est la moyenne de ses
+            CRs. Voici la grille — cochez tous les critères pour viser
+            l&apos;excellence.
+          </p>
+
+          {/* Tranches */}
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
+            {QUALITY_BANDS.map((b) => (
+              <div
+                key={b.range}
+                className={cn(
+                  'rounded-xl border p-4',
+                  b.color,
+                )}
+              >
+                <div className="flex items-baseline justify-between mb-1.5">
+                  <span className="text-xs font-mono opacity-70">{b.range}</span>
+                  <span className="text-sm font-bold">{b.label}</span>
+                </div>
+                <p className="text-xs leading-relaxed opacity-90">{b.desc}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Grille des 11 critères */}
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50 border-b border-slate-200">
+                <tr>
+                  <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider w-16">
+                    Pts
+                  </th>
+                  <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider w-72">
+                    Critère
+                  </th>
+                  <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                    Comment l&apos;obtenir
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {QUALITY_CRITERIA.map((c, i) => (
+                  <tr
+                    key={c.label}
+                    className={i < QUALITY_CRITERIA.length - 1 ? 'border-b border-slate-100' : ''}
+                  >
+                    <td className="px-5 py-3 font-mono text-xs font-semibold text-indigo-600">
+                      +{c.weight}
+                    </td>
+                    <td className="px-5 py-3 font-semibold text-slate-900">{c.label}</td>
+                    <td className="px-5 py-3 text-slate-600 text-xs leading-relaxed">{c.hint}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="mt-6 grid sm:grid-cols-2 gap-4">
+            <div className="bg-rose-50 border border-rose-200 rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <XCircle className="w-4 h-4 text-rose-600" />
+                <span className="text-xs font-semibold text-rose-800 uppercase tracking-wider">
+                  Score 35 — exemple
+                </span>
+              </div>
+              <p className="text-xs text-rose-900 font-mono leading-relaxed whitespace-pre-line">
+{`RDV cliente. Bons retours.
+Concurrent y a fait quelque chose.
+À recontacter.`}
+              </p>
+              <p className="text-xs text-rose-700/80 mt-2 leading-relaxed">
+                Client identifié + commercial + date = 18 pts. Rien d&apos;autre. → 35.
+              </p>
+            </div>
+            <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                <span className="text-xs font-semibold text-emerald-800 uppercase tracking-wider">
+                  Score 92 — exemple
+                </span>
+              </div>
+              <p className="text-xs text-emerald-900 font-mono leading-relaxed whitespace-pre-line">
+{`Pharmacie du Centre — Marie Lambert (Lyon 3e).
+PDM 68%. Rotation B7:90 / K7:35 / L7:85.
+Acteurs : Roche + Abbott (-12% prix).
+"Si vous bougez pas sur l'AF, je teste Abbott
+au prochain trimestre."
+Objectif AF → Non atteint, cause surstock.
+Next rdv le 14/05, envoi argumentaire AF.`}
+              </p>
+              <p className="text-xs text-emerald-700/80 mt-2 leading-relaxed">
+                Client + commercial + date + détail + concurrent + verbatim +
+                chiffres + prix + objectif + besoin + next step = 92.
+              </p>
             </div>
           </div>
         </div>

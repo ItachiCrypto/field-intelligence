@@ -2,6 +2,7 @@
 import { createServiceClient } from '@/lib/supabase/server';
 import { buildExtractionPrompt, parseExtractionResponse } from './extraction-prompt';
 import { buildCanonicalResolver, canonicalizeExtraction } from './canonicalize';
+import { computeCRQualityScore, buildQualityReasonsPayload } from './quality-score';
 import type { RawVisitReport, ExtractedCRData } from './types';
 
 export async function processReport(report: RawVisitReport): Promise<{ success: boolean; error?: string }> {
@@ -403,10 +404,36 @@ export async function processReport(report: RawVisitReport): Promise<{ success: 
       processing_time_ms: Date.now() - startTime,
     });
 
-    // Mark as done
+    // ── CR quality score ─────────────────────────────────────────────────
+    // Score deterministe 0-100 calcule a partir de la richesse de l'extraction.
+    // Stocke sur raw_visit_reports.quality_score + quality_reasons (jsonb)
+    // pour qu'on puisse afficher au commercial "voici ce qui te manque pour 80".
+    const qualityResult = computeCRQualityScore({
+      extracted,
+      crText: report.content_text ?? '',
+      hasClientName: !!effectiveClientName,
+      hasCommercialName: !!report.commercial_name?.trim(),
+      hasVisitDate: !!report.visit_date,
+    });
+    const qualityPayload = buildQualityReasonsPayload(qualityResult);
+
+    // Mark as done + persist quality score
     await supabase.from('raw_visit_reports' as any)
-      .update({ processing_status: 'done', processed_at: new Date().toISOString() })
+      .update({
+        processing_status: 'done',
+        processed_at: new Date().toISOString(),
+        quality_score: qualityResult.score,
+        quality_reasons: qualityPayload,
+      })
       .eq('id', report.id);
+
+    // Refresh commercial moyenne quality_score (= avg de tous ses CRs scores).
+    if (report.commercial_name?.trim()) {
+      await supabase.rpc('refresh_commercial_quality_score' as any, {
+        p_company_id: report.company_id,
+        p_commercial_name: report.commercial_name.trim(),
+      });
+    }
 
     return { success: true };
   } catch (err: any) {
