@@ -3,6 +3,7 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { buildExtractionPrompt, parseExtractionResponse } from './extraction-prompt';
 import { buildCanonicalResolver, canonicalizeExtraction } from './canonicalize';
 import { computeCRQualityScore, buildQualityReasonsPayload } from './quality-score';
+import { computeCostUSD } from './pricing';
 import type { RawVisitReport, ExtractedCRData } from './types';
 
 export async function processReport(report: RawVisitReport): Promise<{ success: boolean; error?: string }> {
@@ -75,6 +76,8 @@ export async function processReport(report: RawVisitReport): Promise<{ success: 
     // Call AI API — try Anthropic first, fall back to OpenAI
     let responseText = '';
     let tokensUsedRaw = 0;
+    let inputTokens = 0;
+    let outputTokens = 0;
     let modelUsed = '';
 
     const anthropicKey = process.env.ANTHROPIC_API_KEY;
@@ -112,7 +115,9 @@ export async function processReport(report: RawVisitReport): Promise<{ success: 
 
       const anthropicData = await anthropicRes.json();
       responseText = anthropicData.content?.[0]?.text ?? '';
-      tokensUsedRaw = (anthropicData.usage?.input_tokens ?? 0) + (anthropicData.usage?.output_tokens ?? 0);
+      inputTokens = anthropicData.usage?.input_tokens ?? 0;
+      outputTokens = anthropicData.usage?.output_tokens ?? 0;
+      tokensUsedRaw = inputTokens + outputTokens;
     } else if (openaiKey && !openaiKey.includes('xxx')) {
       // OpenAI path. gpt-4.1-mini est le bon tier cout/qualite pour cette
       // tache structuree FR (~$0.40/$1.60 par MTok, soit ~10x moins cher que
@@ -150,7 +155,9 @@ export async function processReport(report: RawVisitReport): Promise<{ success: 
 
       const openaiData = await openaiRes.json();
       responseText = openaiData.choices?.[0]?.message?.content ?? '';
-      tokensUsedRaw = openaiData.usage?.total_tokens ?? 0;
+      inputTokens = openaiData.usage?.prompt_tokens ?? 0;
+      outputTokens = openaiData.usage?.completion_tokens ?? 0;
+      tokensUsedRaw = openaiData.usage?.total_tokens ?? inputTokens + outputTokens;
     } else {
       throw new Error('No AI API key configured (ANTHROPIC_API_KEY or OPENAI_API_KEY)');
     }
@@ -393,7 +400,11 @@ export async function processReport(report: RawVisitReport): Promise<{ success: 
       }
     }
 
-    // Log processing result
+    // Log processing result + cost.
+    // cost_usd est calcule serveur a partir du modele utilise (les tarifs
+    // input/output different par MTok). Valeur typique : ~$0.003/CR sur
+    // gpt-4.1-mini, ~$0.020/CR sur Claude Sonnet 4.5.
+    const costUsd = computeCostUSD(modelUsed, inputTokens, outputTokens);
     await supabase.from('processing_results' as any).insert({
       raw_report_id: report.id,
       company_id: report.company_id,
@@ -401,6 +412,9 @@ export async function processReport(report: RawVisitReport): Promise<{ success: 
       signals_created: signalsCreated,
       model_used: modelUsed,
       tokens_used: tokensUsed,
+      input_tokens: inputTokens,
+      output_tokens: outputTokens,
+      cost_usd: costUsd,
       processing_time_ms: Date.now() - startTime,
     });
 
