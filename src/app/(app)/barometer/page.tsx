@@ -13,11 +13,20 @@ const TREND_CONFIG = {
 };
 
 type ClientFilter = 'all' | 'nouveau' | 'etabli';
+type TrendFilter = 'all' | 'up' | 'down' | 'stable' | 'new';
 
 const FILTER_OPTIONS: { key: ClientFilter; label: string; hint: string }[] = [
   { key: 'all', label: 'Tous', hint: 'Tous besoins confondus' },
   { key: 'nouveau', label: 'Nouveaux clients', hint: 'Clients avec 1 seul besoin exprime' },
   { key: 'etabli', label: 'Clients etablis', hint: 'Clients avec au moins 2 besoins exprimes' },
+];
+
+const TREND_FILTERS: { key: TrendFilter; label: string; icon: typeof Sparkles | null; color: string }[] = [
+  { key: 'all',    label: 'Toutes tendances', icon: null,           color: 'text-slate-600' },
+  { key: 'new',    label: 'Nouveau',          icon: Sparkles,       color: 'text-indigo-600' },
+  { key: 'up',     label: 'En hausse',        icon: ArrowUpRight,   color: 'text-rose-600' },
+  { key: 'stable', label: 'Stable',           icon: Minus,          color: 'text-slate-500' },
+  { key: 'down',   label: 'En baisse',        icon: ArrowDownRight, color: 'text-emerald-600' },
 ];
 
 // Palette utilisee pour le nuage de mots : du plus intense (indigo fonce) au plus clair.
@@ -33,6 +42,8 @@ function fontSizeForRank(rank: number, total: number): number {
 export default function BarometerPage() {
   const { needs: NEEDS, signals: SIGNALS } = useAppData();
   const [clientFilter, setClientFilter] = useState<ClientFilter>('all');
+  const [trendFilter, setTrendFilter] = useState<TrendFilter>('all');
+  const [minMentions, setMinMentions] = useState<number>(1);
 
   // Classification des clients : nouveau (1 besoin) vs etabli (>=2 besoins).
   // On compte uniquement les signaux de type 'besoin' pour etre coherent avec le filtre affiche.
@@ -91,7 +102,21 @@ export default function BarometerPage() {
       }));
   }, [clientFilter, NEEDS, SIGNALS, clientStatus]);
 
-  const maxMentions = displayedNeeds.length > 0 ? Math.max(...displayedNeeds.map((n) => n.mentions)) : 0;
+  // Apply trend + minMentions filters AFTER aggregation. Re-rank to keep
+  // ranks contiguous (1, 2, 3...) within the filtered subset.
+  const filteredNeeds = useMemo(() => {
+    return displayedNeeds
+      .filter((n) => trendFilter === 'all' || n.trend === trendFilter)
+      .filter((n) => (n.mentions ?? 0) >= minMentions)
+      .map((n, i) => ({ ...n, rank: i + 1 }));
+  }, [displayedNeeds, trendFilter, minMentions]);
+
+  // Bornes pour le slider min-mentions
+  const maxMentionsAvailable = displayedNeeds.length > 0
+    ? Math.max(...displayedNeeds.map((n) => n.mentions ?? 0))
+    : 1;
+
+  const maxMentions = filteredNeeds.length > 0 ? Math.max(...filteredNeeds.map((n) => n.mentions)) : 0;
 
   // Nuage de mots : on eclate les labels pour chaque item en mots cles (>3 lettres, pas stop words)
   // Chaque mot est credite de 'mentions' pour son poids d'affichage.
@@ -103,7 +128,7 @@ export default function BarometerPage() {
       'meme', 'peu', 'sur', 'ete', 'the', 'and', 'for',
     ]);
     const counts = new Map<string, number>();
-    for (const n of displayedNeeds) {
+    for (const n of filteredNeeds) {
       const tokens = (n.label || '')
         .toLowerCase()
         .normalize('NFD')
@@ -119,7 +144,7 @@ export default function BarometerPage() {
       .map(([word, weight]) => ({ word, weight }))
       .sort((a, b) => b.weight - a.weight)
       .slice(0, 30); // top 30 mots
-  }, [displayedNeeds]);
+  }, [filteredNeeds]);
 
   return (
     <div className="space-y-6">
@@ -134,23 +159,75 @@ export default function BarometerPage() {
         </div>
       </div>
 
-      {/* Filter pills */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-xs font-medium text-slate-500 uppercase tracking-wider mr-1">Filtre client</span>
-        {FILTER_OPTIONS.map((opt) => (
-          <button
-            key={opt.key}
-            onClick={() => setClientFilter(opt.key)}
-            title={opt.hint}
-            className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
-              clientFilter === opt.key
-                ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
-                : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-            }`}
-          >
-            {opt.label}
-          </button>
-        ))}
+      {/* Filtres */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 space-y-3">
+        {/* Filtre client */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-xs font-medium text-slate-500 uppercase tracking-wider w-24 shrink-0">Client</span>
+          {FILTER_OPTIONS.map((opt) => (
+            <button
+              key={opt.key}
+              onClick={() => setClientFilter(opt.key)}
+              title={opt.hint}
+              className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                clientFilter === opt.key
+                  ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                  : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Filtre tendance */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-xs font-medium text-slate-500 uppercase tracking-wider w-24 shrink-0">Tendance</span>
+          {TREND_FILTERS.map((opt) => {
+            const Icon = opt.icon;
+            return (
+              <button
+                key={opt.key}
+                onClick={() => setTrendFilter(opt.key)}
+                className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                  trendFilter === opt.key
+                    ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                {Icon && <Icon className={`w-3 h-3 ${trendFilter === opt.key ? 'text-indigo-600' : opt.color}`} />}
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Filtre min-mentions */}
+        <div className="flex items-center gap-3 flex-wrap">
+          <span className="text-xs font-medium text-slate-500 uppercase tracking-wider w-24 shrink-0">Mentions min.</span>
+          <input
+            type="range"
+            min={1}
+            max={Math.max(1, maxMentionsAvailable)}
+            value={Math.min(minMentions, Math.max(1, maxMentionsAvailable))}
+            onChange={(e) => setMinMentions(Number(e.target.value))}
+            className="flex-1 max-w-[280px] accent-indigo-600 h-1.5"
+          />
+          <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 text-xs font-semibold tabular-nums min-w-[60px] justify-center">
+            ≥ {minMentions}
+          </span>
+          {minMentions > 1 && (
+            <button
+              onClick={() => setMinMentions(1)}
+              className="text-xs text-slate-500 hover:text-slate-900 underline underline-offset-2"
+            >
+              reset
+            </button>
+          )}
+          <span className="text-xs text-slate-400 ml-auto tabular-nums">
+            {filteredNeeds.length}/{displayedNeeds.length} besoins affichés
+          </span>
+        </div>
       </div>
 
       {/* Nuage de mots */}
@@ -185,13 +262,13 @@ export default function BarometerPage() {
       )}
 
       {/* Ranked list */}
-      {displayedNeeds.length === 0 ? (
+      {filteredNeeds.length === 0 ? (
         <div className="bg-slate-50 rounded-xl border border-slate-200 p-6 text-center text-sm text-slate-500">
           Aucun besoin exprime pour ce filtre.
         </div>
       ) : (
         <div className="space-y-3">
-          {displayedNeeds.map((need) => {
+          {filteredNeeds.map((need) => {
             const barWidth = maxMentions > 0 ? (need.mentions / maxMentions) * 100 : 0;
             const trend = TREND_CONFIG[need.trend] || TREND_CONFIG.stable;
             const TrendIcon = trend.Icon;

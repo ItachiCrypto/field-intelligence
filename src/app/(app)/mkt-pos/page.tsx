@@ -32,10 +32,46 @@ const VALEUR_CONFIG: Record<ValeurPercue, { bg: string; text: string; border: st
   faible: { bg: 'bg-rose-50', text: 'text-rose-700', border: 'border-rose-200', label: 'Faible' },
 };
 
-const ACTOR_PALETTE = ['#6366f1', '#e11d48', '#f59e0b', '#10b981', '#8b5cf6', '#06b6d4'];
-function getActorColor(actors: string[], name: string): string {
-  const idx = actors.indexOf(name);
-  return ACTOR_PALETTE[idx >= 0 ? idx % ACTOR_PALETTE.length : 0];
+// 18 couleurs visuellement distinctes (separation TLab > 25 entre voisines)
+// pour mieux differencier les acteurs sur la radar chart. Au-dela on cycle
+// avec un offset stable plutot qu'avec un simple modulo, ce qui donne un
+// pattern moins reconnaissable a l'oeil que "1-2-3-1-2-3".
+const ACTOR_PALETTE = [
+  '#6366f1', // indigo
+  '#e11d48', // rose
+  '#f59e0b', // amber
+  '#10b981', // emerald
+  '#8b5cf6', // violet
+  '#06b6d4', // cyan
+  '#f97316', // orange
+  '#0ea5e9', // sky
+  '#84cc16', // lime
+  '#ec4899', // pink
+  '#14b8a6', // teal
+  '#a855f7', // purple
+  '#eab308', // yellow
+  '#0284c7', // blue
+  '#dc2626', // red
+  '#65a30d', // green
+  '#7c3aed', // violet-deep
+  '#0891b2', // cyan-deep
+];
+
+/**
+ * Hash stable du nom de l'acteur (FNV-1a 32 bits, deterministe). On evite
+ * `actors.indexOf(name) % palette.length` qui, en plus de creer des
+ * collisions au-dela de 6 acteurs, change l'attribution si l'ordre du
+ * tableau change (ajout d'un nouveau concurrent decalant tous les autres).
+ * Avec un hash, "Abbott" garde sa couleur quoi qu'il arrive.
+ */
+function getActorColor(_actors: string[], name: string): string {
+  const s = (name || '').toLowerCase();
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0;
+  }
+  return ACTOR_PALETTE[h % ACTOR_PALETTE.length];
 }
 
 const ATTRIBUTS: Attribut[] = ['prix', 'qualite', 'sav', 'delai', 'relation', 'innovation'];

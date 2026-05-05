@@ -64,10 +64,25 @@ export default function MktPrixPage() {
     return Array.from(set).sort();
   }, [PRIX_SIGNALS]);
 
+  // Refonte : prix_signals.ecart_pct est maintenant nullable (signaux de
+  // type "remise concurrent / prix absolu" sans comparaison directe avec
+  // notre prix). On separe la moyenne sur les signaux QUANTITATIFS
+  // (ecart_pct numerique) des signaux QUALITATIFS (offre/remise/marge).
   const ecartMoyen = useMemo(() => {
-    const vals = PRIX_SIGNALS.map((s) => s.ecart_pct);
-    if (vals.length === 0) return '0';
+    const vals = (PRIX_SIGNALS || [])
+      .map((s) => s.ecart_pct)
+      .filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
+    if (vals.length === 0) return '—';
     return (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1);
+  }, [PRIX_SIGNALS]);
+
+  // Compteur des signaux qualitatifs (sans % calcule) : remises annoncees,
+  // prix absolus, offres promo, marges concurrents. On veut les remonter
+  // distinctement pour que l'utilisateur sache que ces infos sont la.
+  const nbSignauxQualitatifs = useMemo(() => {
+    return (PRIX_SIGNALS || []).filter(
+      (s) => typeof s.ecart_pct !== 'number' || !Number.isFinite(s.ecart_pct),
+    ).length;
   }, [PRIX_SIGNALS]);
 
   const dealsPerdus = useMemo(() => {
@@ -103,6 +118,7 @@ export default function MktPrixPage() {
     for (const s of PRIX_SIGNALS || []) {
       if (s.ecart_type !== 'inferieur') continue; // on ne garde que les cas ou une remise est necessaire
       if (s.statut_deal === 'perdu') continue; // deal perdu = pas de remise accordee
+      if (typeof s.ecart_pct !== 'number' || !Number.isFinite(s.ecart_pct)) continue; // skip signaux qualitatifs sans %
       const key = s.commercial_name || '—';
       if (!byCommercial.has(key)) byCommercial.set(key, { commercial: key, signaux: [], motifs: {} });
       byCommercial.get(key)!.signaux.push(s);
@@ -152,7 +168,9 @@ export default function MktPrixPage() {
     type Card = {
       concurrent_nom: string;
       signaux: typeof PRIX_SIGNALS;
-      ecartMoyAbs: number;
+      ecartMoyAbs: number | null; // null quand aucun signal quantitatif
+      nbQuantitatifs: number;     // signaux avec ecart_pct numerique
+      nbQualitatifs: number;      // remises/offres sans % comparatif
       nbInferieur: number;
       nbSuperieur: number;
       nbGagne: number;
@@ -167,7 +185,9 @@ export default function MktPrixPage() {
         map.set(s.concurrent_nom, {
           concurrent_nom: s.concurrent_nom,
           signaux: [],
-          ecartMoyAbs: 0,
+          ecartMoyAbs: null,
+          nbQuantitatifs: 0,
+          nbQualitatifs: 0,
           nbInferieur: 0,
           nbSuperieur: 0,
           nbGagne: 0,
@@ -179,17 +199,23 @@ export default function MktPrixPage() {
       }
       const c = map.get(s.concurrent_nom)!;
       c.signaux.push(s);
+      const hasQuant = typeof s.ecart_pct === 'number' && Number.isFinite(s.ecart_pct);
+      if (hasQuant) c.nbQuantitatifs++;
+      else c.nbQualitatifs++;
       if (s.ecart_type === 'inferieur') c.nbInferieur++;
-      else c.nbSuperieur++;
+      else if (s.ecart_type === 'superieur') c.nbSuperieur++;
       if (s.statut_deal === 'gagne') c.nbGagne++;
       else if (s.statut_deal === 'perdu') c.nbPerdu++;
       else c.nbEnCours++;
     }
     for (const c of map.values()) {
-      // Ecart moyen absolu : magnitude de l'ecart quel que soit le sens.
-      c.ecartMoyAbs =
-        c.signaux.reduce((acc, s) => acc + Math.abs(s.ecart_pct), 0) /
-        (c.signaux.length || 1);
+      // Ecart moyen absolu : magnitude de l'ecart sur les signaux quantitatifs uniquement.
+      const quants = c.signaux.filter(
+        (s: any) => typeof s.ecart_pct === 'number' && Number.isFinite(s.ecart_pct),
+      );
+      c.ecartMoyAbs = quants.length > 0
+        ? quants.reduce((acc, s: any) => acc + Math.abs(s.ecart_pct), 0) / quants.length
+        : null;
       const commCount = new Map<string, number>();
       const regCount = new Map<string, number>();
       for (const s of c.signaux) {
@@ -225,7 +251,19 @@ export default function MktPrixPage() {
     );
   };
 
-  const ecartBadge = (ecart: number, type: string) => {
+  const ecartBadge = (ecart: number | null | undefined, type: string | null | undefined) => {
+    // Signaux qualitatifs (remises/offres concurrents sans % comparatif) :
+    // pas de chiffre a afficher, on rend un badge neutre.
+    if (typeof ecart !== 'number' || !Number.isFinite(ecart)) {
+      return (
+        <span
+          className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 italic"
+          title="Remise / offre concurrent sans comparaison directe avec notre prix"
+        >
+          Sans %
+        </span>
+      );
+    }
     const isNeg = type === 'inferieur';
     return (
       <span className={`inline-flex items-center gap-1 text-sm font-semibold tabular-nums ${isNeg ? 'text-rose-600' : 'text-emerald-600'}`}>
@@ -250,17 +288,57 @@ export default function MktPrixPage() {
       {/* KPIs */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <KpiCard
-          label="Signaux prix ce mois"
+          label="Signaux prix"
           value={PRIX_SIGNALS.length}
           icon={<CircleDollarSign className="w-5 h-5" />}
           iconColor="text-indigo-600 bg-indigo-50"
+          info={
+            <div className="space-y-2">
+              <p>Total des signaux de prix extraits par l&apos;IA, toutes catégories confondues.</p>
+              <ul className="space-y-1 list-disc pl-4">
+                <li>
+                  <span className="font-semibold text-slate-900">
+                    {PRIX_SIGNALS.length - nbSignauxQualitatifs} quantitatifs
+                  </span>{' '}
+                  : comparaison directe avec notre prix (% calculé).
+                </li>
+                <li>
+                  <span className="font-semibold text-slate-900">
+                    {nbSignauxQualitatifs} qualitatifs
+                  </span>{' '}
+                  : remises, prix absolus, offres ou marges concurrents sans %
+                  comparatif. Visibles dans le détail mais pas dans la moyenne.
+                </li>
+              </ul>
+            </div>
+          }
         />
         <KpiCard
           label="Ecart moyen detecte"
           value={ecartMoyen}
-          suffix="%"
+          suffix={ecartMoyen === '—' ? undefined : '%'}
           icon={<TrendingDown className="w-5 h-5" />}
           iconColor="text-rose-600 bg-rose-50"
+          info={
+            <div className="space-y-2">
+              <p>
+                Moyenne des écarts de prix entre nos tarifs et ceux des concurrents,
+                sur les signaux où une comparaison directe est possible.
+              </p>
+              {nbSignauxQualitatifs > 0 && (
+                <p className="text-slate-500">
+                  Exclut les {nbSignauxQualitatifs} signaux qualitatifs (remises
+                  promo, prix absolus annoncés) où aucun écart n&apos;est calculé.
+                </p>
+              )}
+              {ecartMoyen === '—' && (
+                <p className="text-amber-700">
+                  Aucun signal avec écart numérique pour le moment. Encouragez vos
+                  équipes à indiquer "−15% vs nous" plutôt que "moins cher".
+                </p>
+              )}
+            </div>
+          }
         />
         <KpiCard
           label="Deals perdus sur le prix"
@@ -468,18 +546,32 @@ export default function MktPrixPage() {
                       </Link>
                       <p className="text-xs text-slate-500 mt-0.5">
                         {total} signal{total > 1 ? 'aux' : ''}
+                        {c.nbQualitatifs > 0 && (
+                          <span className="ml-1.5 text-slate-400">
+                            (dont {c.nbQualitatifs} sans % calcule)
+                          </span>
+                        )}
                       </p>
                     </div>
-                    <span
-                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border ${
-                        c.ecartMoyAbs >= 10
-                          ? 'bg-rose-50 text-rose-700 border-rose-200'
-                          : 'bg-amber-50 text-amber-700 border-amber-200'
-                      }`}
-                    >
-                      <TUp className="w-3 h-3" />
-                      Ecart moy. {c.ecartMoyAbs.toFixed(1)}%
-                    </span>
+                    {c.ecartMoyAbs !== null ? (
+                      <span
+                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border ${
+                          c.ecartMoyAbs >= 10
+                            ? 'bg-rose-50 text-rose-700 border-rose-200'
+                            : 'bg-amber-50 text-amber-700 border-amber-200'
+                        }`}
+                      >
+                        <TUp className="w-3 h-3" />
+                        Ecart moy. {c.ecartMoyAbs.toFixed(1)}%
+                      </span>
+                    ) : (
+                      <span
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border bg-slate-50 text-slate-600 border-slate-200"
+                        title="Aucun signal de comparaison directe avec notre prix — uniquement remises/offres concurrents"
+                      >
+                        Pas de comparaison
+                      </span>
+                    )}
                   </div>
 
                   {/* Inferieur / Superieur split */}
