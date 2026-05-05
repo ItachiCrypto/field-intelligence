@@ -210,12 +210,14 @@ export async function processReport(report: RawVisitReport): Promise<{ success: 
       if (px.concurrent_nom) competitorNames.add(px.concurrent_nom);
     }
     for (const compName of competitorNames) {
-      // Check if already exists before inserting (avoids needing UNIQUE constraint)
+      // Check case-INSENSITIVE pour eviter les doublons "Marque d'aiguille" /
+      // "marque d'aiguille". Si une variante existe deja avec une casse
+      // differente, on garde celle-la (ne pas overwrite la premiere casse vue).
       const { data: existingComp } = await supabase
         .from('competitors' as any)
-        .select('id')
+        .select('id, name')
         .eq('company_id', report.company_id)
-        .eq('name', compName)
+        .ilike('name', compName)
         .maybeSingle() as any;
       if (!existingComp) {
         // Determine type and risk from signals mentioning this competitor

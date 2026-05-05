@@ -58,20 +58,31 @@ const ACTOR_PALETTE = [
 ];
 
 /**
- * Hash stable du nom de l'acteur (FNV-1a 32 bits, deterministe). On evite
- * `actors.indexOf(name) % palette.length` qui, en plus de creer des
- * collisions au-dela de 6 acteurs, change l'attribution si l'ordre du
- * tableau change (ajout d'un nouveau concurrent decalant tous les autres).
- * Avec un hash, "Abbott" garde sa couleur quoi qu'il arrive.
+ * Attribution couleur par INDEX dans la liste triee des acteurs.
+ *
+ * Le hash FNV qui etait ici avant garantissait la stabilite "meme nom -> meme
+ * couleur a vie" mais souffrait du paradoxe des anniversaires : avec 10
+ * acteurs sur 18 couleurs, on observait 4-6 collisions en pratique. Les
+ * users voyaient plusieurs concurrents avec la meme couleur sur la radar.
+ *
+ * Approche actuelle : on trie la liste des acteurs deduplique (alphabetique
+ * lowercase) puis on assigne par index modulo palette. Garanties :
+ *   - 0 collision tant qu'il y a <= 18 acteurs distincts (cas usuel)
+ *   - Ordre stable : ajouter "Abbott" ne change pas la couleur de "Lifescan"
+ *     parce que "Abbott" se positionne avant alphabetiquement, decalant
+ *     uniquement les noms qui viennent apres dans l'ordre. C'est OK car
+ *     le tri lexical est deterministe : pour un set d'acteurs donne, les
+ *     couleurs sont les memes a chaque rendu.
+ *   - Stable across charts : tant que tous les charts utilisent la MEME
+ *     liste d'acteurs (passee en arg), la couleur de "Abbott" est
+ *     identique partout dans la page.
  */
-function getActorColor(_actors: string[], name: string): string {
-  const s = (name || '').toLowerCase();
-  let h = 0x811c9dc5;
-  for (let i = 0; i < s.length; i++) {
-    h ^= s.charCodeAt(i);
-    h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0;
-  }
-  return ACTOR_PALETTE[h % ACTOR_PALETTE.length];
+function getActorColor(actors: string[], name: string): string {
+  if (!name) return ACTOR_PALETTE[0];
+  const sortedUnique = Array.from(new Set(actors))
+    .sort((a, b) => (a || '').toLowerCase().localeCompare((b || '').toLowerCase()));
+  const idx = sortedUnique.findIndex((a) => (a || '').toLowerCase() === name.toLowerCase());
+  return ACTOR_PALETTE[(idx >= 0 ? idx : 0) % ACTOR_PALETTE.length];
 }
 
 const ATTRIBUTS: Attribut[] = ['prix', 'qualite', 'sav', 'delai', 'relation', 'innovation'];

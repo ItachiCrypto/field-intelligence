@@ -106,6 +106,9 @@ export default function FicheConcurrentPage({
     commConcurrentes: COMMS,
     prixSignals: PRIX,
     positionnement: POSITIONNEMENT,
+    signals: SIGNALS_ALL,
+    dealsAnalyse: DEALS_MK_ALL,
+    dealsCommerciaux: DEALS_CO_ALL,
   } = useAppData();
 
   // Matching case-insensitive : le concurrent_nom peut differer legerement
@@ -235,8 +238,68 @@ export default function FicheConcurrentPage({
   const topMotifsPerdus = Array.from(motifsPerdus.entries()).sort((a, b) => b[1] - a[1]).slice(0, 2);
   const topMotifsGagnes = Array.from(motifsGagnes.entries()).sort((a, b) => b[1] - a[1]).slice(0, 2);
 
-  const hasForcesData = offresForces.length > 0 || prixForces > 0 || commPositif > 0;
-  const hasFaiblessesData = offresFaiblesses.length > 0 || prixFaiblesses > 0 || commNegatif > 0;
+  // ── Fallback : si aucune offre/comm/prix structuree, on alimente Forces &
+  // Faiblesses depuis les SIGNAUX et les deals_commerciaux/marketing qui
+  // mentionnent ce concurrent. Ca donne du contenu meme quand l'IA n'a pas
+  // genere d'offres_concurrentes (cas frequent : remontees CR sans offre
+  // formelle declaree). Les conditions qui suivent se cumulent avec les
+  // calculs deja faits plus haut.
+  const sigsThisComp = (SIGNALS_ALL || []).filter(
+    (s: any) => (s.competitor_name || '').toLowerCase() === lowerName,
+  );
+  // Signaux severite rouge/orange = menace = force concurrent
+  const sigsForces = sigsThisComp.filter(
+    (s: any) => s.severity === 'rouge' || s.severity === 'orange',
+  ).length;
+  // Signaux verts (satisfaction client chez nous, opportunite) = faiblesse concurrent
+  const sigsFaiblesses = sigsThisComp.filter(
+    (s: any) => s.severity === 'vert' || s.type === 'echec',
+  ).length;
+
+  // Deals (commerciaux + marketing) impliquant ce concurrent
+  const allDeals = [
+    ...(DEALS_MK_ALL || []).map((d: any) => ({ ...d, source: 'mk' })),
+    ...(DEALS_CO_ALL || []).map((d: any) => ({ ...d, source: 'co' })),
+  ].filter((d: any) => (d.concurrent_nom || '').toLowerCase() === lowerName);
+  // Deals perdus contre ce concurrent = il gagne contre nous
+  const dealsPerdus = allDeals.filter((d: any) => d.resultat === 'perdu');
+  const dealsGagnes = allDeals.filter((d: any) => d.resultat === 'gagne');
+
+  // Compteurs de motifs pour les forces (= ce qui pousse les clients vers eux)
+  for (const d of dealsPerdus) {
+    const tag = d.motif_principal || d.motif || 'autre';
+    motifsPerdus.set(tag, (motifsPerdus.get(tag) || 0) + 1);
+  }
+  for (const d of dealsGagnes) {
+    const tag = d.motif_principal || d.motif || 'autre';
+    motifsGagnes.set(tag, (motifsGagnes.get(tag) || 0) + 1);
+  }
+  const topMotifsPerdusAll = Array.from(motifsPerdus.entries()).sort((a, b) => b[1] - a[1]).slice(0, 3);
+  const topMotifsGagnesAll = Array.from(motifsGagnes.entries()).sort((a, b) => b[1] - a[1]).slice(0, 3);
+
+  // Top verbatims (citations) issues des deals perdus / gagnes — concret et
+  // actionable pour le commercial.
+  const verbatimsForces = dealsPerdus
+    .map((d: any) => d.verbatim)
+    .filter((v: string) => v && v.length > 20)
+    .slice(0, 3);
+  const verbatimsFaiblesses = dealsGagnes
+    .map((d: any) => d.verbatim)
+    .filter((v: string) => v && v.length > 20)
+    .slice(0, 3);
+
+  const hasForcesData =
+    offresForces.length > 0 ||
+    prixForces > 0 ||
+    commPositif > 0 ||
+    sigsForces > 0 ||
+    dealsPerdus.length > 0;
+  const hasFaiblessesData =
+    offresFaiblesses.length > 0 ||
+    prixFaiblesses > 0 ||
+    commNegatif > 0 ||
+    sigsFaiblesses > 0 ||
+    dealsGagnes.length > 0;
 
   return (
     <div className="space-y-6">
@@ -340,25 +403,64 @@ export default function FicheConcurrentPage({
             </div>
             <div className="p-5 space-y-4">
               {/* Stats */}
-              <div className="grid grid-cols-3 gap-2 text-center">
+              <div className="grid grid-cols-4 gap-2 text-center">
                 <div className="rounded-lg border border-rose-100 bg-rose-50/40 py-2">
-                  <div className="text-xl font-bold text-rose-700 tabular-nums">{offresForces.length}</div>
-                  <div className="text-[10px] text-rose-600/80 uppercase tracking-wider">Offres gagnantes</div>
+                  <div className="text-xl font-bold text-rose-700 tabular-nums">{dealsPerdus.length}</div>
+                  <div className="text-[10px] text-rose-600/80 uppercase tracking-wider">Deals perdus</div>
+                </div>
+                <div className="rounded-lg border border-rose-100 bg-rose-50/40 py-2">
+                  <div className="text-xl font-bold text-rose-700 tabular-nums">{sigsForces}</div>
+                  <div className="text-[10px] text-rose-600/80 uppercase tracking-wider">Signaux menace</div>
                 </div>
                 <div className="rounded-lg border border-rose-100 bg-rose-50/40 py-2">
                   <div className="text-xl font-bold text-rose-700 tabular-nums">{prixForces}</div>
-                  <div className="text-[10px] text-rose-600/80 uppercase tracking-wider">Prix moins chers</div>
+                  <div className="text-[10px] text-rose-600/80 uppercase tracking-wider">Prix &lt; nous</div>
                 </div>
                 <div className="rounded-lg border border-rose-100 bg-rose-50/40 py-2">
-                  <div className="text-xl font-bold text-rose-700 tabular-nums">{commPositif}</div>
-                  <div className="text-[10px] text-rose-600/80 uppercase tracking-wider">Comm appréciées</div>
+                  <div className="text-xl font-bold text-rose-700 tabular-nums">{offresForces.length + commPositif}</div>
+                  <div className="text-[10px] text-rose-600/80 uppercase tracking-wider">Offres / comm</div>
                 </div>
               </div>
 
-              {/* Top offres qui marchent */}
+              {/* Top motifs perdus (deals + offres) */}
+              {topMotifsPerdusAll.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-slate-700 mb-1.5">Pourquoi on perd contre eux</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {topMotifsPerdusAll.map(([tag, n]) => (
+                      <span
+                        key={tag}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 text-xs font-medium"
+                      >
+                        {tag}
+                        <span className="text-[10px] opacity-70 tabular-nums">×{n}</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Verbatims des deals perdus */}
+              {verbatimsForces.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-slate-700 mb-1.5">Ce que disent les clients qui basculent</p>
+                  <ul className="space-y-1.5">
+                    {verbatimsForces.map((v: string, i: number) => (
+                      <li
+                        key={i}
+                        className="text-xs text-slate-700 italic leading-snug border-l-2 border-rose-300 pl-3"
+                      >
+                        « {v.length > 200 ? v.slice(0, 200) + '…' : v} »
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Top offres qui marchent (si donnees structurees disponibles) */}
               {offresForces.length > 0 && (
                 <div>
-                  <p className="text-xs font-semibold text-slate-700 mb-1.5">Offres qui nous coûtent des deals</p>
+                  <p className="text-xs font-semibold text-slate-700 mb-1.5">Offres formelles qui marchent</p>
                   <ul className="space-y-1.5">
                     {offresForces.map((o: any) => (
                       <li
@@ -375,24 +477,6 @@ export default function FicheConcurrentPage({
                       </li>
                     ))}
                   </ul>
-                </div>
-              )}
-
-              {/* Top motifs perdus */}
-              {topMotifsPerdus.length > 0 && (
-                <div>
-                  <p className="text-xs font-semibold text-slate-700 mb-1.5">Types d&apos;offres dominants</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {topMotifsPerdus.map(([tag, n]) => (
-                      <span
-                        key={tag}
-                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 text-xs font-medium"
-                      >
-                        {tag}
-                        <span className="text-[10px] opacity-70 tabular-nums">×{n}</span>
-                      </span>
-                    ))}
-                  </div>
                 </div>
               )}
 
@@ -420,24 +504,62 @@ export default function FicheConcurrentPage({
               </div>
             </div>
             <div className="p-5 space-y-4">
-              <div className="grid grid-cols-3 gap-2 text-center">
+              <div className="grid grid-cols-4 gap-2 text-center">
                 <div className="rounded-lg border border-emerald-100 bg-emerald-50/40 py-2">
-                  <div className="text-xl font-bold text-emerald-700 tabular-nums">{offresFaiblesses.length}</div>
-                  <div className="text-[10px] text-emerald-600/80 uppercase tracking-wider">Offres perdantes</div>
+                  <div className="text-xl font-bold text-emerald-700 tabular-nums">{dealsGagnes.length}</div>
+                  <div className="text-[10px] text-emerald-600/80 uppercase tracking-wider">Deals gagnés</div>
+                </div>
+                <div className="rounded-lg border border-emerald-100 bg-emerald-50/40 py-2">
+                  <div className="text-xl font-bold text-emerald-700 tabular-nums">{sigsFaiblesses}</div>
+                  <div className="text-[10px] text-emerald-600/80 uppercase tracking-wider">Signaux verts</div>
                 </div>
                 <div className="rounded-lg border border-emerald-100 bg-emerald-50/40 py-2">
                   <div className="text-xl font-bold text-emerald-700 tabular-nums">{prixFaiblesses}</div>
-                  <div className="text-[10px] text-emerald-600/80 uppercase tracking-wider">Prix défavorables</div>
+                  <div className="text-[10px] text-emerald-600/80 uppercase tracking-wider">Prix &gt; nous</div>
                 </div>
                 <div className="rounded-lg border border-emerald-100 bg-emerald-50/40 py-2">
-                  <div className="text-xl font-bold text-emerald-700 tabular-nums">{commNegatif}</div>
-                  <div className="text-[10px] text-emerald-600/80 uppercase tracking-wider">Comm rejetées</div>
+                  <div className="text-xl font-bold text-emerald-700 tabular-nums">{offresFaiblesses.length + commNegatif}</div>
+                  <div className="text-[10px] text-emerald-600/80 uppercase tracking-wider">Offres / comm</div>
                 </div>
               </div>
 
+              {topMotifsGagnesAll.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-slate-700 mb-1.5">Pourquoi on les bat</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {topMotifsGagnesAll.map(([tag, n]) => (
+                      <span
+                        key={tag}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-medium"
+                      >
+                        {tag}
+                        <span className="text-[10px] opacity-70 tabular-nums">×{n}</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Verbatims des deals gagnes */}
+              {verbatimsFaiblesses.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-slate-700 mb-1.5">Ce que disent les clients qui restent / basculent vers nous</p>
+                  <ul className="space-y-1.5">
+                    {verbatimsFaiblesses.map((v: string, i: number) => (
+                      <li
+                        key={i}
+                        className="text-xs text-slate-700 italic leading-snug border-l-2 border-emerald-300 pl-3"
+                      >
+                        « {v.length > 200 ? v.slice(0, 200) + '…' : v} »
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
               {offresFaiblesses.length > 0 && (
                 <div>
-                  <p className="text-xs font-semibold text-slate-700 mb-1.5">Offres qui ne décrochent pas</p>
+                  <p className="text-xs font-semibold text-slate-700 mb-1.5">Offres formelles qui décrochent pas</p>
                   <ul className="space-y-1.5">
                     {offresFaiblesses.map((o: any) => (
                       <li
@@ -454,23 +576,6 @@ export default function FicheConcurrentPage({
                       </li>
                     ))}
                   </ul>
-                </div>
-              )}
-
-              {topMotifsGagnes.length > 0 && (
-                <div>
-                  <p className="text-xs font-semibold text-slate-700 mb-1.5">Types d&apos;offres en échec</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {topMotifsGagnes.map(([tag, n]) => (
-                      <span
-                        key={tag}
-                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-medium"
-                      >
-                        {tag}
-                        <span className="text-[10px] opacity-70 tabular-nums">×{n}</span>
-                      </span>
-                    ))}
-                  </div>
                 </div>
               )}
 
