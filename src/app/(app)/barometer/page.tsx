@@ -3,7 +3,13 @@
 
 import { useMemo, useState } from 'react';
 import { useAppData } from '@/lib/data';
-import { BarChart3, ArrowUpRight, ArrowDownRight, Minus, Sparkles, Cloud } from 'lucide-react';
+import { BarChart3, ArrowUpRight, ArrowDownRight, Minus, Sparkles, Cloud, Package } from 'lucide-react';
+import {
+  NEED_CATEGORIES,
+  categorizeNeed,
+  getCategoryConfig,
+  type NeedCategory,
+} from '@/lib/needs-categories';
 
 const TREND_CONFIG = {
   up: { Icon: ArrowUpRight, color: 'text-rose-500', label: 'En hausse' },
@@ -44,6 +50,7 @@ export default function BarometerPage() {
   const [clientFilter, setClientFilter] = useState<ClientFilter>('all');
   const [trendFilter, setTrendFilter] = useState<TrendFilter>('all');
   const [minMentions, setMinMentions] = useState<number>(1);
+  const [categoryFilter, setCategoryFilter] = useState<NeedCategory | 'all'>('all');
 
   // Classification des clients : nouveau (1 besoin) vs etabli (>=2 besoins).
   // On compte uniquement les signaux de type 'besoin' pour etre coherent avec le filtre affiche.
@@ -102,14 +109,42 @@ export default function BarometerPage() {
       }));
   }, [clientFilter, NEEDS, SIGNALS, clientStatus]);
 
-  // Apply trend + minMentions filters AFTER aggregation. Re-rank to keep
-  // ranks contiguous (1, 2, 3...) within the filtered subset.
+  // Catégorisation : on attache la categorie a chaque besoin une fois
+  // pour eviter de re-matcher les regex a chaque rendu / filtre.
+  const categorizedNeeds = useMemo(() => {
+    return displayedNeeds.map((n) => ({ ...n, category: categorizeNeed(n.label) }));
+  }, [displayedNeeds]);
+
+  // Aggregation par categorie pour la card "Que demandent les clients ?"
+  const categoryStats = useMemo(() => {
+    const stats = new Map<NeedCategory, { count: number; mentions: number; topLabels: string[] }>();
+    for (const cat of NEED_CATEGORIES) {
+      stats.set(cat.id, { count: 0, mentions: 0, topLabels: [] });
+    }
+    stats.set('autre', { count: 0, mentions: 0, topLabels: [] });
+    for (const n of categorizedNeeds) {
+      const s = stats.get(n.category)!;
+      s.count++;
+      s.mentions += n.mentions ?? 0;
+      if (s.topLabels.length < 4 && !s.topLabels.includes(n.label)) {
+        s.topLabels.push(n.label);
+      }
+    }
+    return Array.from(stats.entries())
+      .map(([id, data]) => ({ id, ...data, config: getCategoryConfig(id) }))
+      .filter((e) => e.count > 0)
+      .sort((a, b) => b.mentions - a.mentions);
+  }, [categorizedNeeds]);
+
+  // Apply trend + minMentions + category filters AFTER aggregation. Re-rank
+  // to keep ranks contiguous (1, 2, 3...) within the filtered subset.
   const filteredNeeds = useMemo(() => {
-    return displayedNeeds
+    return categorizedNeeds
       .filter((n) => trendFilter === 'all' || n.trend === trendFilter)
       .filter((n) => (n.mentions ?? 0) >= minMentions)
+      .filter((n) => categoryFilter === 'all' || n.category === categoryFilter)
       .map((n, i) => ({ ...n, rank: i + 1 }));
-  }, [displayedNeeds, trendFilter, minMentions]);
+  }, [categorizedNeeds, trendFilter, minMentions, categoryFilter]);
 
   // Bornes pour le slider min-mentions
   const maxMentionsAvailable = displayedNeeds.length > 0
@@ -228,7 +263,87 @@ export default function BarometerPage() {
             {filteredNeeds.length}/{displayedNeeds.length} besoins affichés
           </span>
         </div>
+
+        {/* Filtre categorie */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-xs font-medium text-slate-500 uppercase tracking-wider w-24 shrink-0">Type</span>
+          <button
+            onClick={() => setCategoryFilter('all')}
+            className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+              categoryFilter === 'all'
+                ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+            }`}
+          >
+            Tous types
+          </button>
+          {categoryStats.map((cat) => (
+            <button
+              key={cat.id}
+              onClick={() => setCategoryFilter(cat.id)}
+              title={cat.config.description}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                categoryFilter === cat.id
+                  ? cat.config.badgeClass.replace(/\bbg-\w+-50\b/, (m) => m.replace('-50', '-100'))
+                  : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+              }`}
+            >
+              {cat.config.label}
+              <span className="font-mono text-[10px] opacity-70">{cat.mentions}</span>
+            </button>
+          ))}
+        </div>
       </div>
+
+      {/* Que demandent les clients — synthese par categorie */}
+      {categoryStats.length > 0 && (
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Package className="w-4 h-4 text-indigo-600" />
+              <h2 className="text-sm font-semibold text-slate-900">
+                Que demandent les clients ?
+              </h2>
+            </div>
+            <span className="text-xs text-slate-400">
+              Catégorisation automatique des besoins exprimés
+            </span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {categoryStats.map((cat) => {
+              const isActive = categoryFilter === cat.id;
+              return (
+                <button
+                  key={cat.id}
+                  onClick={() => setCategoryFilter(isActive ? 'all' : cat.id)}
+                  className={`text-left rounded-lg border p-3 transition-all hover:shadow-sm ${cat.config.badgeClass} ${
+                    isActive ? 'ring-2 ring-offset-1 ring-indigo-400' : ''
+                  }`}
+                >
+                  <div className="flex items-baseline justify-between mb-1.5">
+                    <span className="text-xs font-bold uppercase tracking-wider">
+                      {cat.config.label}
+                    </span>
+                    <span className="text-base font-bold tabular-nums">{cat.mentions}</span>
+                  </div>
+                  <p className="text-[11px] opacity-80 leading-snug mb-2">
+                    {cat.count} besoin{cat.count > 1 ? 's' : ''} distinct{cat.count > 1 ? 's' : ''}
+                  </p>
+                  {cat.topLabels.length > 0 && (
+                    <div className="border-t pt-2 mt-1 space-y-0.5 opacity-90">
+                      {cat.topLabels.slice(0, 3).map((label) => (
+                        <p key={label} className="text-[11px] truncate" title={label}>
+                          • {label}
+                        </p>
+                      ))}
+                    </div>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Nuage de mots */}
       {wordCloud.length > 0 && (
@@ -285,9 +400,18 @@ export default function BarometerPage() {
 
                   {/* Content */}
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-2">
-                      <h3 className="font-semibold text-slate-900 text-sm">{need.label}</h3>
-                      <div className="flex items-center gap-3">
+                    <div className="flex items-center justify-between mb-2 gap-3">
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <h3 className="font-semibold text-slate-900 text-sm truncate">{need.label}</h3>
+                        {(need as any).category && (need as any).category !== 'autre' && (
+                          <span
+                            className={`inline-flex shrink-0 px-2 py-0.5 rounded-full text-[10px] font-semibold border ${getCategoryConfig((need as any).category).badgeClass}`}
+                          >
+                            {getCategoryConfig((need as any).category).label}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3 shrink-0">
                         <span className="text-sm font-medium text-slate-700 tabular-nums">{need.mentions} mentions</span>
                         {clientFilter !== 'all' && (need as any).nbClients !== undefined && (
                           <span className="text-xs text-slate-500 tabular-nums">{(need as any).nbClients} client{(need as any).nbClients > 1 ? 's' : ''}</span>

@@ -185,10 +185,58 @@ export default function FicheConcurrentPage({
   }).length;
   const totalDealsImpactes = offres.reduce((acc: number, o: any) => acc + o.deals_impactes, 0);
   const totalDealsPerdus = offres.reduce((acc: number, o: any) => acc + o.deals_perdus, 0);
+  // ecart_pct est nullable (signaux qualitatifs). On filtre avant moyenne pour
+  // eviter NaN / 0 trompeur.
+  const prixQuants = prix.filter(
+    (p: any) => typeof p.ecart_pct === 'number' && Number.isFinite(p.ecart_pct),
+  );
   const ecartMoyenAbs =
-    prix.length > 0
-      ? prix.reduce((acc: number, p: any) => acc + Math.abs(p.ecart_pct), 0) / prix.length
-      : 0;
+    prixQuants.length > 0
+      ? prixQuants.reduce((acc: number, p: any) => acc + Math.abs(p.ecart_pct), 0) / prixQuants.length
+      : null;
+
+  // ── Forces & Faiblesses du concurrent ────────────────────────────────────
+  // Synthese : que ce concurrent gagne ou perd CONTRE NOUS, sur 4 axes
+  // (offres, prix, communications, signaux). Aide le marketeur et le commercial
+  // a savoir ou attaquer / defendre.
+  const offresForces = offres
+    .filter((o: any) => (o.deals_perdus || 0) > (o.deals_gagnes || 0))
+    .sort((a: any, b: any) => (b.deals_perdus || 0) - (a.deals_perdus || 0))
+    .slice(0, 3);
+  const offresFaiblesses = offres
+    .filter((o: any) => (o.deals_gagnes || 0) > (o.deals_perdus || 0))
+    .sort((a: any, b: any) => (b.deals_gagnes || 0) - (a.deals_gagnes || 0))
+    .slice(0, 3);
+
+  // Prix : "fort sur le prix" = il est plus bas que nous ET a gagne le deal
+  const prixForces = prix.filter(
+    (p: any) => p.ecart_type === 'inferieur' && p.statut_deal === 'perdu',
+  ).length;
+  // "Faible sur le prix" = il est plus cher que nous OU on a gagne le deal
+  const prixFaiblesses = prix.filter(
+    (p: any) => p.ecart_type === 'superieur' || p.statut_deal === 'gagne',
+  ).length;
+
+  // Communications : reaction_client agrege
+  const commPositif = comms.filter((c: any) => c.reaction_client === 'positive').length;
+  const commNegatif = comms.filter((c: any) => c.reaction_client === 'negative').length;
+
+  // Top 2 motifs des deals perdus (= ce qui marche pour le concurrent)
+  // Et top 2 motifs des deals gagnes (= ce qu'il rate)
+  const motifsPerdus = new Map<string, number>();
+  const motifsGagnes = new Map<string, number>();
+  for (const o of offres) {
+    const tag = o.type_offre || 'autre';
+    if ((o.deals_perdus || 0) > 0)
+      motifsPerdus.set(tag, (motifsPerdus.get(tag) || 0) + (o.deals_perdus || 0));
+    if ((o.deals_gagnes || 0) > 0)
+      motifsGagnes.set(tag, (motifsGagnes.get(tag) || 0) + (o.deals_gagnes || 0));
+  }
+  const topMotifsPerdus = Array.from(motifsPerdus.entries()).sort((a, b) => b[1] - a[1]).slice(0, 2);
+  const topMotifsGagnes = Array.from(motifsGagnes.entries()).sort((a, b) => b[1] - a[1]).slice(0, 2);
+
+  const hasForcesData = offresForces.length > 0 || prixForces > 0 || commPositif > 0;
+  const hasFaiblessesData = offresFaiblesses.length > 0 || prixFaiblesses > 0 || commNegatif > 0;
 
   return (
     <div className="space-y-6">
@@ -254,7 +302,13 @@ export default function FicheConcurrentPage({
           <FicheKpi
             label="Signaux prix"
             value={prix.length}
-            sub={prix.length > 0 ? `Ecart moy. ${ecartMoyenAbs.toFixed(1)}%` : undefined}
+            sub={
+              ecartMoyenAbs !== null
+                ? `Ecart moy. ${ecartMoyenAbs.toFixed(1)}%`
+                : prix.length > 0
+                ? `${prix.length} signal(aux) qualitatifs`
+                : undefined
+            }
             tone="amber"
           />
           <FicheKpi
@@ -265,6 +319,170 @@ export default function FicheConcurrentPage({
           />
         </div>
       </div>
+
+      {/* Forces & Faiblesses */}
+      {(hasForcesData || hasFaiblessesData) && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* Ce qui FONCTIONNE pour le concurrent (= ce sur quoi il nous bat) */}
+          <div className="bg-white rounded-xl border border-rose-200 shadow-sm overflow-hidden">
+            <div className="bg-rose-50 border-b border-rose-200 px-5 py-3 flex items-center gap-2">
+              <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-rose-100 text-rose-700 text-xs font-bold">
+                ↑
+              </span>
+              <div>
+                <h2 className="text-sm font-bold text-rose-900">
+                  Ce qui marche pour {decodedName}
+                </h2>
+                <p className="text-[11px] text-rose-700/80">
+                  Forces du concurrent — où il nous bat
+                </p>
+              </div>
+            </div>
+            <div className="p-5 space-y-4">
+              {/* Stats */}
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div className="rounded-lg border border-rose-100 bg-rose-50/40 py-2">
+                  <div className="text-xl font-bold text-rose-700 tabular-nums">{offresForces.length}</div>
+                  <div className="text-[10px] text-rose-600/80 uppercase tracking-wider">Offres gagnantes</div>
+                </div>
+                <div className="rounded-lg border border-rose-100 bg-rose-50/40 py-2">
+                  <div className="text-xl font-bold text-rose-700 tabular-nums">{prixForces}</div>
+                  <div className="text-[10px] text-rose-600/80 uppercase tracking-wider">Prix moins chers</div>
+                </div>
+                <div className="rounded-lg border border-rose-100 bg-rose-50/40 py-2">
+                  <div className="text-xl font-bold text-rose-700 tabular-nums">{commPositif}</div>
+                  <div className="text-[10px] text-rose-600/80 uppercase tracking-wider">Comm appréciées</div>
+                </div>
+              </div>
+
+              {/* Top offres qui marchent */}
+              {offresForces.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-slate-700 mb-1.5">Offres qui nous coûtent des deals</p>
+                  <ul className="space-y-1.5">
+                    {offresForces.map((o: any) => (
+                      <li
+                        key={o.id || o.titre}
+                        className="text-xs text-slate-700 flex items-start gap-2 leading-snug"
+                      >
+                        <span className="inline-block w-1 h-1 rounded-full bg-rose-500 mt-1.5 shrink-0" />
+                        <span className="flex-1 truncate">
+                          <span className="font-semibold">{o.titre || o.type_offre}</span>
+                          <span className="text-rose-700 font-mono ml-2 tabular-nums text-[11px]">
+                            {o.deals_perdus} perdus
+                          </span>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Top motifs perdus */}
+              {topMotifsPerdus.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-slate-700 mb-1.5">Types d&apos;offres dominants</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {topMotifsPerdus.map(([tag, n]) => (
+                      <span
+                        key={tag}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 text-xs font-medium"
+                      >
+                        {tag}
+                        <span className="text-[10px] opacity-70 tabular-nums">×{n}</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {!hasForcesData && (
+                <p className="text-xs text-slate-400 italic">
+                  Aucune force détectée pour ce concurrent dans les CRs analysés.
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Ce qui NE FONCTIONNE PAS (= leurs faiblesses, on les bat la-dessus) */}
+          <div className="bg-white rounded-xl border border-emerald-200 shadow-sm overflow-hidden">
+            <div className="bg-emerald-50 border-b border-emerald-200 px-5 py-3 flex items-center gap-2">
+              <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold">
+                ↓
+              </span>
+              <div>
+                <h2 className="text-sm font-bold text-emerald-900">
+                  Ce qui ne marche pas pour {decodedName}
+                </h2>
+                <p className="text-[11px] text-emerald-700/80">
+                  Faiblesses — où vous le battez
+                </p>
+              </div>
+            </div>
+            <div className="p-5 space-y-4">
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div className="rounded-lg border border-emerald-100 bg-emerald-50/40 py-2">
+                  <div className="text-xl font-bold text-emerald-700 tabular-nums">{offresFaiblesses.length}</div>
+                  <div className="text-[10px] text-emerald-600/80 uppercase tracking-wider">Offres perdantes</div>
+                </div>
+                <div className="rounded-lg border border-emerald-100 bg-emerald-50/40 py-2">
+                  <div className="text-xl font-bold text-emerald-700 tabular-nums">{prixFaiblesses}</div>
+                  <div className="text-[10px] text-emerald-600/80 uppercase tracking-wider">Prix défavorables</div>
+                </div>
+                <div className="rounded-lg border border-emerald-100 bg-emerald-50/40 py-2">
+                  <div className="text-xl font-bold text-emerald-700 tabular-nums">{commNegatif}</div>
+                  <div className="text-[10px] text-emerald-600/80 uppercase tracking-wider">Comm rejetées</div>
+                </div>
+              </div>
+
+              {offresFaiblesses.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-slate-700 mb-1.5">Offres qui ne décrochent pas</p>
+                  <ul className="space-y-1.5">
+                    {offresFaiblesses.map((o: any) => (
+                      <li
+                        key={o.id || o.titre}
+                        className="text-xs text-slate-700 flex items-start gap-2 leading-snug"
+                      >
+                        <span className="inline-block w-1 h-1 rounded-full bg-emerald-500 mt-1.5 shrink-0" />
+                        <span className="flex-1 truncate">
+                          <span className="font-semibold">{o.titre || o.type_offre}</span>
+                          <span className="text-emerald-700 font-mono ml-2 tabular-nums text-[11px]">
+                            {o.deals_gagnes} gagnés
+                          </span>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {topMotifsGagnes.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-slate-700 mb-1.5">Types d&apos;offres en échec</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {topMotifsGagnes.map(([tag, n]) => (
+                      <span
+                        key={tag}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-medium"
+                      >
+                        {tag}
+                        <span className="text-[10px] opacity-70 tabular-nums">×{n}</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {!hasFaiblessesData && (
+                <p className="text-xs text-slate-400 italic">
+                  Aucune faiblesse détectée pour ce concurrent dans les CRs analysés.
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="border-b border-slate-200">
@@ -560,14 +778,21 @@ function TabPrix({ prix }: { prix: any[] }) {
   const enCours = prix.filter((p) => p.statut_deal === 'en_cours').length;
   const nbInferieur = prix.filter((p) => p.ecart_type === 'inferieur').length;
   const nbSuperieur = prix.filter((p) => p.ecart_type === 'superieur').length;
+  // ecart_pct nullable : on ne moyenne que les signaux quantitatifs.
+  const prixQuants = prix.filter(
+    (p: any) => typeof p.ecart_pct === 'number' && Number.isFinite(p.ecart_pct),
+  );
   const ecartMoyAbs =
-    prix.reduce((acc, p) => acc + Math.abs(p.ecart_pct), 0) / prix.length;
+    prixQuants.length > 0
+      ? prixQuants.reduce((acc, p) => acc + Math.abs(p.ecart_pct), 0) / prixQuants.length
+      : 0;
 
   // Tendance : regrouper par semaine et calculer l'ecart moyen signe.
   const byWeek = new Map<string, { sum: number; n: number }>();
   for (const p of prix) {
     const d = new Date(p.date);
     if (Number.isNaN(d.getTime())) continue;
+    if (typeof p.ecart_pct !== 'number' || !Number.isFinite(p.ecart_pct)) continue;
     const y = d.getUTCFullYear();
     const jan1 = new Date(Date.UTC(y, 0, 1));
     const diff = (d.getTime() - jan1.getTime()) / 86400000;
@@ -688,15 +913,22 @@ function TabPrix({ prix }: { prix: any[] }) {
             <tbody>
               {prix.map((s) => {
                 const isNeg = s.ecart_type === 'inferieur';
+                const hasPct = typeof s.ecart_pct === 'number' && Number.isFinite(s.ecart_pct);
                 return (
                   <tr key={s.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/50">
                     <td className="px-4 py-2.5 text-center">
-                      <span
-                        className={`text-sm font-semibold tabular-nums ${isNeg ? 'text-rose-600' : 'text-emerald-600'}`}
-                      >
-                        {s.ecart_pct > 0 ? '+' : ''}
-                        {s.ecart_pct}%
-                      </span>
+                      {hasPct ? (
+                        <span
+                          className={`text-sm font-semibold tabular-nums ${isNeg ? 'text-rose-600' : 'text-emerald-600'}`}
+                        >
+                          {s.ecart_pct > 0 ? '+' : ''}
+                          {s.ecart_pct}%
+                        </span>
+                      ) : (
+                        <span className="text-xs text-slate-400 italic" title="Remise/offre concurrent sans % comparatif">
+                          Sans %
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-2.5 text-slate-700">{s.client_name}</td>
                     <td className="px-4 py-2.5 text-slate-700">{s.commercial_name}</td>
