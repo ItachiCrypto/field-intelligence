@@ -11,6 +11,7 @@ import type { DealMotif, DealAnalyse } from '@/lib/types-v2';
 import { cn, formatDate } from '@/lib/utils';
 import { getISOWeekNumber } from '@/lib/date-utils';
 import { KpiCard } from '@/components/shared/kpi-card';
+import { CRReference } from '@/components/shared/cr-reference';
 import { AbbreviationHighlight } from '@/components/shared/abbreviation-highlight';
 import {
   PieChart, Pie, Cell, LineChart, Line, XAxis, YAxis,
@@ -498,6 +499,7 @@ export default function MktDealPage() {
                 <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Region</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Date</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Verbatim</th>
+                <th className="text-center px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Source</th>
                 <th className="text-right px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
@@ -534,6 +536,14 @@ export default function MktDealPage() {
                   <td className="px-4 py-3 text-slate-600 tabular-nums">{formatDate(d.date)}</td>
                   <td className="px-4 py-3 text-slate-600 max-w-xs">
                     <AbbreviationHighlight text={d.verbatim} className="text-sm" />
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    <CRReference
+                      reportIds={[(d as any).source_report_id]}
+                      variant="minimal"
+                      label="CR"
+                      contextLabel={`Deal ${d.resultat ?? ''} — ${d.client_name ?? ''}`}
+                    />
                   </td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-1">

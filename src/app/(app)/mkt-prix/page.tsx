@@ -5,6 +5,7 @@ import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { useAppData } from '@/lib/data';
 import { KpiCard } from '@/components/shared/kpi-card';
+import { CRReference } from '@/components/shared/cr-reference';
 import { formatDate } from '@/lib/utils';
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend,
@@ -678,13 +679,26 @@ export default function MktPrixPage() {
                         <div key={s.id} className="px-5 py-3 space-y-1">
                           <div className="flex items-start justify-between gap-2">
                             {ecartBadge(s.ecart_pct, s.ecart_type)}
-                            {statutBadge(s.statut_deal)}
+                            <div className="flex items-center gap-1.5">
+                              {statutBadge(s.statut_deal)}
+                              <CRReference
+                                reportIds={[(s as any).source_report_id]}
+                                variant="minimal"
+                                label="CR"
+                                contextLabel={`Signal prix — ${s.concurrent_nom} chez ${s.client_name ?? 'client'}`}
+                              />
+                            </div>
                           </div>
                           <div className="text-sm text-slate-700">
                             {s.client_name}{' '}
                             <span className="text-slate-400">—</span>{' '}
                             <span className="text-slate-600">{s.commercial_name}</span>
                           </div>
+                          {(s as any).verbatim && (
+                            <div className="text-xs text-slate-500 italic border-l-2 border-slate-200 pl-2 py-0.5">
+                              « {String((s as any).verbatim).slice(0, 200)}{String((s as any).verbatim).length > 200 ? '…' : ''} »
+                            </div>
+                          )}
                           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-500">
                             <span>{s.region}</span>
                             <span className="tabular-nums">{formatDate(s.date)}</span>

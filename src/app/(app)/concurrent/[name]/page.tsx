@@ -5,6 +5,7 @@ import { use, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useAppData } from '@/lib/data';
 import { SeverityBadge } from '@/components/shared/severity-badge';
+import { CRReference } from '@/components/shared/cr-reference';
 import { formatDate } from '@/lib/utils';
 import type {
   OffreType, CommType, ReactionClient, Attribut, ValeurPercue,
@@ -278,15 +279,31 @@ export default function FicheConcurrentPage({
   const topMotifsGagnesAll = Array.from(motifsGagnes.entries()).sort((a, b) => b[1] - a[1]).slice(0, 3);
 
   // Top verbatims (citations) issues des deals perdus / gagnes — concret et
-  // actionable pour le commercial.
+  // actionable pour le commercial. On garde le source_report_id pour pouvoir
+  // ouvrir le CR d'origine au clic.
   const verbatimsForces = dealsPerdus
-    .map((d: any) => d.verbatim)
-    .filter((v: string) => v && v.length > 20)
-    .slice(0, 3);
+    .filter((d: any) => d.verbatim && d.verbatim.length > 20)
+    .slice(0, 3)
+    .map((d: any) => ({ verbatim: d.verbatim as string, sourceId: d.source_report_id as string | null }));
   const verbatimsFaiblesses = dealsGagnes
-    .map((d: any) => d.verbatim)
-    .filter((v: string) => v && v.length > 20)
-    .slice(0, 3);
+    .filter((d: any) => d.verbatim && d.verbatim.length > 20)
+    .slice(0, 3)
+    .map((d: any) => ({ verbatim: d.verbatim as string, sourceId: d.source_report_id as string | null }));
+
+  // Pour les motifs, on collecte les source_report_id contributeurs par tag
+  // pour permettre de cliquer "+5 deals motif=prix" et voir les 5 CRs sources.
+  const sourcesByMotifPerdus = new Map<string, string[]>();
+  const sourcesByMotifGagnes = new Map<string, string[]>();
+  for (const d of dealsPerdus) {
+    const tag = d.motif_principal || d.motif || 'autre';
+    if (!sourcesByMotifPerdus.has(tag)) sourcesByMotifPerdus.set(tag, []);
+    if (d.source_report_id) sourcesByMotifPerdus.get(tag)!.push(d.source_report_id);
+  }
+  for (const d of dealsGagnes) {
+    const tag = d.motif_principal || d.motif || 'autre';
+    if (!sourcesByMotifGagnes.has(tag)) sourcesByMotifGagnes.set(tag, []);
+    if (d.source_report_id) sourcesByMotifGagnes.get(tag)!.push(d.source_report_id);
+  }
 
   const hasForcesData =
     offresForces.length > 0 ||
@@ -427,15 +444,25 @@ export default function FicheConcurrentPage({
                 <div>
                   <p className="text-xs font-semibold text-slate-700 mb-1.5">Pourquoi on perd contre eux</p>
                   <div className="flex flex-wrap gap-1.5">
-                    {topMotifsPerdusAll.map(([tag, n]) => (
-                      <span
-                        key={tag}
-                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 text-xs font-medium"
-                      >
-                        {tag}
-                        <span className="text-[10px] opacity-70 tabular-nums">×{n}</span>
-                      </span>
-                    ))}
+                    {topMotifsPerdusAll.map(([tag, n]) => {
+                      const sources = sourcesByMotifPerdus.get(tag) ?? [];
+                      return (
+                        <span
+                          key={tag}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 text-xs font-medium"
+                        >
+                          {tag}
+                          <span className="text-[10px] opacity-70 tabular-nums">×{n}</span>
+                          <CRReference
+                            reportIds={sources}
+                            variant="rose"
+                            size="xs"
+                            label={`${sources.length}`}
+                            contextLabel={`${decodedName} · motif "${tag}" — ${sources.length} CR${sources.length > 1 ? 's' : ''}`}
+                          />
+                        </span>
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -444,13 +471,24 @@ export default function FicheConcurrentPage({
               {verbatimsForces.length > 0 && (
                 <div>
                   <p className="text-xs font-semibold text-slate-700 mb-1.5">Ce que disent les clients qui basculent</p>
-                  <ul className="space-y-1.5">
-                    {verbatimsForces.map((v: string, i: number) => (
+                  <ul className="space-y-2">
+                    {verbatimsForces.map((v, i) => (
                       <li
                         key={i}
-                        className="text-xs text-slate-700 italic leading-snug border-l-2 border-rose-300 pl-3"
+                        className="text-xs text-slate-700 italic leading-snug border-l-2 border-rose-300 pl-3 flex items-start gap-2"
                       >
-                        « {v.length > 200 ? v.slice(0, 200) + '…' : v} »
+                        <span className="flex-1">
+                          « {v.verbatim.length > 200 ? v.verbatim.slice(0, 200) + '…' : v.verbatim} »
+                        </span>
+                        {v.sourceId && (
+                          <CRReference
+                            reportIds={[v.sourceId]}
+                            variant="rose"
+                            size="xs"
+                            label="CR"
+                            contextLabel={`Verbatim — ${decodedName}`}
+                          />
+                        )}
                       </li>
                     ))}
                   </ul>
@@ -527,15 +565,25 @@ export default function FicheConcurrentPage({
                 <div>
                   <p className="text-xs font-semibold text-slate-700 mb-1.5">Pourquoi on les bat</p>
                   <div className="flex flex-wrap gap-1.5">
-                    {topMotifsGagnesAll.map(([tag, n]) => (
-                      <span
-                        key={tag}
-                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-medium"
-                      >
-                        {tag}
-                        <span className="text-[10px] opacity-70 tabular-nums">×{n}</span>
-                      </span>
-                    ))}
+                    {topMotifsGagnesAll.map(([tag, n]) => {
+                      const sources = sourcesByMotifGagnes.get(tag) ?? [];
+                      return (
+                        <span
+                          key={tag}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-medium"
+                        >
+                          {tag}
+                          <span className="text-[10px] opacity-70 tabular-nums">×{n}</span>
+                          <CRReference
+                            reportIds={sources}
+                            variant="emerald"
+                            size="xs"
+                            label={`${sources.length}`}
+                            contextLabel={`${decodedName} · motif "${tag}" — ${sources.length} CR${sources.length > 1 ? 's' : ''}`}
+                          />
+                        </span>
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -544,13 +592,24 @@ export default function FicheConcurrentPage({
               {verbatimsFaiblesses.length > 0 && (
                 <div>
                   <p className="text-xs font-semibold text-slate-700 mb-1.5">Ce que disent les clients qui restent / basculent vers nous</p>
-                  <ul className="space-y-1.5">
-                    {verbatimsFaiblesses.map((v: string, i: number) => (
+                  <ul className="space-y-2">
+                    {verbatimsFaiblesses.map((v, i) => (
                       <li
                         key={i}
-                        className="text-xs text-slate-700 italic leading-snug border-l-2 border-emerald-300 pl-3"
+                        className="text-xs text-slate-700 italic leading-snug border-l-2 border-emerald-300 pl-3 flex items-start gap-2"
                       >
-                        « {v.length > 200 ? v.slice(0, 200) + '…' : v} »
+                        <span className="flex-1">
+                          « {v.verbatim.length > 200 ? v.verbatim.slice(0, 200) + '…' : v.verbatim} »
+                        </span>
+                        {v.sourceId && (
+                          <CRReference
+                            reportIds={[v.sourceId]}
+                            variant="emerald"
+                            size="xs"
+                            label="CR"
+                            contextLabel={`Verbatim — ${decodedName}`}
+                          />
+                        )}
                       </li>
                     ))}
                   </ul>
@@ -1013,6 +1072,9 @@ function TabPrix({ prix }: { prix: any[] }) {
                 <th className="text-left px-4 py-2 text-xs font-medium text-slate-500 uppercase tracking-wider">
                   Date
                 </th>
+                <th className="text-center px-4 py-2 text-xs font-medium text-slate-500 uppercase tracking-wider">
+                  Source
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -1057,6 +1119,14 @@ function TabPrix({ prix }: { prix: any[] }) {
                     </td>
                     <td className="px-4 py-2.5 text-slate-600 tabular-nums">
                       {formatDate(s.date)}
+                    </td>
+                    <td className="px-4 py-2.5 text-center">
+                      <CRReference
+                        reportIds={[(s as any).source_report_id]}
+                        variant="minimal"
+                        label="CR"
+                        contextLabel={`Signal prix — ${s.client_name ?? 'client'}`}
+                      />
                     </td>
                   </tr>
                 );

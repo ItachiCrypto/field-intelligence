@@ -9,6 +9,7 @@ import { formatRelativeTime } from '@/lib/utils';
 import { KpiCard } from '@/components/shared/kpi-card';
 import { SeverityBadge } from '@/components/shared/severity-badge';
 import { AbbreviationHighlight } from '@/components/shared/abbreviation-highlight';
+import { CRReference } from '@/components/shared/cr-reference';
 import { AlertStatus } from '@/lib/types';
 import { Bell, CheckCircle2, Clock, AlertTriangle } from 'lucide-react';
 
@@ -183,6 +184,12 @@ export default function AlertsPage() {
                         En cours
                       </span>
                     )}
+                    <CRReference
+                      reportIds={[(alert as any).source_report_id, (alert as any).signal?.source_report_id]}
+                      variant="minimal"
+                      label="CR source"
+                      contextLabel={`Alerte — ${alert.client_name ?? 'client'}`}
+                    />
                   </div>
                   <p className="text-sm text-slate-900 leading-relaxed">
                     <AbbreviationHighlight text={alert.signal?.content || alert.content || ''} />
