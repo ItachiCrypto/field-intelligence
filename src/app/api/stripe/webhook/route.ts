@@ -102,12 +102,6 @@ export async function POST(request: NextRequest) {
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session;
-        const companyId =
-          session.metadata?.company_id ||
-          session.client_reference_id ||
-          null;
-        if (!companyId) break;
-
         const subscriptionId = session.subscription as string | null;
         if (!subscriptionId) break;
 
@@ -116,15 +110,56 @@ export async function POST(request: NextRequest) {
         const plan = priceId ? getPlanByStripePriceId(priceId) : null;
         if (!plan) break;
 
-        // Defense in depth: confirm the Stripe customer on this subscription
-        // matches the one we have on file for this company. Prevents a
-        // spoofed/rehomed customer from forcing a plan upgrade on someone
-        // else's company_id by putting it in metadata.
         const customerId = subscription.customer as string;
+
+        // Resolution du target company en suivant cet ordre de confiance
+        // (du plus a moins fiable) :
+        //   1. Le customer Stripe a ete cree par /api/stripe/checkout avec
+        //      metadata.company_id. On retrieve et on relit cette metadata
+        //      directement aupres de Stripe : c'est la source de verite
+        //      authentifiee.
+        //   2. companies.stripe_customer_id deja persiste = la customer
+        //      a deja ete liee a une company chez nous. Match exact requis.
+        //
+        // On rejette tout fallback session.metadata / client_reference_id
+        // qui pourrait etre forge si quelqu'un cree une checkout en dehors
+        // de /api/stripe/checkout (Payment Links, integration externe).
+        let resolvedCompanyId: string | null = null;
+        try {
+          const customer = await stripe.customers.retrieve(customerId);
+          if (
+            customer &&
+            !('deleted' in customer && customer.deleted) &&
+            customer.metadata?.company_id
+          ) {
+            resolvedCompanyId = customer.metadata.company_id;
+          }
+        } catch {
+          /* customer fetch failed — fall through to DB lookup */
+        }
+
+        if (!resolvedCompanyId) {
+          const { data: byCustomer } = await serviceClient
+            .from('companies')
+            .select('id')
+            .eq('stripe_customer_id', customerId)
+            .maybeSingle();
+          resolvedCompanyId = byCustomer?.id ?? null;
+        }
+
+        if (!resolvedCompanyId) {
+          console.error('[stripe-webhook] cannot resolve company for customer', customerId);
+          break;
+        }
+
+        // Defense in depth : si la company a deja un stripe_customer_id, il
+        // doit matcher. Empeche un attaquant de forcer un upgrade en
+        // re-attachant un customer a une autre company via une checkout
+        // externe.
         const { data: company } = await serviceClient
           .from('companies')
           .select('id, stripe_customer_id')
-          .eq('id', companyId)
+          .eq('id', resolvedCompanyId)
           .single();
         if (!company) break;
         if (
@@ -133,7 +168,7 @@ export async function POST(request: NextRequest) {
         ) {
           console.error(
             '[stripe-webhook] customer mismatch for company',
-            companyId
+            resolvedCompanyId,
           );
           break;
         }
@@ -147,7 +182,7 @@ export async function POST(request: NextRequest) {
             stripe_subscription_id: subscriptionId,
             subscription_status: 'active',
           })
-          .eq('id', companyId);
+          .eq('id', resolvedCompanyId);
         break;
       }
 

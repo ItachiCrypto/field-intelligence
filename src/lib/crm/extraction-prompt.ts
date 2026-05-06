@@ -16,6 +16,40 @@ const MAX_CR_INPUT_CHARS = 32_000;
 // Hard cap on the company-supplied business context.
 const MAX_BUSINESS_CONTEXT_CHARS = 4_000;
 
+// Caps sur les listes injectees : empeche un attaquant ou une corruption
+// data de gonfler le prompt avec 10 000 abbreviations / concurrents.
+// 200 entrees couvrent largement les cas reels et plafonnent les couts.
+const MAX_COMPETITORS_INJECTED = 100;
+const MAX_ABBREVIATIONS_INJECTED = 200;
+
+/**
+ * Defense prompt-injection : on neutralise dans le texte utilisateur les
+ * sequences qui pourraient ressembler a un delimitateur de notre propre
+ * prompt ("CONTEXTE DE L'ENTREPRISE", "COMPTE-RENDU:", "Extrayez en JSON",
+ * triple guillemets, balises XML/markdown). Ces sequences sont remplacees
+ * par un equivalent visuellement proche mais qui ne risque pas de tromper
+ * le parser du LLM.
+ *
+ * On evite l'echappement complet (qui reduirait la qualite d'extraction
+ * sur du texte legitime) — on cible uniquement les patterns suspects.
+ */
+function neutralizeInjection(input: string): string {
+  if (!input) return input;
+  return input
+    // Triple guillemets utilises comme delimiteur du CR — neutraliser pour
+    // empecher la fermeture prematuree du bloc.
+    .replace(/"{3,}/g, '"""')
+    .replace(/'{3,}/g, "'''")
+    // Sequences qui imitent nos en-tetes de section.
+    .replace(/^(#{1,3}\s*)?(COMPTE[-\s]RENDU|CONTEXTE DE L['' ]?ENTREPRISE|REGLE DE CANONICALISATION|EXTRACTION DES PRIX_SIGNALS|REGLES GENERALES|EXTRACTION GEOGRAPHIQUE|EXTRACTION SECTORIELLE|PERSONAS A SERVIR)/gim, '·$2')
+    // Instructions overrides classiques.
+    .replace(/\b(ignore[zr]?|forget|disregard|override|bypass)\s+(all\s+)?(previous|above|prior|earlier|preceding)\s+(instructions?|prompts?|rules?|constraints?)/gi, '[directive ignoree]')
+    .replace(/\b(system|assistant)\s*:\s*/gi, '$1.')
+    // Markers connus d'injection.
+    .replace(/<\|im_(start|end|sep)\|>/gi, '')
+    .replace(/\[\[\s*(SYSTEM|INSTRUCTION|PROMPT)\s*\]\]/gi, '');
+}
+
 export interface AccountContext {
   /** Account name as known in the CRM (Salesforce Account.Name) */
   name?: string | null;
@@ -40,23 +74,36 @@ export function buildExtractionPrompt(
         ? crText.slice(0, MAX_CR_INPUT_CHARS) + '\n[... tronque]'
         : crText
       : '';
+  // Neutraliser les patterns de prompt-injection AVANT injection dans le
+  // prompt. Le CR vient du CRM donc d'un client identifie, mais une
+  // pharmacie pourrait inserer dans un CR "ignore previous instructions..."
+  // pour polluer l'extraction. Idem business_context qui est texte libre.
+  const guardedCr = neutralizeInjection(safeCr);
+
+  // Cap les listes de contexte. >100 concurrents et >200 abbreviations
+  // c'est anormal — soit corruption data soit attaque pour gonfler les
+  // couts en tokens. On tronque silencieusement.
+  const cappedCompetitors = knownCompetitors.slice(0, MAX_COMPETITORS_INJECTED);
+  const cappedAbbreviations = knownAbbreviations.slice(0, MAX_ABBREVIATIONS_INJECTED);
+
   const competitorsList =
-    knownCompetitors.length > 0
-      ? `Concurrents connus de cette entreprise (a utiliser comme noms canoniques) : ${knownCompetitors.join(', ')}`
+    cappedCompetitors.length > 0
+      ? `Concurrents connus de cette entreprise (a utiliser comme noms canoniques) : ${cappedCompetitors.join(', ')}`
       : 'Aucun concurrent connu pour le moment.';
 
   const abbrList =
-    knownAbbreviations.length > 0
-      ? `Abbreviations / glossaire (left=alias dans le CR, right=forme canonique a utiliser dans tes outputs) :\n${knownAbbreviations
+    cappedAbbreviations.length > 0
+      ? `Abbreviations / glossaire (left=alias dans le CR, right=forme canonique a utiliser dans tes outputs) :\n${cappedAbbreviations
           .map((a) => `  - ${a.short} = ${a.full}`)
           .join('\n')}`
       : '';
 
   const trimmedContext = (businessContext ?? '').trim();
-  const safeContext =
+  const cappedContext =
     trimmedContext.length > MAX_BUSINESS_CONTEXT_CHARS
       ? trimmedContext.slice(0, MAX_BUSINESS_CONTEXT_CHARS) + '\n[... tronque]'
       : trimmedContext;
+  const safeContext = neutralizeInjection(cappedContext);
 
   const contextBlock = safeContext
     ? `CONTEXTE DE L'ENTREPRISE UTILISATRICE (a utiliser pour mieux interpreter le CR : secteur, produits, concurrents, jargon metier, KPIs prioritaires) :
@@ -115,7 +162,7 @@ ${abbrList}
 
 COMPTE-RENDU:
 """
-${safeCr}
+${guardedCr}
 """
 
 Extrayez en JSON strict (pas de texte avant/apres, uniquement le JSON) :

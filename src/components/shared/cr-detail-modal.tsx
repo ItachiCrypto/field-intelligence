@@ -82,7 +82,15 @@ export function CRDetailModal({ reportIds, onClose, contextLabel }: CRDetailModa
       setCrs([]);
       return;
     }
-    const ids = Array.from(new Set(reportIds));
+    // Validation stricte UUID v4 : evite que des chaines arbitraires
+    // (commas, guillemets, injection PostgREST) ne se retrouvent dans
+    // l'URL. Les ids non-UUID sont silencieusement ignores.
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    const ids = Array.from(new Set(reportIds.filter((id) => UUID_RE.test(id))));
+    if (ids.length === 0) {
+      setCrs([]);
+      return;
+    }
     const token = getAccessToken();
     const inList = `(${ids.map((id) => `"${id}"`).join(',')})`;
     const url = `${SUPABASE_URL}/rest/v1/raw_visit_reports?id=in.${encodeURIComponent(inList)}&select=id,subject,content_text,client_name,commercial_name,visit_date,quality_score,quality_reasons`;

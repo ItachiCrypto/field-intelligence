@@ -46,8 +46,13 @@ async function deleteInBatches(
   let deleted = 0;
   const errors: string[] = [];
 
+  // Defense in depth : Salesforce IDs sont alphanumeriques (15 ou 18 chars)
+  // mais on filtre quand meme contre tout char ambigue dans une URL avant
+  // de les coller dans la query string. Si un ID est malforme on le skip.
+  const SF_ID_RE = /^[a-zA-Z0-9]{15,18}$/;
   for (let i = 0; i < ids.length; i += BATCH_SIZE) {
-    const batch = ids.slice(i, i + BATCH_SIZE);
+    const batch = ids.slice(i, i + BATCH_SIZE).filter((id) => SF_ID_RE.test(id));
+    if (batch.length === 0) continue;
     const url = `${instanceUrl}/services/data/${SF_API_VERSION}/composite/sobjects?ids=${batch.join(',')}&allOrNone=false`;
     const resp = await fetch(url, {
       method: 'DELETE',

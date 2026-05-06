@@ -36,6 +36,18 @@ function getSecret(): Buffer {
       'OAUTH_STATE_SECRET must be set to at least 32 characters (use 64 hex chars).'
     );
   }
+  // Defense-in-depth contre les secrets faibles. On exige >= 8 chars
+  // distincts dans les 64 premiers — empeche les "aaaaaaaa..." ou les
+  // suites trop predictibles (ex. "secret_key_for_local_dev_12345678").
+  // Cette heuristique n'est pas une preuve d'entropie mais bloque les
+  // erreurs grossieres de configuration.
+  const sample = secret.slice(0, 64);
+  const distinct = new Set(sample.split('')).size;
+  if (distinct < 8) {
+    throw new Error(
+      'OAUTH_STATE_SECRET has too few distinct characters (low entropy). Use crypto.randomBytes(32).toString("hex").'
+    );
+  }
   return Buffer.from(secret, 'utf-8');
 }
 

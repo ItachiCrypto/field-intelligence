@@ -12,12 +12,18 @@ import { createClient } from '@/lib/supabase/server';
  *   - backslash variants (`/\\evil.com`)
  *   - paths containing `..`                          (defense in depth)
  *   - paths containing CR/LF                         (header-injection guard)
+ *   - paths containing `#` or `?`                    (no fragment / query smuggling)
+ *   - paths containing whitespace, control chars, `<`, `>`
+ *   - paths longer than 256 chars                    (cap defense)
  */
 function sanitizeNext(raw: string | null): string {
   if (!raw) return '/dashboard';
+  if (raw.length > 256) return '/dashboard';
   if (!raw.startsWith('/')) return '/dashboard';
   if (raw.startsWith('//') || raw.startsWith('/\\')) return '/dashboard';
   if (raw.includes('..') || /[\r\n]/.test(raw)) return '/dashboard';
+  if (raw.includes('#') || raw.includes('?')) return '/dashboard';
+  if (/[<>\s\0]/.test(raw)) return '/dashboard';
   return raw;
 }
 
