@@ -8,6 +8,7 @@ import { SEVERITY_CONFIG, REGIONS } from '@/lib/constants';
 import { SeverityBadge } from '@/components/shared/severity-badge';
 import { SeverityIndicator } from '@/components/shared/severity-indicator';
 import { SignalCard } from '@/components/shared/signal-card';
+import { CompetitorSynthesis } from '@/components/shared/competitor-synthesis';
 import { Modal } from '@/components/shared/modal';
 import { ConfirmDialog } from '@/components/shared/confirm-dialog';
 import { createClient } from '@/lib/supabase/client';
@@ -26,7 +27,16 @@ const PERIOD_OPTIONS: { key: PeriodFilter; label: string }[] = [
 ];
 
 export default function RadarPage() {
-  const { competitors: COMPETITORS, signals: SIGNALS, prixSignals: PRIX_SIGNALS, refresh } = useAppData();
+  const {
+    competitors: COMPETITORS,
+    signals: SIGNALS,
+    prixSignals: PRIX_SIGNALS,
+    dealsAnalyse: DEALS_MK_ALL,
+    dealsCommerciaux: DEALS_CO_ALL,
+    offresConcurrentes: OFFRES_ALL,
+    commConcurrentes: COMMS_ALL,
+    refresh,
+  } = useAppData();
   const { company } = useAuth();
   const [periodFilter, setPeriodFilter] = useState<PeriodFilter>('all');
   const [regionFilter, setRegionFilter] = useState<string>('all');
@@ -234,14 +244,17 @@ export default function RadarPage() {
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2.5">
                         <SeverityIndicator severity={comp.risk} size="sm" />
-                        <Link
-                          href={`/concurrent/${encodeURIComponent(comp.name)}`}
-                          onClick={(e) => e.stopPropagation()}
-                          className="font-medium text-slate-900 hover:text-indigo-700 hover:underline underline-offset-2"
-                          title="Ouvrir la fiche concurrent"
+                        {/* Le nom n'est plus un lien : un clic sur n'importe ou
+                            de la ligne (nom inclus) deplie la synthese inline.
+                            La fiche complete reste accessible via le lien
+                            "Voir fiche complete" dans la section depliee. */}
+                        <span
+                          className={`font-medium ${
+                            isSelected ? 'text-indigo-700' : 'text-slate-900'
+                          }`}
                         >
                           {comp.name}
-                        </Link>
+                        </span>
                         {comp.is_new && (
                           <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold bg-sky-50 text-sky-700 border border-sky-200 uppercase tracking-wider">
                             Nouveau
@@ -296,25 +309,40 @@ export default function RadarPage() {
         </div>
       </div>
 
-      {/* Selected competitor signals */}
+      {/* Selected competitor : synthese Forces/Faiblesses + signaux */}
       {selectedCompetitor && (
-        <div className="space-y-3">
-          <div className="flex items-center gap-3">
-            <h2 className="text-base font-semibold text-slate-900">
-              Signaux lies a {selectedCompetitor}
-            </h2>
-            <span className="inline-flex items-center justify-center min-w-[1.5rem] h-6 rounded-full bg-slate-100 text-slate-600 text-xs font-semibold px-1.5 tabular-nums">
-              {competitorSignals.length}
-            </span>
-            <div className="flex-1 h-px bg-slate-200" />
-          </div>
-          {competitorSignals.length > 0 ? (
-            competitorSignals.map((s) => <SignalCard key={s.id} signal={s} />)
-          ) : (
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-8 text-center text-slate-500">
-              Aucun signal pour ce concurrent avec les filtres actuels.
+        <div className="space-y-5">
+          {/* Synthese ce qui marche / ne marche pas */}
+          <CompetitorSynthesis
+            name={selectedCompetitor}
+            signals={SIGNALS}
+            prixSignals={PRIX_SIGNALS}
+            dealsMarketing={DEALS_MK_ALL}
+            dealsCommerciaux={DEALS_CO_ALL}
+            offres={OFFRES_ALL}
+            comms={COMMS_ALL}
+            showFichLink={true}
+          />
+
+          {/* Signaux lies */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-3">
+              <h2 className="text-base font-semibold text-slate-900">
+                Signaux liés à {selectedCompetitor}
+              </h2>
+              <span className="inline-flex items-center justify-center min-w-[1.5rem] h-6 rounded-full bg-slate-100 text-slate-600 text-xs font-semibold px-1.5 tabular-nums">
+                {competitorSignals.length}
+              </span>
+              <div className="flex-1 h-px bg-slate-200" />
             </div>
-          )}
+            {competitorSignals.length > 0 ? (
+              competitorSignals.map((s) => <SignalCard key={s.id} signal={s} />)
+            ) : (
+              <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-8 text-center text-slate-500">
+                Aucun signal pour ce concurrent avec les filtres actuels.
+              </div>
+            )}
+          </div>
         </div>
       )}
       {/* Create Modal */}
